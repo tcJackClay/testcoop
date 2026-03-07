@@ -7,11 +7,19 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-type TabType = 'api' | 'language' | 'dev';
+type TabType = 'api' | 'language' | 'dev' | 'register';
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('api');
+  
+  // 注册相关状态
+  const [registerUsername, setRegisterUsername] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   
   const { user, isDevMode, toggleDevMode } = useAuthStore();
   const isAdmin = user?.username === 'admin';
@@ -23,6 +31,65 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const testApi = (apiName: string, response: string) => {
     console.log(`[DEV] 模拟${apiName}测试成功`);
     alert(`[DEV] 模拟${apiName}测试成功\n\n${response}`);
+  };
+
+  // 处理注册提交
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegisterError(null);
+    
+    if (registerPassword !== registerConfirmPassword) {
+      setRegisterError('两次输入的密码不一致');
+      return;
+    }
+    
+    if (registerPassword.length < 6) {
+      setRegisterError('密码长度至少6位');
+      return;
+    }
+    
+    if (!isAdmin) {
+      setRegisterError('只有管理员才能注册新用户');
+      return;
+    }
+    
+    setIsRegistering(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          username: registerUsername,
+          password: registerPassword,
+          name: registerUsername,
+          email: '',
+          phone: '',
+          avatar: '',
+          roleIds: [1],
+        }),
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.code === 0) {
+        setRegisterSuccess(true);
+        setRegisterUsername('');
+        setRegisterPassword('');
+        setRegisterConfirmPassword('');
+      } else {
+        setRegisterError(result.msg || '注册失败');
+      }
+    } catch (err) {
+      setRegisterError('网络错误，请稍后重试');
+      console.error('注册错误:', err);
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   return (
@@ -74,6 +141,18 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             >
               <Zap className="w-4 h-4 inline mr-1" />
               开发者
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('register')}
+              className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'register'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-white'
+              }`}
+            >
+              用户注册
             </button>
           )}
         </div>
@@ -173,6 +252,77 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                     </div>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'register' && isAdmin && (
+            <div className="space-y-4">
+              {registerSuccess ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-green-400 text-3xl">✓</span>
+                  </div>
+                  <p className="text-green-400 font-medium mb-2">注册成功！</p>
+                  <p className="text-gray-400 text-sm mb-4">请前往登录</p>
+                  <button
+                    onClick={() => {
+                      setRegisterSuccess(false);
+                      onClose();
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    确定
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">用户名</label>
+                    <input
+                      type="text"
+                      value={registerUsername}
+                      onChange={(e) => setRegisterUsername(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      placeholder="请输入用户名"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">密码</label>
+                    <input
+                      type="password"
+                      value={registerPassword}
+                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      placeholder="请输入密码（至少6位）"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">确认密码</label>
+                    <input
+                      type="password"
+                      value={registerConfirmPassword}
+                      onChange={(e) => setRegisterConfirmPassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      placeholder="请再次输入密码"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  {registerError && (
+                    <p className="text-sm text-red-400">{registerError}</p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isRegistering}
+                    className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isRegistering ? '注册中...' : '注册'}
+                  </button>
+                </form>
               )}
             </div>
           )}

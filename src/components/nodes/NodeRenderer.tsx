@@ -96,9 +96,9 @@ function renderNodeBody(node: CanvasNode) {
         />
       );
     
-    case 'videoInput':
-    
     case 'aiVideo':
+    case 'generateCharacterVideo':
+    case 'generateSceneVideo':
     case 'generateCharacterVideo':
     case 'generateSceneVideo':
     case 'aiImage':

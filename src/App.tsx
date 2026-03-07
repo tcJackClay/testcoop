@@ -9,6 +9,8 @@ import Storyboard from './features/storyboard/Storyboard';
 import History from './features/history/History';
 import Models from './features/models/Models';
 import ChatPanel from './features/chat/ChatPanel';
+import CharactersPanel from './features/characters/CharactersPanel';
+import HistoryPanel from './features/history/HistoryPanel';
 import { useCanvasStore, type NodeType } from './stores/canvasStore';
 
 export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models';
@@ -20,6 +22,8 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [charactersOpen, setCharactersOpen] = useState(false);
   
   const { selectedNodeIds } = useCanvasStore();
 
@@ -63,8 +67,17 @@ export default function App() {
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           onAddNode={handleAddNode}
+          onHistoryClick={() => setHistoryOpen(!historyOpen)}
+          onCharactersClick={() => setCharactersOpen(!charactersOpen)}
+          historyOpen={historyOpen}
+          charactersOpen={charactersOpen}
         />
         
+        {/* History Panel (left side) */}
+        {historyOpen && viewMode === 'canvas' && (
+          <HistoryPanel onClose={() => setHistoryOpen(false)} />
+        )}
+
         <main className="flex-1 flex overflow-hidden">
           {viewMode === 'canvas' && (
             <div className="flex-1 flex">
@@ -83,7 +96,12 @@ export default function App() {
           {viewMode === 'models' && <Models />}
         </main>
 
-        {/* Chat Panel */}
+        {/* Characters Panel (right side) */}
+        {charactersOpen && viewMode === 'canvas' && (
+          <CharactersPanel onClose={() => setCharactersOpen(false)} />
+        )}
+
+        {/* Chat Panel (right side) */}
         {chatOpen && viewMode === 'canvas' && (
           <ChatPanel onClose={() => setChatOpen(false)} />
         )}

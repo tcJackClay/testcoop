@@ -1,20 +1,25 @@
+import { useState } from 'react';
 import { 
-  PanelLeftClose, 
-  PanelLeft, 
-  Image, 
-  Video, 
-  Wand2, 
-  Film, 
-  Eye, 
-  HardDrive,
-  Layers,
-  FileText,
+  Layout,
+  MousePointer2,
+  History,
   Users,
-  Mountain,
-  Clapperboard,
+  MessageSquare,
+  Save,
+  FolderOpen,
+  Download,
+  Image,
+  Video,
+  FileText,
+  BookOpen,
+  Wand2,
+  Film,
+  Eye,
+  HardDrive,
   GitCompare,
   Sparkles,
-  BookOpen,
+  Clapperboard,
+  Mountain,
   Plus
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -27,70 +32,33 @@ interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onAddNode?: (type: NodeType) => void;
+  onHistoryClick?: () => void;
+  onCharactersClick?: () => void;
+  historyOpen?: boolean;
+  charactersOpen?: boolean;
 }
 
-interface NodeCategory {
-  name: string;
-  nameKey: string;
-  items: { type: NodeType; labelKey: string; icon: React.ReactNode }[];
+interface ToolItem {
+  id: string;
+  icon: React.ReactNode;
+  titleKey: string;
+  onClick?: () => void;
+  isActive?: boolean;
 }
-
-const nodeCategories: NodeCategory[] = [
-  {
-    name: 'Input',
-    nameKey: 'nodes.category.input',
-    items: [
-      { type: 'imageInput', labelKey: 'nodes.imageInput', icon: <Image className="w-4 h-4" /> },
-      { type: 'videoInput', labelKey: 'nodes.videoInput', icon: <Video className="w-4 h-4" /> },
-      { type: 'textNode', labelKey: 'nodes.textNode', icon: <FileText className="w-4 h-4" /> },
-      { type: 'novelInput', labelKey: 'nodes.novelInput', icon: <BookOpen className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'AI Generation',
-    nameKey: 'nodes.category.ai',
-    items: [
-      { type: 'aiImage', labelKey: 'nodes.aiImage', icon: <Wand2 className="w-4 h-4" /> },
-      { type: 'aiVideo', labelKey: 'nodes.aiVideo', icon: <Film className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Storyboard',
-    nameKey: 'nodes.category.storyboard',
-    items: [
-      { type: 'storyboardNode', labelKey: 'nodes.storyboardNode', icon: <Clapperboard className="w-4 h-4" /> },
-      { type: 'videoAnalyze', labelKey: 'nodes.videoAnalyze', icon: <Sparkles className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Character/Scene',
-    nameKey: 'nodes.category.character',
-    items: [
-      { type: 'characterDescription', labelKey: 'nodes.characterDescription', icon: <Users className="w-4 h-4" /> },
-      { type: 'sceneDescription', labelKey: 'nodes.sceneDescription', icon: <Mountain className="w-4 h-4" /> },
-      { type: 'createCharacter', labelKey: 'nodes.createCharacter', icon: <Users className="w-4 h-4" /> },
-      { type: 'createScene', labelKey: 'nodes.createScene', icon: <Mountain className="w-4 h-4" /> },
-    ],
-  },
-  {
-    name: 'Tools',
-    nameKey: 'nodes.category.tools',
-    items: [
-      { type: 'imageCompare', labelKey: 'nodes.imageCompare', icon: <GitCompare className="w-4 h-4" /> },
-      { type: 'preview', labelKey: 'nodes.preview', icon: <Eye className="w-4 h-4" /> },
-      { type: 'saveLocal', labelKey: 'nodes.saveLocal', icon: <HardDrive className="w-4 h-4" /> },
-    ],
-  },
-];
 
 export default function Sidebar({ 
   viewMode, 
   onViewChange, 
   collapsed, 
   onToggleCollapse,
-  onAddNode 
+  onAddNode,
+  onHistoryClick,
+  onCharactersClick,
+  historyOpen,
+  charactersOpen
 }: SidebarProps) {
   const { t } = useTranslation();
+  const [showAddMenu, setShowAddMenu] = useState(false);
 
   const handleDragStart = (e: React.DragEvent, nodeType: NodeType) => {
     e.dataTransfer.setData('application/reactflow', nodeType);
@@ -104,50 +72,138 @@ export default function Sidebar({
     }
   };
 
+  const nodeTypes: { type: NodeType; icon: React.ReactNode; label: string }[] = [
+    { type: 'imageInput', icon: <Image size={18} />, label: '图片输入' },
+    { type: 'videoInput', icon: <Video size={18} />, label: '视频输入' },
+    { type: 'textNode', icon: <FileText size={18} />, label: '文字节点' },
+    { type: 'novelInput', icon: <BookOpen size={18} />, label: '小说输入' },
+    { type: 'aiImage', icon: <Wand2 size={18} />, label: 'AI 绘图' },
+    { type: 'aiVideo', icon: <Film size={18} />, label: 'AI 视频' },
+    { type: 'storyboardNode', icon: <Clapperboard size={18} />, label: '智能分镜' },
+    { type: 'videoAnalyze', icon: <Sparkles size={18} />, label: '视频拆解' },
+    { type: 'characterDescription', icon: <Users size={18} />, label: '角色描述' },
+    { type: 'sceneDescription', icon: <Mountain size={18} />, label: '场景描述' },
+    { type: 'imageCompare', icon: <GitCompare size={18} />, label: '图像对比' },
+    { type: 'preview', icon: <Eye size={18} />, label: '预览窗口' },
+    { type: 'saveLocal', icon: <HardDrive size={18} />, label: '保存到本地' },
+  ];
+
   return (
     <aside 
-      className={`bg-gray-800 border-r border-gray-700 flex flex-col transition-all duration-200 ${
-        collapsed ? 'w-12' : 'w-64'
+      className={`bg-gray-800 border-r border-gray-700 flex flex-col items-center py-3 gap-3 z-40 shrink-0 transition-all duration-200 ${
+        collapsed ? 'w-12' : 'w-14'
       }`}
     >
-      <div className="p-2 flex justify-end">
+      {/* Add Node Button */}
+      <div className="relative">
         <button
-          onClick={onToggleCollapse}
-          className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+          onClick={() => setShowAddMenu(!showAddMenu)}
+          className="p-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-all"
+          title={t('添加节点')}
         >
-          {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          <Plus size={18} />
         </button>
+        
+        {/* Add Node Menu */}
+        {showAddMenu && (
+          <div 
+            className="absolute left-full ml-2 top-0 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 z-50"
+            onMouseLeave={() => setShowAddMenu(false)}
+          >
+            {nodeTypes.map((item) => (
+              <div
+                key={item.type}
+                draggable
+                onDragStart={(e) => handleDragStart(e, item.type)}
+                onClick={(e) => {
+                  handleClick(e, item.type);
+                  setShowAddMenu(false);
+                }}
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white cursor-pointer transition-colors"
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {!collapsed && (
-        <div className="flex-1 overflow-y-auto p-2">
-          {nodeCategories.map((category) => (
-            <div key={category.name} className="mb-4">
-              <div className="flex items-center gap-2 px-2 py-1 text-xs font-medium text-gray-500 uppercase">
-                <Layers className="w-3 h-3" />
-                {t(category.nameKey)}
-              </div>
-              
-              <div className="mt-2 space-y-1">
-                {category.items.map((item) => (
-                  <div
-                    key={item.type}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, item.type)}
-                    onClick={(e) => handleClick(e, item.type)}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600
-                             rounded-md cursor-grab text-sm text-gray-300 hover:text-white
-                             transition-colors"
-                  >
-                    {item.icon}
-                    <span>{t(item.labelKey)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Separator */}
+      <div className="w-8 h-px bg-gray-700" />
+
+      {/* Tool Buttons */}
+      <button
+        className="p-2.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
+        title={t('自动整理节点')}
+      >
+        <Layout size={18} />
+      </button>
+
+      <button
+        className="p-2.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
+        title={t('选择工具')}
+      >
+        <MousePointer2 size={18} />
+      </button>
+
+      <button
+        onClick={onHistoryClick}
+        className={`p-2.5 rounded-lg transition-all ${
+          historyOpen 
+            ? 'bg-zinc-800 text-white' 
+            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+        }`}
+        title={t('生成历史')}
+      >
+        <History size={18} />
+      </button>
+
+      <button
+        onClick={onCharactersClick}
+        className={`p-2.5 rounded-lg transition-all ${
+          charactersOpen 
+            ? 'bg-zinc-800 text-white' 
+            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+        }`}
+        title={t('角色库')}
+      >
+        <Users size={18} />
+      </button>
+
+      <div className="flex-1" />
+
+      {/* Bottom Tools */}
+      <button
+        className="p-2.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
+        title={t('AI 对话')}
+        onClick={() => {
+          // Toggle chat - handled by parent
+        }}
+      >
+        <MessageSquare size={18} />
+      </button>
+
+      <button
+        className="p-2.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
+        title={t('保存项目')}
+      >
+        <Save size={18} />
+      </button>
+
+      <button
+        className="p-2.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
+        title={t('加载项目')}
+      >
+        <FolderOpen size={18} />
+      </button>
+
+      <button
+        className="p-2.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
+        title={t('导入工作流')}
+      >
+        <Download size={18} />
+      </button>
     </aside>
   );
 }

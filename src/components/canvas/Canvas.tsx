@@ -199,7 +199,7 @@ export default function Canvas() {
         ref={containerRef}
         className="flex-1 relative overflow-hidden canvas-grid"
         style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : 'default' }}
-        onWheel={handleWheel}
+
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

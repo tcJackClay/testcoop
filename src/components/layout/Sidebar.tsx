@@ -38,14 +38,6 @@ interface SidebarProps {
   charactersOpen?: boolean;
 }
 
-interface ToolItem {
-  id: string;
-  icon: React.ReactNode;
-  titleKey: string;
-  onClick?: () => void;
-  isActive?: boolean;
-}
-
 export default function Sidebar({ 
   viewMode, 
   onViewChange, 
@@ -89,8 +81,7 @@ export default function Sidebar({
   ];
 
   return (
-    <aside 
-    >
+    <aside className="fixed left-4 top-1/2 -translate-y-1/2 bg-gray-800/95 backdrop-blur rounded-2xl shadow-2xl border border-gray-700 flex flex-col items-center py-3 gap-3 z-50 w-12 transition-all duration-200">
       {/* Add Node Button */}
       <div className="relative">
         <button
@@ -163,7 +154,7 @@ export default function Sidebar({
             ? 'bg-zinc-800 text-white' 
             : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
         }`}
-        title={t('角色库')}
+        title={t('资产库')}
       >
         <Users size={18} />
       </button>

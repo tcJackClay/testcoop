@@ -6,8 +6,6 @@ import NodeRenderer from '../nodes/NodeRenderer';
 import ConnectionLine from '../nodes/ConnectionLine';
 import CanvasToolbar from './CanvasToolbar';
 import CanvasContextMenu from './CanvasContextMenu';
-import AssetSidebar from './AssetSidebar';
-import { Image } from 'lucide-react';
 
 interface ContextMenuState {
   visible: boolean;
@@ -28,7 +26,6 @@ export default function Canvas() {
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, worldX: 0, worldY: 0 });
-  const [isAssetSidebarOpen, setIsAssetSidebarOpen] = useState(false);
   
   // Store
   const { 
@@ -53,6 +50,7 @@ export default function Canvas() {
     element.addEventListener('wheel', handleWheelNative, { passive: false });
     return () => element.removeEventListener('wheel', handleWheelNative);
   }, [handleWheelNative]);
+  
   // Zoom handlers
   const handleZoomIn = useCallback(() => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) }), [viewPort.zoom, updateViewPort]);
   const handleZoomOut = useCallback(() => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) }), [viewPort.zoom, updateViewPort]);
@@ -251,23 +249,6 @@ export default function Canvas() {
           onClose={closeContextMenu}
         />
       </div>
-      
-      {/* Asset Library Sidebar */}
-      <AssetSidebar 
-        isOpen={isAssetSidebarOpen} 
-        onClose={() => setIsAssetSidebarOpen(false)} 
-      />
-      {/* Asset Library Button - Bottom Right */}
-      <button
-        onClick={() => setIsAssetSidebarOpen(!isAssetSidebarOpen)}
-        className={`fixed bottom-6 right-6 z-40 p-3 rounded-lg shadow-lg transition-all flex items-center gap-2 ${
-          isAssetSidebarOpen ? 'bg-blue-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-        }`}
-        title="资产库"
-      >
-        <Image className="w-5 h-5" />
-        <span className="text-sm font-medium">资产库</span>
-      </button>
     </div>
   );
 }

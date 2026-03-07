@@ -1,0 +1,43 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "confirm": "Confirm",
+    "search": "Search",
+    "comingSoon": "Coming Soon"
+  },
+  "nav": {
+    "canvas": "Canvas",
+    "storyboard": "Storyboard",
+    "history": "History",
+    "models": "Models",
+    "settings": "Settings"
+  },
+  "canvas": {
+    "addNode": "Add Node",
+    "deleteNode": "Delete Node",
+    "connect": "Connect",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "fitView": "Fit View",
+    "clearCanvas": "Clear Canvas"
+  },
+  "nodes": {
+    "imageInput": "Image Input",
+    "videoInput": "Video Input",
+    "aiImage": "AI Image",
+    "aiVideo": "AI Video",
+    "preview": "Preview",
+    "saveLocal": "Save to Local"
+  },
+  "settings": {
+    "title": "Settings",
+    "apiConfig": "API Configuration",
+    "theme": "Theme",
+    "language": "Language"
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "create": "创建",
+    "confirm": "确认",
+    "search": "搜索",
+    "comingSoon": "即将上线"
+  },
+  "nav": {
+    "canvas": "画布",
+    "storyboard": "智能分镜",
+    "history": "历史记录",
+    "models": "模型库",
+    "settings": "设置"
+  },
+  "canvas": {
+    "addNode": "添加节点",
+    "deleteNode": "删除节点",
+    "connect": "连接",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fitView": "适应视图",
+    "clearCanvas": "清空画布"
+  },
+  "nodes": {
+    "imageInput": "图片输入",
+    "videoInput": "视频输入",
+    "aiImage": "AI 绘图",
+    "aiVideo": "AI 视频",
+    "preview": "预览",
+    "saveLocal": "保存到本地"
+  },
+  "settings": {
+    "title": "设置",
+    "apiConfig": "API 配置",
+    "theme": "主题",
+    "language": "语言"
+  },
+  "storyboard": {
+    "addShot": "添加镜头",
+    "import": "导入",
+    "clear": "清空",
+    "cardView": "卡片视图",
+    "tableView": "表格视图",
+    "empty": "暂无分镜",
+    "emptyHint": "点击上方按钮添加或导入",
+    "scene": "场景",
+    "actions": "操作",
+    "editShot": "编辑镜头",
+    "description": "描述",
+    "descriptionPlaceholder": "输入镜头描述...",
+    "prompt": "提示词",
+    "promptPlaceholder": "输入 AI 生成提示词...",
+    "negativePrompt": "负面提示词",
+    "negativePromptPlaceholder": "输入不想出现的内容...",
+    "shotType": "景别",
+    "cameraMovement": "运镜",
+    "duration": "时长"
+  },
+  "history": {
+    "filter": "筛选",
+    "type": "类型",
+    "status": "状态",
+    "all": "全部",
+    "image": "图片",
+    "video": "视频",
+    "success": "成功",
+    "failed": "失败",
+    "pending": "处理中",
+    "results": "条结果",
+    "performanceFast": "极速",
+    "performanceNormal": "普通",
+    "performanceOff": "关闭",
+    "downloadAll": "批量下载",
+    "clearAll": "清空全部",
+    "empty": "暂无历史记录"
+  },
+  "models": {
+    "title": "模型库",
+    "addModel": "添加模型",
+    "editModel": "编辑模型",
+    "deleteModel": "删除模型",
+    "testModel": "测试",
+    "provider": "供应商",
+    "modelId": "模型 ID",
+    "baseUrl": "接口地址",
+    "apiKey": "API Key",
+    "type": "类型",
+    "empty": "暂无模型配置"
+  }
+}

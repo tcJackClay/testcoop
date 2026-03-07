@@ -39,6 +39,7 @@ export default function Canvas() {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
+    console.log('[Wheel] deltaY:', e.deltaY, 'deltaX:', e.deltaX, 'deltaZ:', e.deltaZ);
     updateViewPort({ zoom: newZoom });
   }, [viewPort.zoom, updateViewPort]);
 

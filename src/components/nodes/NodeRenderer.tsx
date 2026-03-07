@@ -160,38 +160,136 @@ function renderNodeBody(node: CanvasNode) {
       const imageUrl = node.data.imageUrl as string;
       const prompt = node.data.prompt as string || '';
       const status = node.data.status as string || 'idle';
+      const aspectRatio = node.data.aspectRatio as string || '1:1';
+      const resolution = node.data.resolution as string || '1K';
+      
+      // 处理图片上传
+      const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          const url = URL.createObjectURL(file);
+          updateData('imageUrl', url);
+        }
+      };
       
       return (
-        <div className="space-y-2">
-          {/* Image Preview / Upload Area */}
-          <div 
-            className="w-32 h-20 bg-gray-700 rounded flex items-center justify-center overflow-hidden cursor-pointer hover:bg-gray-600"
-            onClick={(e) => e.stopPropagation()}
-            title="Click to upload image"
-          >
+        <div className="space-y-2 min-w-[240px]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-2 py-1 border-b border-gray-600">
+            <div className="flex items-center gap-2">
+              <Image className="w-4 h-4 text-amber-400" />
+              <span className="text-xs text-gray-300">参考图片</span>
+            </div>
+          </div>
+          
+          {/* Image Upload/Preview */}
+          <div className="px-2">
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              id={`image-upload-${node.id}`}
+              onChange={handleImageUpload}
+            />
             {imageUrl ? (
-              <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+              <label 
+                htmlFor={`image-upload-${node.id}`}
+                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90"
+                style={{ aspectRatio: '16/9' }}
+              >
+                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <Upload className="w-6 h-6 text-white" />
+                </div>
+              </label>
             ) : (
-              <div className="text-center">
-                <Image className="w-6 h-6 text-gray-500 mx-auto" />
-                <span className="text-[10px] text-gray-500">Upload</span>
-              </div>
+              <label 
+                htmlFor={`image-upload-${node.id}`}
+                className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 hover:bg-gray-600/30"
+              >
+                <Upload className="w-8 h-8 text-gray-500" />
+                <span className="text-xs text-gray-500">点击或拖拽上传</span>
+              </label>
             )}
           </div>
           
           {/* Prompt Input */}
-          <input
-            type="text"
-            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
-            placeholder="Enter prompt..."
-            value={prompt}
-            onChange={(e) => updateData('prompt', e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="px-2">
+            <textarea
+              className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white resize-none"
+              rows={2}
+              placeholder="描述你想要生成的画面..."
+              value={prompt}
+              onChange={(e) => updateData('prompt', e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          
+          {/* Settings */}
+          <div className="px-2 flex gap-2">
+            <select
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              value={aspectRatio}
+              onChange={(e) => updateData('aspectRatio', e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <option value="1:1">1:1</option>
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+              <option value="4:3">4:3</option>
+              <option value="3:4">3:4</option>
+            </select>
+            <select
+              className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              value={resolution}
+              onChange={(e) => updateData('resolution', e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <option value="1K">1K</option>
+              <option value="2K">2K</option>
+              <option value="4K">4K</option>
+            </select>
+          </div>
+          
+          {/* Generate Button */}
+          <div className="px-2">
+            <button
+              className={`w-full py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${
+                status === 'processing' 
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                  : 'bg-pink-500 hover:bg-pink-600 text-white'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (status !== 'processing') {
+                  const store = useCanvasStore.getState();
+                  if (store.executeNode) {
+                    store.executeNode(node.id);
+                  }
+                }
+              }}
+              disabled={status === 'processing'}
+            >
+              {status === 'processing' ? (
+                <>
+                  <span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3" />
+                  生成图片
+                </>
+              )}
+            </button>
+          </div>
           
           {/* Status indicator */}
-          {status === 'processing' && (
-            <div className="text-[10px] text-yellow-400">Generating...</div>
+          {status === 'failed' && (
+            <div className="px-2 text-[10px] text-red-400">生成失败</div>
+          )}
+          {status === 'completed' && (
+            <div className="px-2 text-[10px] text-green-400">生成完成</div>
           )}
         </div>
       );

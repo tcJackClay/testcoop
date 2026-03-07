@@ -193,10 +193,7 @@ function renderNodeBody(node: CanvasNode) {
 }
 
 export default function NodeRenderer({ node }: NodeRendererProps) {
-  const { selectNode, moveNode, selectedNodeIds } = useCanvasStore();
-  const [isDragging, setIsDragging] = useState(false);
-  const dragOffset = useRef({ x: 0, y: 0 });
-  const isSelected = selectedNodeIds.includes(node.id);
+  const { selectNode, moveNode, selectedNodeIds, viewPort } = useCanvasStore();
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).tagName === 'INPUT' || 
@@ -205,20 +202,34 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     }
     e.stopPropagation();
     setIsDragging(true);
-    dragOffset.current = {
-      x: e.clientX - node.position.x,
-      y: e.clientY - node.position.y,
-    };
+    
+    // Store initial mouse position in canvas coordinates
+    const canvasEl = document.querySelector('.canvas-content');
+    if (canvasEl) {
+      const rect = canvasEl.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+      const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+      dragOffset.current = {
+        x: mouseX - node.position.x,
+        y: mouseY - node.position.y,
+      };
+    }
     selectNode(node.id, e.shiftKey);
-  }, [node.position, node.id, selectNode]);
+  }, [node.position, node.id, selectNode, viewPort]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging) {
-      const newX = e.clientX - dragOffset.current.x;
-      const newY = e.clientY - dragOffset.current.y;
-      moveNode(node.id, { x: newX, y: newY });
+      const container = containerRef.current?.parentElement;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+        const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+        const newX = mouseX - dragOffset.current.x;
+        const newY = mouseY - dragOffset.current.y;
+        moveNode(node.id, { x: newX, y: newY });
+      }
     }
-  }, [isDragging, node.id, moveNode]);
+  }, [isDragging, node.id, moveNode, viewPort]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);

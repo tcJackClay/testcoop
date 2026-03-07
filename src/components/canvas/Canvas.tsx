@@ -217,7 +217,7 @@ export default function Canvas() {
         onDragOver={handleDragOver}
       >
         <div
-          className="absolute inset-0 origin-top-left"
+          className="absolute inset-0 origin-top-left canvas-content"
           style={{
             transform: `translate(${viewPort.x}px, ${viewPort.y}px) scale(${viewPort.zoom})`,
           }}

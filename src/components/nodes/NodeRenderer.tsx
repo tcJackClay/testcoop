@@ -174,12 +174,34 @@ function renderNodeBody(node: CanvasNode) {
       
       return (
         <div className="space-y-2 min-w-[240px]">
-          {/* Header */}
-          <div className="flex items-center justify-between px-2 py-1 border-b border-gray-600">
-            <div className="flex items-center gap-2">
-              <Image className="w-4 h-4 text-amber-400" />
-              <span className="text-xs text-gray-300">参考图片</span>
-            </div>
+          {/* Image Upload/Preview */}
+          <div className="px-2">
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              id={`image-upload-${node.id}`}
+              onChange={handleImageUpload}
+            />
+            {imageUrl ? (
+              <label 
+                htmlFor={`image-upload-${node.id}`}
+                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90 h-24"
+              >
+                <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <Upload className="w-6 h-6 text-white" />
+                </div>
+              </label>
+            ) : (
+              <label 
+                htmlFor={`image-upload-${node.id}`}
+                className="flex flex-col items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 hover:bg-gray-600/30 h-24"
+              >
+                <Upload className="w-6 h-6 text-gray-500" />
+                <span className="text-xs text-gray-500">点击上传</span>
+              </label>
+            )}
           </div>
           
           {/* Image Upload/Preview */}
@@ -225,8 +247,8 @@ function renderNodeBody(node: CanvasNode) {
             />
           </div>
           
-          {/* Settings */}
-          <div className="px-2 flex gap-2">
+          {/* Settings + Generate Button */}
+          <div className="px-2 flex gap-2 items-center">
             <select
               className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
               value={aspectRatio}
@@ -249,6 +271,21 @@ function renderNodeBody(node: CanvasNode) {
               <option value="2K">2K</option>
               <option value="4K">4K</option>
             </select>
+            <button
+              className={`flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${status === 'processing' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600 text-white'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (status !== 'processing') {
+                  const store = useCanvasStore.getState();
+                  if (store.executeNode) {
+                    store.executeNode(node.id);
+                  }
+                }
+              }}
+              disabled={status === 'processing'}
+            >
+              {status === 'processing' ? <><span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />生成中</> : <><Sparkles className="w-3 h-3" />生成</>}
+            </button>
           </div>
           
           {/* Generate Button */}

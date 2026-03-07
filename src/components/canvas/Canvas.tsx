@@ -39,7 +39,7 @@ export default function Canvas() {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
-    console.log('[Wheel] deltaY:', e.deltaY, 'deltaX:', e.deltaX, 'deltaZ:', e.deltaZ);
+
     updateViewPort({ zoom: newZoom });
   }, [viewPort.zoom, updateViewPort]);
 
@@ -49,7 +49,17 @@ export default function Canvas() {
     if (!element) return;
     
     element.addEventListener('wheel', handleWheelNative, { passive: false });
-    return () => element.removeEventListener('wheel', handleWheelNative);
+    // Prevent touchpad pinch gestures (Safari)
+    element.addEventListener('gesturestart', (e: Event) => e.preventDefault());
+    element.addEventListener('gesturechange', (e: Event) => e.preventDefault());
+    element.addEventListener('gestureend', (e: Event) => e.preventDefault());
+    
+    return () => {
+      element.removeEventListener('wheel', handleWheelNative);
+      element.removeEventListener('gesturestart', () => {});
+      element.removeEventListener('gesturechange', () => {});
+      element.removeEventListener('gestureend', () => {});
+    };
   }, [handleWheelNative]);
   // Zoom handlers
   const handleZoomIn = useCallback(() => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) }), [viewPort.zoom, updateViewPort]);
@@ -199,7 +209,7 @@ export default function Canvas() {
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden canvas-grid"
-        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : 'default' }}
+        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : 'default', touchAction: 'none' }}
 
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

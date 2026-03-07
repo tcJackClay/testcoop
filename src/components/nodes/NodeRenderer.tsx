@@ -174,6 +174,7 @@ function renderNodeBody(node: CanvasNode) {
       
       return (
         <div className="space-y-2 min-w-[240px]">
+
           {/* Image Upload/Preview */}
           <div className="px-2">
             <input 
@@ -186,40 +187,12 @@ function renderNodeBody(node: CanvasNode) {
             {imageUrl ? (
               <label 
                 htmlFor={`image-upload-${node.id}`}
-                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90 h-24"
+                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90 h-32"
+
+
               >
                 <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                  <Upload className="w-6 h-6 text-white" />
-                </div>
-              </label>
-            ) : (
-              <label 
-                htmlFor={`image-upload-${node.id}`}
-                className="flex flex-col items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 hover:bg-gray-600/30 h-24"
-              >
-                <Upload className="w-6 h-6 text-gray-500" />
-                <span className="text-xs text-gray-500">点击上传</span>
-              </label>
-            )}
-          </div>
-          
-          {/* Image Upload/Preview */}
-          <div className="px-2">
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              id={`image-upload-${node.id}`}
-              onChange={handleImageUpload}
-            />
-            {imageUrl ? (
-              <label 
-                htmlFor={`image-upload-${node.id}`}
-                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90"
-                style={{ aspectRatio: '16/9' }}
-              >
-                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                   <Upload className="w-6 h-6 text-white" />
                 </div>
@@ -287,40 +260,6 @@ function renderNodeBody(node: CanvasNode) {
               {status === 'processing' ? <><span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />生成中</> : <><Sparkles className="w-3 h-3" />生成</>}
             </button>
           </div>
-          {/* Status indicator */}
-          {/* Generate Button */}
-          <div className="px-2">
-            <button
-              className={`w-full py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${
-                status === 'processing' 
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
-                  : 'bg-pink-500 hover:bg-pink-600 text-white'
-              }`}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (status !== 'processing') {
-                  const store = useCanvasStore.getState();
-                  if (store.executeNode) {
-                    store.executeNode(node.id);
-                  }
-                }
-              }}
-              disabled={status === 'processing'}
-            >
-              {status === 'processing' ? (
-                <>
-                  <span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  生成中...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3 h-3" />
-                  生成图片
-                </>
-              )}
-            </button>
-          </div>
-          
           {/* Status indicator */}
           {status === 'failed' && (
             <div className="px-2 text-[10px] text-red-400">生成失败</div>

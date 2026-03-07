@@ -85,8 +85,11 @@ export default function Canvas() {
     undoStack,
     redoStack,
     selectNodesInBox,
-    clearSelection
+    clearSelection,
+    copyNodes,
+    pasteNodes
   } = useCanvasStore();
+
 
   // Handle wheel zoom with passive: false to allow preventDefault
   const handleWheelNative = useCallback((e: WheelEvent) => {
@@ -260,10 +263,18 @@ export default function Canvas() {
       if (e.key === 'Escape') {
         clearSelection();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        copyNodes();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        pasteNodes();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection]);
+  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection, copyNodes, pasteNodes]);
 
   const handleZoomIn = () => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) });
   const handleZoomOut = () => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) });

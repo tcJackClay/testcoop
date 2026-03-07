@@ -163,6 +163,7 @@ function renderNodeBody(node: CanvasNode) {
       const aspectRatio = node.data.aspectRatio as string || '1:1';
       const resolution = node.data.resolution as string || '1K';
       const [imageDimensions, setImageDimensions] = useState<{width: number; height: number} | null>(null);
+      console.log('[ImageNode] render, imageUrl:', imageUrl, 'imageDimensions:', imageDimensions);
       
       // 处理图片上传
       const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,6 +175,7 @@ function renderNodeBody(node: CanvasNode) {
       };
       
       const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        console.log('[ImageNode] onLoad triggered, naturalWidth:', e.currentTarget.naturalWidth, 'naturalHeight:', e.currentTarget.naturalHeight);
         setImageDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight });
       };
       

@@ -60,8 +60,6 @@ export default function Canvas() {
 
   // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
-
-
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     updateViewPort({ zoom: newZoom });
@@ -259,34 +257,12 @@ export default function Canvas() {
         isOpen={isAssetSidebarOpen} 
         onClose={() => setIsAssetSidebarOpen(false)} 
       />
-      
       {/* Asset Library Button - Bottom Right */}
       <button
         onClick={() => setIsAssetSidebarOpen(!isAssetSidebarOpen)}
         className={`fixed bottom-6 right-6 z-40 p-3 rounded-lg shadow-lg transition-all flex items-center gap-2 ${
-          isAssetSidebarOpen 
-            ? 'bg-blue-700 text-white' 
-            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+          isAssetSidebarOpen ? 'bg-blue-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
         }`}
-        title="资产库"
-      >
-        <Image className="w-5 h-5" />
-        <span className="text-sm font-medium">资产库</span>
-      </button>
-      <button
-        onClick={() => setIsAssetSidebarOpen(!isAssetSidebarOpen)}
-        className={`fixed top-16 right-4 z-40 p-2.5 rounded-lg shadow-lg transition-all ${
-          isAssetSidebarOpen 
-            ? 'bg-blue-700 text-white' 
-            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-        }`}
-        title="资产库"
-      >
-        <Image className="w-5 h-5" />
-      </button>
-      <button
-        onClick={() => setIsAssetSidebarOpen(true)}
-        className="fixed bottom-6 right-6 z-40 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
         title="资产库"
       >
         <Image className="w-5 h-5" />

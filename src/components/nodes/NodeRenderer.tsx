@@ -347,6 +347,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       return;
     }
     
+    e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
     

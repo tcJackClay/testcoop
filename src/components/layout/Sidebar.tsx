@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '../../App';
 import type { NodeType } from '../../stores/canvasStore';
 import type { LeftPanelType } from '../leftPanel/LeftPanel';
+import type { RightPanelType } from '../rightPanel/RightPanel';
 
 interface SidebarProps {
   viewMode: ViewMode;
@@ -34,7 +35,9 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   onAddNode?: (type: NodeType) => void;
   leftPanel: LeftPanelType;
+  rightPanel: RightPanelType;
   onLeftPanelChange: (type: LeftPanelType) => void;
+  onRightPanelChange: (type: RightPanelType) => void;
 }
 
 export default function Sidebar({ 
@@ -44,7 +47,9 @@ export default function Sidebar({
   onToggleCollapse,
   onAddNode,
   leftPanel,
-  onLeftPanelChange
+  rightPanel,
+  onLeftPanelChange,
+  onRightPanelChange
 }: SidebarProps) {
   const { t } = useTranslation();
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -77,8 +82,11 @@ export default function Sidebar({
     { type: 'saveLocal', icon: <HardDrive size={16} />, label: '保存到本地' },
   ];
 
+  // Dynamic position: move right when leftPanel is open
+  const sidebarLeft = leftPanel ? 'left-16' : 'left-4';
+
   return (
-    <aside className="fixed left-4 top-1/2 -translate-y-1/2 bg-gray-800/95 backdrop-blur rounded-2xl shadow-2xl border border-gray-700 flex flex-col items-center py-2 gap-1 z-50 w-10 transition-all duration-200">
+    <aside className={`fixed ${sidebarLeft} top-1/2 -translate-y-1/2 bg-gray-800/95 backdrop-blur rounded-2xl shadow-2xl border border-gray-700 flex flex-col items-center py-2 gap-1 z-50 w-10 transition-all duration-200`}>
       {/* Add Node Button */}
       <div className="relative">
         <button
@@ -141,10 +149,25 @@ export default function Sidebar({
         <History size={16} />
       </button>
 
+      <div className="flex-1" />
+
+      {/* Right Panel Buttons */}
       <button
-        onClick={() => onLeftPanelChange('characters')}
+        onClick={() => onRightPanelChange('chat')}
         className={`p-2 rounded-lg transition-all ${
-          leftPanel === 'characters'
+          rightPanel === 'chat'
+            ? 'bg-zinc-800 text-white' 
+            : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+        }`}
+        title={t('对话')}
+      >
+        <MessageSquare size={16} />
+      </button>
+
+      <button
+        onClick={() => onRightPanelChange('characters')}
+        className={`p-2 rounded-lg transition-all ${
+          rightPanel === 'characters'
             ? 'bg-zinc-800 text-white' 
             : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
         }`}
@@ -156,14 +179,6 @@ export default function Sidebar({
       <div className="flex-1" />
 
       {/* Bottom Tools */}
-      <button
-        className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
-        title={t('对话')}
-        onClick={() => {}}
-      >
-        <MessageSquare size={16} />
-      </button>
-
       <button
         className="p-2 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-all"
         title={t('保存')}

@@ -8,8 +8,8 @@ import LoginModal from './components/auth/LoginModal';
 import Storyboard from './features/storyboard/Storyboard';
 import History from './features/history/History';
 import Models from './features/models/Models';
-import ChatPanel from './features/chat/ChatPanel';
 import LeftPanel, { type LeftPanelType } from './components/leftPanel/LeftPanel';
+import RightPanel, { type RightPanelType } from './components/rightPanel/RightPanel';
 import { useCanvasStore, type NodeType } from './stores/canvasStore';
 
 export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models';
@@ -19,8 +19,8 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
+  const [rightPanel, setRightPanel] = useState<RightPanelType>(null);
   
   const { selectedNodeIds, nodes, deleteNode, clearSelection, addNode } = useCanvasStore();
 
@@ -48,14 +48,18 @@ export default function App() {
     setLeftPanel(prev => prev === type ? null : type);
   }, []);
 
+  const handleRightPanelChange = useCallback((type: RightPanelType) => {
+    setRightPanel(prev => prev === type ? null : type);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
       <Header
         viewMode={viewMode}
         onViewChange={handleViewChange}
         onSettingsClick={() => setShowSettings(true)}
-        onChatClick={() => setChatOpen(!chatOpen)}
-        chatOpen={chatOpen}
+        onChatClick={() => handleRightPanelChange('chat')}
+        chatOpen={rightPanel === 'chat'}
         onNewProject={handleNewProject}
       />
       
@@ -63,10 +67,13 @@ export default function App() {
         <Sidebar
           viewMode={viewMode}
           onViewChange={handleViewChange}
+          collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           onAddNode={handleAddNode}
           leftPanel={leftPanel}
+          rightPanel={rightPanel}
           onLeftPanelChange={handleLeftPanelChange}
+          onRightPanelChange={handleRightPanelChange}
         />
         
         {/* Left Panel */}
@@ -87,9 +94,9 @@ export default function App() {
           {viewMode === 'models' && <Models />}
         </main>
 
-        {/* Chat Panel (right side) */}
-        {chatOpen && viewMode === 'canvas' && (
-          <ChatPanel onClose={() => setChatOpen(false)} />
+        {/* Right Panel */}
+        {rightPanel && viewMode === 'canvas' && (
+          <RightPanel type={rightPanel} onClose={() => setRightPanel(null)} />
         )}
       </div>
 

@@ -32,6 +32,8 @@
  * | 字段 | 类型 | 必填 | 说明 |
  * |------|------|------|------|
  * | id | number | 是 | 主键，后端生成 |
+ * | userId | number | 是 | 所属用户ID (创建/更新时必填) |
+ * | projectId | number | 是 | 关联项目ID (创建/更新时必填) |
  * | userId | number | 是 | 所属用户ID |
  * | projectId | number | 否 | 关联项目ID |
  * | resourceName | string | 是 | 资源名称 |
@@ -122,6 +124,40 @@ export interface BaseRequest {
 }
 
 /**
+ * 创建请求体 (不含id, createdTime, updatedTime)
+ * userId: 必填
+ * projectId: 必填
+ */
+export interface CreateRequest {
+  userId: number;
+  projectId: number;
+  resourceName: string;
+  resourceType: string;
+  resourceContent?: string;
+  resourceStatus?: string;
+  status: number;
+  createdBy: string;
+  updatedBy: string;
+  ext1?: string;
+  ext2?: string;
+}
+
+/**
+ * 更新请求体 (含id，userId和projectId必填，其他可选)
+ */
+export interface UpdateRequest {
+  id: number;
+  userId: number;
+  projectId: number;
+  resourceName?: string;
+  resourceType?: string;
+  resourceContent?: string;
+  resourceStatus?: string;
+  status?: number;
+  updatedBy: string;
+  ext1?: string;
+  ext2?: string;
+}
  * 创建请求体 (不含id, createdTime, updatedTime)
  */
 export interface CreateRequest extends Omit<BaseRequest, 'id' | 'createdTime' | 'updatedTime'> {}

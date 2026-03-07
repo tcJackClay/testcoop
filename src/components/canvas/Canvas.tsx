@@ -61,6 +61,14 @@ export default function Canvas() {
       element.removeEventListener('gestureend', () => {});
     };
   }, [handleWheelNative]);
+
+  // 临时禁用滚轮缩放用于调试
+  // useEffect(() => {
+  //   const element = containerRef.current;
+  //   if (!element) return;
+  //   element.addEventListener('wheel', handleWheelNative, { passive: false });
+  //   return () => element.removeEventListener('wheel', handleWheelNative);
+  // }, [handleWheelNative]);
   // Zoom handlers
   const handleZoomIn = useCallback(() => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) }), [viewPort.zoom, updateViewPort]);
   const handleZoomOut = useCallback(() => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) }), [viewPort.zoom, updateViewPort]);
@@ -209,7 +217,7 @@ export default function Canvas() {
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden canvas-grid"
-        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : 'default', touchAction: 'none' }}
+        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : 'default' }}
 
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

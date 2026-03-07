@@ -90,9 +90,6 @@ export default function Sidebar({
 
   return (
     <aside 
-      className={`bg-gray-800 border-r border-gray-700 flex flex-col items-center py-3 gap-3 z-40 shrink-0 transition-all duration-200 ${
-        collapsed ? 'w-12' : 'w-14'
-      }`}
     >
       {/* Add Node Button */}
       <div className="relative">

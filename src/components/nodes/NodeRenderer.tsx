@@ -16,7 +16,8 @@ import {
   GitCompare,
   Play,
   Save,
-  Upload
+  Upload,
+  X
 } from 'lucide-react';
 import type { CanvasNode, NodeType } from '../../stores/canvasStore';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -193,7 +194,7 @@ function renderNodeBody(node: CanvasNode) {
 }
 
 export default function NodeRenderer({ node }: NodeRendererProps) {
-  const { selectNode, moveNode, selectedNodeIds, viewPort } = useCanvasStore();
+  const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -260,7 +261,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   return (
     <div
       ref={containerRef}
-      className={`node absolute min-w-[180px] cursor-move select-none rounded-lg border-2 ${colorClass} ${
+      className={`node absolute min-w-[180px] cursor-move select-none rounded-lg border-2 group ${colorClass} ${
         isSelected ? 'ring-2 ring-white/50' : ''
       }`}
       style={{
@@ -275,6 +276,18 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
         <span className="text-gray-400">{icon}</span>
         <span className="text-sm font-medium truncate">{label}</span>
       </div>
+
+      {/* Delete Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          deleteNode(node.id);
+        }}
+        className="absolute -top-2.5 -right-2.5 z-50 p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-gray-400 hover:text-red-500 border-gray-700 hover:bg-gray-700"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <X size={12} />
+      </button>
 
       {/* Body */}
       <div className="p-3">

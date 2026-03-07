@@ -194,6 +194,7 @@ function renderNodeBody(node: CanvasNode) {
 
 export default function NodeRenderer({ node }: NodeRendererProps) {
   const { selectNode, moveNode, selectedNodeIds, viewPort } = useCanvasStore();
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).tagName === 'INPUT' || 

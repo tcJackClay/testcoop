@@ -260,7 +260,18 @@ export default function Canvas() {
         onClose={() => setIsAssetSidebarOpen(false)} 
       />
       
-      {/* Asset Library Button - Bottom Right */}
+      {/* Asset Library Button - Below Header */}
+      <button
+        onClick={() => setIsAssetSidebarOpen(!isAssetSidebarOpen)}
+        className={`fixed top-16 right-4 z-40 p-2.5 rounded-lg shadow-lg transition-all ${
+          isAssetSidebarOpen 
+            ? 'bg-blue-700 text-white' 
+            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+        }`}
+        title="资产库"
+      >
+        <Image className="w-5 h-5" />
+      </button>
       <button
         onClick={() => setIsAssetSidebarOpen(true)}
         className="fixed bottom-6 right-6 z-40 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2"

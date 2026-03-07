@@ -50,7 +50,7 @@ export default function AssetSidebar({ isOpen, onClose, onAssetSelect }: AssetSi
   if (!isOpen) return null;
 
   return (
-    <aside className="fixed right-0 top-0 h-full w-80 bg-gray-800 border-l border-gray-700 flex flex-col z-50 animate-in slide-in-from-right duration-300">
+    <aside className="fixed right-0 top-16 bottom-4 w-80 bg-gray-800 border-l border-gray-700 rounded-l-lg flex flex-col z-40 animate-in slide-in-from-right duration-300 shadow-xl">
       {/* Header */}
       <div className="h-14 px-4 border-b border-gray-700 flex items-center justify-between bg-gray-800">
         <h3 className="text-sm font-bold text-white flex items-center gap-2">

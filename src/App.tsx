@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
@@ -9,8 +9,7 @@ import Storyboard from './features/storyboard/Storyboard';
 import History from './features/history/History';
 import Models from './features/models/Models';
 import ChatPanel from './features/chat/ChatPanel';
-import CharactersPanel from './features/characters/CharactersPanel';
-import HistoryPanel from './features/history/HistoryPanel';
+import LeftPanel, { type LeftPanelType } from './components/leftPanel/LeftPanel';
 import { useCanvasStore, type NodeType } from './stores/canvasStore';
 
 export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models';
@@ -21,20 +20,15 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [charactersOpen, setCharactersOpen] = useState(false);
+  const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
   
-  const { selectedNodeIds, nodes, deleteNode, clearSelection } = useCanvasStore();
-
+  const { selectedNodeIds, nodes, deleteNode, clearSelection, addNode } = useCanvasStore();
 
   const handleViewChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
   }, []);
 
-  const { addNode } = useCanvasStore();
-
   const handleAddNode = useCallback((type: NodeType) => {
-    // Add node to center of canvas view
     const x = 100 + Math.random() * 200;
     const y = 100 + Math.random() * 200;
     addNode(type, { x, y });
@@ -44,12 +38,15 @@ export default function App() {
   const handleNewProject = useCallback(() => {
     if (nodes.length > 0) {
       if (confirm('确定要新建项目吗？当前内容将被清空。')) {
-        // Clear all nodes
         nodes.forEach(node => deleteNode(node.id));
         clearSelection();
       }
     }
   }, [nodes, deleteNode, clearSelection]);
+
+  const handleLeftPanelChange = useCallback((type: LeftPanelType) => {
+    setLeftPanel(prev => prev === type ? null : type);
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
@@ -66,18 +63,15 @@ export default function App() {
         <Sidebar
           viewMode={viewMode}
           onViewChange={handleViewChange}
-          collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           onAddNode={handleAddNode}
-          onHistoryClick={() => setHistoryOpen(!historyOpen)}
-          onCharactersClick={() => setCharactersOpen(!charactersOpen)}
-          historyOpen={historyOpen}
-          charactersOpen={charactersOpen}
+          leftPanel={leftPanel}
+          onLeftPanelChange={handleLeftPanelChange}
         />
         
-        {/* History Panel (left side) */}
-        {historyOpen && viewMode === 'canvas' && (
-          <HistoryPanel onClose={() => setHistoryOpen(false)} />
+        {/* Left Panel */}
+        {leftPanel && viewMode === 'canvas' && (
+          <LeftPanel type={leftPanel} onClose={() => setLeftPanel(null)} />
         )}
 
         <main className="flex-1 flex overflow-hidden">
@@ -92,11 +86,6 @@ export default function App() {
           {viewMode === 'history' && <History />}
           {viewMode === 'models' && <Models />}
         </main>
-
-        {/* Characters Panel (right side) */}
-        {charactersOpen && viewMode === 'canvas' && (
-          <CharactersPanel onClose={() => setCharactersOpen(false)} />
-        )}
 
         {/* Chat Panel (right side) */}
         {chatOpen && viewMode === 'canvas' && (

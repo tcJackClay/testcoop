@@ -25,6 +25,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '../../App';
 import type { NodeType } from '../../stores/canvasStore';
+import type { LeftPanelType } from '../leftPanel/LeftPanel';
 
 interface SidebarProps {
   viewMode: ViewMode;
@@ -32,10 +33,8 @@ interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onAddNode?: (type: NodeType) => void;
-  onHistoryClick?: () => void;
-  onCharactersClick?: () => void;
-  historyOpen?: boolean;
-  charactersOpen?: boolean;
+  leftPanel: LeftPanelType;
+  onLeftPanelChange: (type: LeftPanelType) => void;
 }
 
 export default function Sidebar({ 
@@ -44,10 +43,8 @@ export default function Sidebar({
   collapsed, 
   onToggleCollapse,
   onAddNode,
-  onHistoryClick,
-  onCharactersClick,
-  historyOpen,
-  charactersOpen
+  leftPanel,
+  onLeftPanelChange
 }: SidebarProps) {
   const { t } = useTranslation();
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -133,9 +130,9 @@ export default function Sidebar({
       </button>
 
       <button
-        onClick={onHistoryClick}
+        onClick={() => onLeftPanelChange('history')}
         className={`p-2 rounded-lg transition-all ${
-          historyOpen 
+          leftPanel === 'history'
             ? 'bg-zinc-800 text-white' 
             : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
         }`}
@@ -145,9 +142,9 @@ export default function Sidebar({
       </button>
 
       <button
-        onClick={onCharactersClick}
+        onClick={() => onLeftPanelChange('characters')}
         className={`p-2 rounded-lg transition-all ${
-          charactersOpen 
+          leftPanel === 'characters'
             ? 'bg-zinc-800 text-white' 
             : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
         }`}

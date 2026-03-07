@@ -88,8 +88,26 @@ export default function Canvas() {
     clearSelection
   } = useCanvasStore();
 
+  // Handle wheel zoom with passive: false to allow preventDefault
+  const handleWheelNative = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
+    updateViewPort({ zoom: newZoom });
+  }, [viewPort.zoom, updateViewPort]);
+
+  // Attach wheel event listener with passive: false
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    
+    element.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheelNative);
+  }, [handleWheelNative]);
+
   // Handle wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     updateViewPort({ zoom: newZoom });

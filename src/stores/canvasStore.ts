@@ -65,6 +65,7 @@ export interface CanvasState {
   selectNode: (id: string, multi?: boolean) => void;
   clearSelection: () => void;
   selectNodesInBox: (box: { x: number; y: number; width: number; height: number }) => void;
+  selectAll: () => void;
   
   addConnection: (sourceId: string, targetId: string, sourceHandle?: string, targetHandle?: string) => void;
   deleteConnection: (id: string) => void;
@@ -195,6 +196,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       .map((node) => node.id);
     
     set({ selectedNodeIds: selectedIds });
+  },
+
+  selectAll: () => {
+    const { nodes } = get();
+    set({ selectedNodeIds: nodes.map((node) => node.id) });
   },
 
   addConnection: (sourceId, targetId, sourceHandle, targetHandle) => {

@@ -195,20 +195,24 @@ function renderNodeBody(node: CanvasNode) {
 export default function NodeRenderer({ node }: NodeRendererProps) {
   const { selectNode, moveNode, selectedNodeIds, viewPort } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedNodeIds.includes(node.id);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't start drag if clicking on input or textarea
     if ((e.target as HTMLElement).tagName === 'INPUT' || 
         (e.target as HTMLElement).tagName === 'TEXTAREA') {
       return;
     }
+    
     e.stopPropagation();
     setIsDragging(true);
     
-    // Store initial mouse position in canvas coordinates
-    const canvasEl = document.querySelector('.canvas-content');
-    if (canvasEl) {
-      const rect = canvasEl.getBoundingClientRect();
+    // Get the canvas container
+    const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
+    if (canvasContainer) {
+      const rect = canvasContainer.getBoundingClientRect();
       const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
       const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
       dragOffset.current = {
@@ -216,20 +220,21 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
         y: mouseY - node.position.y,
       };
     }
+    
     selectNode(node.id, e.shiftKey);
   }, [node.position, node.id, selectNode, viewPort]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isDragging) {
-      const container = containerRef.current?.parentElement;
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-        const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-        const newX = mouseX - dragOffset.current.x;
-        const newY = mouseY - dragOffset.current.y;
-        moveNode(node.id, { x: newX, y: newY });
-      }
+    if (!isDragging) return;
+    
+    const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
+    if (canvasContainer) {
+      const rect = canvasContainer.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+      const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+      const newX = mouseX - dragOffset.current.x;
+      const newY = mouseY - dragOffset.current.y;
+      moveNode(node.id, { x: newX, y: newY });
     }
   }, [isDragging, node.id, moveNode, viewPort]);
 
@@ -254,6 +259,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
   return (
     <div
+      ref={containerRef}
       className={`node absolute min-w-[180px] cursor-move select-none rounded-lg border-2 ${colorClass} ${
         isSelected ? 'ring-2 ring-white/50' : ''
       }`}

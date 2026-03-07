@@ -16,8 +16,7 @@ import {
   GitCompare,
   Play,
   Save,
-  Upload,
-  X
+  Upload
 } from 'lucide-react';
 import type { CanvasNode, NodeType } from '../../stores/canvasStore';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -194,26 +193,22 @@ function renderNodeBody(node: CanvasNode) {
 }
 
 export default function NodeRenderer({ node }: NodeRendererProps) {
-  const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode } = useCanvasStore();
+  const { selectNode, moveNode, selectedNodeIds, viewPort } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
-  const dragOffset = useRef({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedNodeIds.includes(node.id);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Don't start drag if clicking on input or textarea
     if ((e.target as HTMLElement).tagName === 'INPUT' || 
         (e.target as HTMLElement).tagName === 'TEXTAREA') {
       return;
     }
-    
     e.stopPropagation();
     setIsDragging(true);
     
-    // Get the canvas container
-    const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
-    if (canvasContainer) {
-      const rect = canvasContainer.getBoundingClientRect();
+    // Store initial mouse position in canvas coordinates
+    const canvasEl = document.querySelector('.canvas-content');
+    if (canvasEl) {
+      const rect = canvasEl.getBoundingClientRect();
       const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
       const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
       dragOffset.current = {
@@ -221,21 +216,20 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
         y: mouseY - node.position.y,
       };
     }
-    
     selectNode(node.id, e.shiftKey);
   }, [node.position, node.id, selectNode, viewPort]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging) return;
-    
-    const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
-    if (canvasContainer) {
-      const rect = canvasContainer.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-      const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-      const newX = mouseX - dragOffset.current.x;
-      const newY = mouseY - dragOffset.current.y;
-      moveNode(node.id, { x: newX, y: newY });
+    if (isDragging) {
+      const container = containerRef.current?.parentElement;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+        const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+        const newX = mouseX - dragOffset.current.x;
+        const newY = mouseY - dragOffset.current.y;
+        moveNode(node.id, { x: newX, y: newY });
+      }
     }
   }, [isDragging, node.id, moveNode, viewPort]);
 
@@ -260,8 +254,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
   return (
     <div
-      ref={containerRef}
-      className={`node absolute min-w-[180px] cursor-move select-none rounded-lg border-2 group ${colorClass} ${
+      className={`node absolute min-w-[180px] cursor-move select-none rounded-lg border-2 ${colorClass} ${
         isSelected ? 'ring-2 ring-white/50' : ''
       }`}
       style={{
@@ -276,18 +269,6 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
         <span className="text-gray-400">{icon}</span>
         <span className="text-sm font-medium truncate">{label}</span>
       </div>
-
-      {/* Delete Button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          deleteNode(node.id);
-        }}
-        className="absolute -top-2.5 -right-2.5 z-50 p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-gray-400 hover:text-red-500 border-gray-700 hover:bg-gray-700"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <X size={12} />
-      </button>
 
       {/* Body */}
       <div className="p-3">

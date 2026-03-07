@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Canvas from './components/canvas/Canvas';
+import NodePropertiesPanel from './components/canvas/NodePropertiesPanel';
 import SettingsModal from './features/settings/SettingsModal';
 import Storyboard from './features/storyboard/Storyboard';
 import History from './features/history/History';
@@ -19,12 +20,21 @@ export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [charactersOpen, setCharactersOpen] = useState(false);
   
   const { selectedNodeIds, nodes, deleteNode, clearSelection } = useCanvasStore();
 
+  // Show properties panel when a node is selected in canvas view
+  useEffect(() => {
+    if (viewMode === 'canvas' && selectedNodeIds.length > 0) {
+      setPropertiesPanelOpen(true);
+    } else if (viewMode !== 'canvas') {
+      setPropertiesPanelOpen(false);
+    }
+  }, [selectedNodeIds.length, viewMode]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
@@ -85,6 +95,11 @@ export default function App() {
               <div className="flex-1">
                 <Canvas />
               </div>
+              {propertiesPanelOpen && (
+                <NodePropertiesPanel 
+                  onClose={() => setPropertiesPanelOpen(false)} 
+                />
+              )}
             </div>
           )}
           {viewMode === 'storyboard' && <Storyboard />}

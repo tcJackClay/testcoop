@@ -24,56 +24,46 @@ import { useCanvasStore } from '../../stores/canvasStore';
 
 // Generation node types that support execution
 const generationNodeTypes = [
-  'aiImage',
-  'aiVideo',
-  'generateCharacterImage',
-  'generateSceneImage',
-  'generateCharacterVideo',
-  'generateSceneVideo'
+  'imageNode',
+  'videoNode'
 ];
 
 const nodeIcons: Record<NodeType, React.ReactNode> = {
-  imageInput: <Image className="w-4 h-4" />,
   videoInput: <Video className="w-4 h-4" />,
   textNode: <FileText className="w-4 h-4" />,
   novelInput: <BookOpen className="w-4 h-4" />,
   characterDescription: <Users className="w-4 h-4" />,
   sceneDescription: <Mountain className="w-4 h-4" />,
-  generateCharacterImage: <Users className="w-4 h-4" />,
-  generateSceneImage: <Mountain className="w-4 h-4" />,
   generateCharacterVideo: <Users className="w-4 h-4" />,
   generateSceneVideo: <Mountain className="w-4 h-4" />,
   createCharacter: <Users className="w-4 h-4" />,
   createScene: <Mountain className="w-4 h-4" />,
   videoAnalyze: <Sparkles className="w-4 h-4" />,
   storyboardNode: <Clapperboard className="w-4 h-4" />,
-  aiImage: <Wand2 className="w-4 h-4" />,
   aiVideo: <Film className="w-4 h-4" />,
   imageCompare: <GitCompare className="w-4 h-4" />,
-  preview: <Eye className="w-4 h-4" />,
   saveLocal: <HardDrive className="w-4 h-4" />,
+  imageNode: <Image className="w-4 h-4" />,
+  videoNode: <Film className="w-4 h-4" />,
 };
 
 const nodeColors: Record<string, string> = {
-  imageInput: 'border-blue-500 bg-blue-500/10',
   videoInput: 'border-purple-500 bg-purple-500/10',
   textNode: 'border-gray-500 bg-gray-500/10',
   novelInput: 'border-amber-500 bg-amber-500/10',
   characterDescription: 'border-green-500 bg-green-500/10',
   sceneDescription: 'border-emerald-500 bg-emerald-500/10',
-  generateCharacterImage: 'border-green-400 bg-green-400/10',
-  generateSceneImage: 'border-emerald-400 bg-emerald-400/10',
   generateCharacterVideo: 'border-green-300 bg-green-300/10',
   generateSceneVideo: 'border-emerald-300 bg-emerald-300/10',
   createCharacter: 'border-teal-500 bg-teal-500/10',
   createScene: 'border-teal-400 bg-teal-400/10',
   videoAnalyze: 'border-violet-500 bg-violet-500/10',
   storyboardNode: 'border-orange-500 bg-orange-500/10',
-  aiImage: 'border-pink-500 bg-pink-500/10',
   aiVideo: 'border-red-500 bg-red-500/10',
   imageCompare: 'border-cyan-500 bg-cyan-500/10',
-  preview: 'border-indigo-500 bg-indigo-500/10',
   saveLocal: 'border-yellow-500 bg-yellow-500/10',
+  imageNode: 'border-pink-400 bg-pink-400/10',
+  videoNode: 'border-red-400 bg-red-400/10',
 };
 
 interface NodeRendererProps {
@@ -106,28 +96,11 @@ function renderNodeBody(node: CanvasNode) {
         />
       );
     
-    case 'imageInput':
     case 'videoInput':
-      return (
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
-            placeholder={node.type === 'imageInput' ? 'Image URL...' : 'Video URL...'}
-            value={(node.data.imageUrl || node.data.videoUrl || '') as string}
-            onChange={(e) => updateData(node.type === 'imageInput' ? 'imageUrl' : 'videoUrl', e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button 
-            className="p-1 bg-gray-600 hover:bg-gray-500 rounded"
-            onClick={(e) => e.stopPropagation()}
-            title="Upload"
-          >
-            <Upload className="w-3 h-3" />
-          </button>
-        </div>
-      );
     
+    case 'aiVideo':
+    case 'generateCharacterVideo':
+    case 'generateSceneVideo':
     case 'aiImage':
     case 'aiVideo':
     case 'generateCharacterImage':
@@ -183,12 +156,87 @@ function renderNodeBody(node: CanvasNode) {
         </div>
       );
     
-    case 'preview':
+    case 'imageNode': {
+      const imageUrl = node.data.imageUrl as string;
+      const prompt = node.data.prompt as string || '';
+      const status = node.data.status as string || 'idle';
+      
       return (
-        <div className="w-32 h-20 bg-gray-700 rounded flex items-center justify-center">
-          <Play className="w-8 h-8 text-gray-500" />
+        <div className="space-y-2">
+          {/* Image Preview / Upload Area */}
+          <div 
+            className="w-32 h-20 bg-gray-700 rounded flex items-center justify-center overflow-hidden cursor-pointer hover:bg-gray-600"
+            onClick={(e) => e.stopPropagation()}
+            title="Click to upload image"
+          >
+            {imageUrl ? (
+              <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-center">
+                <Image className="w-6 h-6 text-gray-500 mx-auto" />
+                <span className="text-[10px] text-gray-500">Upload</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Prompt Input */}
+          <input
+            type="text"
+            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+            placeholder="Enter prompt..."
+            value={prompt}
+            onChange={(e) => updateData('prompt', e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Status indicator */}
+          {status === 'processing' && (
+            <div className="text-[10px] text-yellow-400">Generating...</div>
+          )}
         </div>
       );
+    }
+    
+    case 'videoNode': {
+      const videoUrl = node.data.videoUrl as string;
+      const prompt = node.data.prompt as string || '';
+      const status = node.data.status as string || 'idle';
+      
+      return (
+        <div className="space-y-2">
+          {/* Video Preview / Upload Area */}
+          <div 
+            className="w-32 h-20 bg-gray-700 rounded flex items-center justify-center overflow-hidden cursor-pointer hover:bg-gray-600"
+            onClick={(e) => e.stopPropagation()}
+            title="Click to upload video"
+          >
+            {videoUrl ? (
+              <video src={videoUrl} className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-center">
+                <Film className="w-6 h-6 text-gray-500 mx-auto" />
+                <span className="text-[10px] text-gray-500">Upload</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Prompt Input */}
+          <input
+            type="text"
+            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+            placeholder="Enter prompt..."
+            value={prompt}
+            onChange={(e) => updateData('prompt', e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Status indicator */}
+          {status === 'processing' && (
+            <div className="text-[10px] text-yellow-400">Generating...</div>
+          )}
+        </div>
+      );
+    }
     
     case 'saveLocal':
       return (

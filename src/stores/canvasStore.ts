@@ -10,28 +10,23 @@ export interface CanvasNode {
   width?: number;
   height?: number;
   collapsed?: boolean;
-}
-
+};
 export type NodeType = 
-  | 'imageInput' 
   | 'videoInput' 
   | 'textNode' 
   | 'novelInput'
   | 'characterDescription'
   | 'sceneDescription'
-  | 'generateCharacterImage'
-  | 'generateSceneImage'
   | 'generateCharacterVideo'
   | 'generateSceneVideo'
   | 'createCharacter'
   | 'createScene'
   | 'videoAnalyze'
   | 'storyboardNode'
-  | 'aiImage'
-  | 'aiVideo'
   | 'imageCompare'
   | 'preview'
-  | 'saveLocal';
+  | 'imageNode'
+  | 'videoNode';
 
 export interface Connection {
   id: string;
@@ -79,25 +74,40 @@ export interface CanvasState {
 }
 
 const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
-  imageInput: { type: 'imageInput', data: { label: 'Image Input', imageUrl: '' } },
   videoInput: { type: 'videoInput', data: { label: 'Video Input', videoUrl: '' } },
   textNode: { type: 'textNode', data: { label: 'Text', content: '' } },
   novelInput: { type: 'novelInput', data: { label: 'Novel Input', content: '' } },
   characterDescription: { type: 'characterDescription', data: { label: 'Character Description' } },
   sceneDescription: { type: 'sceneDescription', data: { label: 'Scene Description' } },
-  generateCharacterImage: { type: 'generateCharacterImage', data: { label: 'Generate Character Image', prompt: '' } },
-  generateSceneImage: { type: 'generateSceneImage', data: { label: 'Generate Scene Image', prompt: '' } },
   generateCharacterVideo: { type: 'generateCharacterVideo', data: { label: 'Generate Character Video', prompt: '' } },
   generateSceneVideo: { type: 'generateSceneVideo', data: { label: 'Generate Scene Video', prompt: '' } },
   createCharacter: { type: 'createCharacter', data: { label: 'Create Character' } },
   createScene: { type: 'createScene', data: { label: 'Create Scene' } },
   videoAnalyze: { type: 'videoAnalyze', data: { label: 'Video Analyze' } },
   storyboardNode: { type: 'storyboardNode', data: { label: 'Storyboard' } },
-  aiImage: { type: 'aiImage', data: { label: 'AI Image', prompt: '', modelId: '' } },
   aiVideo: { type: 'aiVideo', data: { label: 'AI Video', prompt: '', modelId: '' } },
   imageCompare: { type: 'imageCompare', data: { label: 'Image Compare', imageA: '', imageB: '' } },
   preview: { type: 'preview', data: { label: 'Preview' } },
-  saveLocal: { type: 'saveLocal', data: { label: 'Save to Local', autoSave: false } },
+  imageNode: { 
+    type: 'imageNode', 
+    data: { 
+      label: 'Image', 
+      imageUrl: '',
+      prompt: '',
+      aspectRatio: '1:1',
+      resolution: '1K',
+      status: 'idle'
+    } 
+  },
+  videoNode: { 
+    type: 'videoNode', 
+    data: { 
+      label: 'Video', 
+      videoUrl: '',
+      prompt: '',
+      status: 'idle'
+    } 
+  },
 };
 
 let nodeIdCounter = 0;
@@ -295,7 +305,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   // 执行节点：调用任务 API 生成图片或视频
   executeNode: async (nodeId) => {
-    const { nodes, updateNode } = get();
+    const { nodes, updateNode, addNode, addConnection } = get();
     const node = nodes.find(n => n.id === nodeId);
     if (!node) return;
 
@@ -309,8 +319,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return;
     }
 
-    // 确定任务类型
-    const isVideoNode = ['aiVideo', 'generateCharacterVideo', 'generateSceneVideo'].includes(node.type);
+    // 确定任务类型 (imageNode = 图片, videoNode = 视频)
+    const isVideoNode = node.type === 'videoNode' || ['aiVideo', 'generateCharacterVideo', 'generateSceneVideo'].includes(node.type);
+    const isImageNode = node.type === 'imageNode';
     const taskType = isVideoNode ? 'video' : 'image';
 
     // 默认 modelId (需要根据实际情况调整)
@@ -329,6 +340,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
       if (response.data?.data) {
         const taskResult = response.data.data;
+        
         // 更新状态和 taskId
         updateNode(nodeId, { 
           data: { 
@@ -337,6 +349,28 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
             taskId: taskResult.id
           } 
         });
+        
+        // 如果是图片生成任务，自动创建 imageNode 并连接
+        if (!isVideoNode && taskResult.result) {
+          const imageNodeId = `imageNode_${Date.now()}`;
+          const newImageNode = {
+            id: imageNodeId,
+            type: 'imageNode' as NodeType,
+            position: { x: node.position.x + 350, y: node.position.y },
+            data: { 
+              label: 'Generated Image', 
+              imageUrl: taskResult.result,
+              status: 'completed'
+            }
+          };
+          
+          // 保存到 undo stack 并添加节点
+          get().saveToUndoStack();
+          set((state) => ({ nodes: [...state.nodes, newImageNode] }));
+          
+          // 创建连接边
+          addConnection(nodeId, imageNodeId);
+        }
       }
     } catch (error) {
       // 更新状态为失败

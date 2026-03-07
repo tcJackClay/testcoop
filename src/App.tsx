@@ -6,6 +6,9 @@ import Canvas from './components/canvas/Canvas';
 import NodePropertiesPanel from './components/canvas/NodePropertiesPanel';
 import SettingsModal from './features/settings/SettingsModal';
 import Storyboard from './features/storyboard/Storyboard';
+import History from './features/history/History';
+import Models from './features/models/Models';
+import ChatPanel from './features/chat/ChatPanel';
 import { useCanvasStore, type NodeType } from './stores/canvasStore';
 
 export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models';
@@ -16,6 +19,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   
   const { selectedNodeIds } = useCanvasStore();
 
@@ -41,12 +45,15 @@ export default function App() {
     addNode(type, { x, y });
     setViewMode('canvas');
   }, [addNode]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
       <Header
         viewMode={viewMode}
         onViewChange={handleViewChange}
         onSettingsClick={() => setShowSettings(true)}
+        onChatClick={() => setChatOpen(!chatOpen)}
+        chatOpen={chatOpen}
       />
       
       <div className="flex-1 flex overflow-hidden">
@@ -75,6 +82,11 @@ export default function App() {
           {viewMode === 'history' && <History />}
           {viewMode === 'models' && <Models />}
         </main>
+
+        {/* Chat Panel */}
+        {chatOpen && viewMode === 'canvas' && (
+          <ChatPanel onClose={() => setChatOpen(false)} />
+        )}
       </div>
 
       {showSettings && (

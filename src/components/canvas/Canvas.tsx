@@ -7,12 +7,54 @@ import {
   Grid3X3,
   Undo2,
   Redo2,
-  MousePointer2
+  Image,
+  Video,
+  FileText,
+  BookOpen,
+  Wand2,
+  Film,
+  Eye,
+  HardDrive,
+  GitCompare,
+  Sparkles,
+  Clapperboard,
+  Users,
+  Mountain
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useCanvasStore, type NodeType } from '../../stores/canvasStore';
 import NodeRenderer from '../nodes/NodeRenderer';
 import ConnectionLine from '../nodes/ConnectionLine';
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  worldX: number;
+  worldY: number;
+}
+
+interface ContextMenuItem {
+  type: NodeType;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const nodeTypeItems: ContextMenuItem[] = [
+  { type: 'imageInput', label: '图片输入', icon: <Image className="w-4 h-4" /> },
+  { type: 'videoInput', label: '视频输入', icon: <Video className="w-4 h-4" /> },
+  { type: 'textNode', label: '文字节点', icon: <FileText className="w-4 h-4" /> },
+  { type: 'novelInput', label: '小说输入', icon: <BookOpen className="w-4 h-4" /> },
+  { type: 'aiImage', label: 'AI 绘图', icon: <Wand2 className="w-4 h-4" /> },
+  { type: 'aiVideo', label: 'AI 视频', icon: <Film className="w-4 h-4" /> },
+  { type: 'storyboardNode', label: '智能分镜', icon: <Clapperboard className="w-4 h-4" /> },
+  { type: 'videoAnalyze', label: '视频拆解', icon: <Sparkles className="w-4 h-4" /> },
+  { type: 'characterDescription', label: '角色描述', icon: <Users className="w-4 h-4" /> },
+  { type: 'sceneDescription', label: '场景描述', icon: <Mountain className="w-4 h-4" /> },
+  { type: 'imageCompare', label: '图像对比', icon: <GitCompare className="w-4 h-4" /> },
+  { type: 'preview', label: '预览窗口', icon: <Eye className="w-4 h-4" /> },
+  { type: 'saveLocal', label: '保存到本地', icon: <HardDrive className="w-4 h-4" /> },
+];
 
 export default function Canvas() {
   const { t } = useTranslation();
@@ -22,6 +64,13 @@ export default function Canvas() {
   const [selectionBox, setSelectionBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    worldX: 0,
+    worldY: 0,
+  });
   
   const { 
     nodes, 
@@ -45,6 +94,41 @@ export default function Canvas() {
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     updateViewPort({ zoom: newZoom });
   }, [viewPort.zoom, updateViewPort]);
+
+  // Handle context menu (right-click)
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const worldX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+      const worldY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+      setContextMenu({
+        visible: true,
+        x: e.clientX,
+        y: e.clientY,
+        worldX,
+        worldY,
+      });
+    }
+  }, [viewPort.x, viewPort.y, viewPort.zoom]);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(prev => ({ ...prev, visible: false }));
+  }, []);
+
+  const handleAddNodeFromContextMenu = useCallback((type: NodeType) => {
+    addNode(type, { x: contextMenu.worldX, y: contextMenu.worldY });
+    closeContextMenu();
+  }, [addNode, contextMenu.worldX, contextMenu.worldY, closeContextMenu]);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => closeContextMenu();
+    if (contextMenu.visible) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu.visible, closeContextMenu]);
 
   // Handle pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -94,7 +178,7 @@ export default function Canvas() {
       const rect = containerRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
       const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-      addNode(nodeType as any, { x, y });
+      addNode(nodeType as NodeType, { x, y });
     }
   }, [addNode, viewPort]);
 
@@ -215,6 +299,7 @@ export default function Canvas() {
         onMouseLeave={handleMouseUp}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
+        onContextMenu={handleContextMenu}
       >
         <div
           className="absolute inset-0 origin-top-left canvas-content"
@@ -258,7 +343,28 @@ export default function Canvas() {
             <div className="text-center text-gray-500">
               <Grid3X3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{t('canvas.addNode')}</p>
+              <p className="text-xs mt-1">右键点击添加节点</p>
             </div>
+          </div>
+        )}
+
+        {/* Context Menu */}
+        {contextMenu.visible && (
+          <div
+            className="fixed z-50 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {nodeTypeItems.map((item) => (
+              <button
+                key={item.type}
+                onClick={() => handleAddNodeFromContextMenu(item.type)}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            ))}
           </div>
         )}
       </div>

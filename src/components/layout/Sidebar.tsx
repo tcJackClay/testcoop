@@ -26,6 +26,7 @@ interface SidebarProps {
   onViewChange: (mode: ViewMode) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onAddNode?: (type: NodeType) => void;
 }
 
 interface NodeCategory {
@@ -86,13 +87,21 @@ export default function Sidebar({
   viewMode, 
   onViewChange, 
   collapsed, 
-  onToggleCollapse 
+  onToggleCollapse,
+  onAddNode 
 }: SidebarProps) {
   const { t } = useTranslation();
 
   const handleDragStart = (e: React.DragEvent, nodeType: NodeType) => {
     e.dataTransfer.setData('application/reactflow', nodeType);
     e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleClick = (e: React.MouseEvent, nodeType: NodeType) => {
+    e.preventDefault();
+    if (onAddNode) {
+      onAddNode(nodeType);
+    }
   };
 
   return (
@@ -125,6 +134,7 @@ export default function Sidebar({
                     key={item.type}
                     draggable
                     onDragStart={(e) => handleDragStart(e, item.type)}
+                    onClick={(e) => handleClick(e, item.type)}
                     className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600
                              rounded-md cursor-grab text-sm text-gray-300 hover:text-white
                              transition-colors"

@@ -6,8 +6,7 @@ import Canvas from './components/canvas/Canvas';
 import NodePropertiesPanel from './components/canvas/NodePropertiesPanel';
 import SettingsModal from './features/settings/SettingsModal';
 import Storyboard from './features/storyboard/Storyboard';
-import Models from './features/models/Models';
-import { useCanvasStore } from './stores/canvasStore';
+import { useCanvasStore, type NodeType } from './stores/canvasStore';
 
 export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models';
 
@@ -32,6 +31,16 @@ export default function App() {
   const handleViewChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
   }, []);
+
+  const { addNode } = useCanvasStore();
+
+  const handleAddNode = useCallback((type: NodeType) => {
+    // Add node to center of canvas view
+    const x = 100 + Math.random() * 200;
+    const y = 100 + Math.random() * 200;
+    addNode(type, { x, y });
+    setViewMode('canvas');
+  }, [addNode]);
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
       <Header
@@ -46,6 +55,7 @@ export default function App() {
           onViewChange={handleViewChange}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onAddNode={handleAddNode}
         />
         
         <main className="flex-1 flex overflow-hidden">

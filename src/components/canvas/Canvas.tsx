@@ -6,6 +6,8 @@ import NodeRenderer from '../nodes/NodeRenderer';
 import ConnectionLine from '../nodes/ConnectionLine';
 import CanvasToolbar from './CanvasToolbar';
 import CanvasContextMenu from './CanvasContextMenu';
+import AssetSidebar from './AssetSidebar';
+import { Image } from 'lucide-react';
 
 interface ContextMenuState {
   visible: boolean;
@@ -26,6 +28,7 @@ export default function Canvas() {
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, worldX: 0, worldY: 0 });
+  const [isAssetSidebarOpen, setIsAssetSidebarOpen] = useState(false);
   
   // Store
   const { 
@@ -250,6 +253,22 @@ export default function Canvas() {
           onClose={closeContextMenu}
         />
       </div>
+      
+      {/* Asset Library Sidebar */}
+      <AssetSidebar 
+        isOpen={isAssetSidebarOpen} 
+        onClose={() => setIsAssetSidebarOpen(false)} 
+      />
+      
+      {/* Asset Library Button - Bottom Right */}
+      <button
+        onClick={() => setIsAssetSidebarOpen(true)}
+        className="fixed bottom-6 right-6 z-40 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+        title="资产库"
+      >
+        <Image className="w-5 h-5" />
+        <span className="text-sm font-medium">资产库</span>
+      </button>
     </div>
   );
 }

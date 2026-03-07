@@ -112,6 +112,27 @@ export default function Canvas() {
     }
   }, [viewPort.x, viewPort.y, viewPort.zoom]);
 
+  // Handle double-click (same as right-click - show context menu)
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    // Only trigger on the canvas background, not on nodes
+    if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains('canvas-content')) {
+      return;
+    }
+    e.preventDefault();
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const worldX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+      const worldY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+      setContextMenu({
+        visible: true,
+        x: e.clientX,
+        y: e.clientY,
+        worldX,
+        worldY,
+      });
+    }
+  }, [viewPort.x, viewPort.y, viewPort.zoom]);
+
   const closeContextMenu = useCallback(() => {
     setContextMenu(prev => ({ ...prev, visible: false }));
   }, []);
@@ -133,12 +154,10 @@ export default function Canvas() {
   // Handle pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      // Middle mouse or Alt+Left click for panning
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX - viewPort.x, y: e.clientY - viewPort.y });
     } else if (e.button === 0 && e.target === containerRef.current) {
-      // Left click on canvas for selection box
       clearSelection();
       setIsSelecting(true);
       setSelectionStart({ x: e.clientX, y: e.clientY });
@@ -190,23 +209,19 @@ export default function Canvas() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Undo: Ctrl/Cmd + Z
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
       }
-      // Redo: Ctrl/Cmd + Shift + Z or Ctrl + Y
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
         e.preventDefault();
         redo();
       }
-      // Delete selected nodes
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodeIds.length > 0 && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
           deleteSelectedNodes();
         }
       }
-      // Escape to clear selection
       if (e.key === 'Escape') {
         clearSelection();
       }
@@ -300,6 +315,7 @@ export default function Canvas() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onContextMenu={handleContextMenu}
+        onDoubleClick={handleDoubleClick}
       >
         <div
           className="absolute inset-0 origin-top-left canvas-content"
@@ -343,7 +359,7 @@ export default function Canvas() {
             <div className="text-center text-gray-500">
               <Grid3X3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{t('canvas.addNode')}</p>
-              <p className="text-xs mt-1">右键点击添加节点</p>
+              <p className="text-xs mt-1">双击或右键点击添加节点</p>
             </div>
           </div>
         )}

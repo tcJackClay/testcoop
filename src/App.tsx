@@ -25,7 +25,7 @@ export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [charactersOpen, setCharactersOpen] = useState(false);
   
-  const { selectedNodeIds } = useCanvasStore();
+  const { selectedNodeIds, nodes, deleteNode, clearSelection } = useCanvasStore();
 
   // Show properties panel when a node is selected in canvas view
   useEffect(() => {
@@ -50,6 +50,16 @@ export default function App() {
     setViewMode('canvas');
   }, [addNode]);
 
+  const handleNewProject = useCallback(() => {
+    if (nodes.length > 0) {
+      if (confirm('确定要新建项目吗？当前内容将被清空。')) {
+        // Clear all nodes
+        nodes.forEach(node => deleteNode(node.id));
+        clearSelection();
+      }
+    }
+  }, [nodes, deleteNode, clearSelection]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
       <Header
@@ -58,6 +68,7 @@ export default function App() {
         onSettingsClick={() => setShowSettings(true)}
         onChatClick={() => setChatOpen(!chatOpen)}
         chatOpen={chatOpen}
+        onNewProject={handleNewProject}
       />
       
       <div className="flex-1 flex overflow-hidden">

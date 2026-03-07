@@ -36,7 +36,7 @@ export function useCanvasEvents({
   updateViewPort,
   selectNodesInBox,
 }: UseCanvasEventsProps) {
-  const { addNode, deleteSelectedNodes, undo, redo, undoStack, redoStack, copyNodes, pasteNodes, selectAll } = useCanvasStore();
+  const { addNode, deleteSelectedNodes, undo, redo, undoStack, redoStack, copyNodes, pasteNodes, selectAll, selectedNodeIds } = useCanvasStore();
 
   // Handle wheel zoom
   const handleWheelNative = useCallback((e: WheelEvent) => {

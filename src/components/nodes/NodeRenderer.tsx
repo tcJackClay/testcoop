@@ -287,7 +287,7 @@ function renderNodeBody(node: CanvasNode) {
               {status === 'processing' ? <><span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />生成中</> : <><Sparkles className="w-3 h-3" />生成</>}
             </button>
           </div>
-          
+          {/* Status indicator */}
           {/* Generate Button */}
           <div className="px-2">
             <button

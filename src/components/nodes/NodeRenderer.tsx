@@ -187,11 +187,11 @@ function renderNodeBody(node: CanvasNode) {
             {imageUrl ? (
               <label 
                 htmlFor={`image-upload-${node.id}`}
-                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90 h-32"
+                className="relative flex items-center justify-center rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90 min-h-[160px]"
 
 
               >
-                <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
+                <img src={imageUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
 
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                   <Upload className="w-6 h-6 text-white" />

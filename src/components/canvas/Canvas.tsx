@@ -4,22 +4,24 @@ import {
   ZoomOut, 
   Maximize2, 
   Trash2,
-  Grid3X3
+  Grid3X3,
+  Undo2,
+  Redo2,
+  MousePointer2
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCanvasStore } from '../../stores/canvasStore';
 import NodeRenderer from '../nodes/NodeRenderer';
 import ConnectionLine from '../nodes/ConnectionLine';
 
-interface CanvasProps {
-  // Props will be extended
-}
-
-export default function Canvas({}: CanvasProps) {
+export default function Canvas() {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionBox, setSelectionBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   
   const { 
     nodes, 
@@ -28,12 +30,17 @@ export default function Canvas({}: CanvasProps) {
     addNode,
     updateViewPort,
     deleteSelectedNodes,
-    selectedNodeIds
+    selectedNodeIds,
+    undo,
+    redo,
+    undoStack,
+    redoStack,
+    selectNodesInBox,
+    clearSelection
   } = useCanvasStore();
 
   // Handle wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     updateViewPort({ zoom: newZoom });
@@ -41,24 +48,43 @@ export default function Canvas({}: CanvasProps) {
 
   // Handle pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('canvas-grid')) {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - viewPort.x, y: e.clientY - viewPort.y });
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      // Middle mouse or Alt+Left click for panning
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - viewPort.x, y: e.clientY - viewPort.y });
+    } else if (e.button === 0 && e.target === containerRef.current) {
+      // Left click on canvas for selection box
+      clearSelection();
+      setIsSelecting(true);
+      setSelectionStart({ x: e.clientX, y: e.clientY });
+      setSelectionBox({ x: e.clientX, y: e.clientY, width: 0, height: 0 });
     }
-  }, [viewPort.x, viewPort.y]);
+  }, [viewPort.x, viewPort.y, clearSelection]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isDragging) {
+    if (isPanning) {
       updateViewPort({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
       });
+    } else if (isSelecting) {
+      const x = Math.min(e.clientX, selectionStart.x);
+      const y = Math.min(e.clientY, selectionStart.y);
+      const width = Math.abs(e.clientX - selectionStart.x);
+      const height = Math.abs(e.clientY - selectionStart.y);
+      setSelectionBox({ x, y, width, height });
     }
-  }, [isDragging, dragStart, updateViewPort]);
+  }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort]);
 
   const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+    if (isSelecting && selectionBox && selectionBox.width > 5 && selectionBox.height > 5) {
+      selectNodesInBox(selectionBox);
+    }
+    setIsPanning(false);
+    setIsSelecting(false);
+    setSelectionBox(null);
+  }, [isSelecting, selectionBox, selectNodesInBox]);
 
   // Handle drop
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -68,7 +94,7 @@ export default function Canvas({}: CanvasProps) {
       const rect = containerRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
       const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-      addNode(nodeType, { x, y });
+      addNode(nodeType as any, { x, y });
     }
   }, [addNode, viewPort]);
 
@@ -80,15 +106,30 @@ export default function Canvas({}: CanvasProps) {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Undo: Ctrl/Cmd + Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      // Redo: Ctrl/Cmd + Shift + Z or Ctrl + Y
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        redo();
+      }
+      // Delete selected nodes
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedNodeIds.length > 0) {
+        if (selectedNodeIds.length > 0 && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
           deleteSelectedNodes();
         }
+      }
+      // Escape to clear selection
+      if (e.key === 'Escape') {
+        clearSelection();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeIds, deleteSelectedNodes]);
+  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection]);
 
   const handleZoomIn = () => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) });
   const handleZoomOut = () => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) });
@@ -126,6 +167,30 @@ export default function Canvas({}: CanvasProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={undo}
+            disabled={undoStack.length === 0}
+            className={`p-1.5 rounded ${
+              undoStack.length > 0 
+                ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
+                : 'text-gray-600 cursor-not-allowed'
+            }`}
+            title={t('canvas.undo')}
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={redo}
+            disabled={redoStack.length === 0}
+            className={`p-1.5 rounded ${
+              redoStack.length > 0 
+                ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
+                : 'text-gray-600 cursor-not-allowed'
+            }`}
+            title={t('canvas.redo')}
+          >
+            <Redo2 className="w-4 h-4" />
+          </button>
           {selectedNodeIds.length > 0 && (
             <button
               onClick={deleteSelectedNodes}
@@ -142,7 +207,7 @@ export default function Canvas({}: CanvasProps) {
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden canvas-grid"
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : 'default' }}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -173,6 +238,19 @@ export default function Canvas({}: CanvasProps) {
             <NodeRenderer key={node.id} node={node} />
           ))}
         </div>
+
+        {/* Selection Box */}
+        {selectionBox && (
+          <div
+            className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none"
+            style={{
+              left: selectionBox.x,
+              top: selectionBox.y,
+              width: selectionBox.width,
+              height: selectionBox.height,
+            }}
+          />
+        )}
 
         {/* Empty state */}
         {nodes.length === 0 && (

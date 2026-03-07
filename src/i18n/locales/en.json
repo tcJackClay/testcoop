@@ -1,4 +1,36 @@
 {
+  "properties": {
+    "title": "Properties",
+    "noSelection": "Select a node to view properties",
+    "noProperties": "No additional properties",
+    "content": "Content",
+    "imageUrl": "Image URL",
+    "videoUrl": "Video URL",
+    "label": "Label",
+    "prompt": "Prompt",
+    "promptPlaceholder": "Enter prompt...",
+    "negativePrompt": "Negative Prompt",
+    "negativePromptPlaceholder": "Enter what to avoid...",
+    "selectModel": "Select Model",
+    "model": "Model",
+    "steps": "Steps",
+    "cfgScale": "CFG Scale",
+    "name": "Name",
+    "description": "Description",
+    "analyzeType": "Analyze Type",
+    "analyzeAll": "Analyze All",
+    "analyzeScene": "Scene Analysis",
+    "analyzeCharacter": "Character Analysis",
+    "analyzeAction": "Action Analysis",
+    "aspectRatio": "Aspect Ratio",
+    "frameRate": "Frame Rate",
+    "imageA": "Image A",
+    "imageB": "Image B",
+    "autoSave": "Auto Save",
+    "position": "Position",
+    "delete": "Delete Node"
+  },
+
   "common": {
     "loading": "Loading...",
     "save": "Save",
@@ -39,5 +71,22 @@
     "apiConfig": "API Configuration",
     "theme": "Theme",
     "language": "Language"
+  },
+  "models": {
+    "title": "Model Library",
+    "addModel": "Add Model",
+    "editModel": "Edit Model",
+    "deleteModel": "Delete Model",
+    "testModel": "Test",
+    "provider": "Provider",
+    "modelId": "Model ID",
+    "baseUrl": "Base URL",
+    "apiKey": "API Key",
+    "type": "Type",
+    "typeImage": "Image",
+    "typeVideo": "Video",
+    "name": "Name",
+    "empty": "No models configured",
+    "confirmDelete": "Are you sure you want to delete this model?"
   }
 }

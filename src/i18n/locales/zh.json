@@ -1,4 +1,35 @@
 {
+  "properties": {
+    "title": "节点属性",
+    "noSelection": "选择节点以查看属性",
+    "noProperties": "该节点无额外属性",
+    "content": "内容",
+    "imageUrl": "图片地址",
+    "videoUrl": "视频地址",
+    "label": "标签",
+    "prompt": "提示词",
+    "promptPlaceholder": "输入 AI 提示词...",
+    "negativePrompt": "反向提示词",
+    "negativePromptPlaceholder": "输入不想生成的内容...",
+    "selectModel": "选择模型",
+    "model": "模型",
+    "steps": "采样步数",
+    "cfgScale": "引导系数",
+    "name": "名称",
+    "description": "描述",
+    "analyzeType": "分析类型",
+    "analyzeAll": "全部分析",
+    "analyzeScene": "场景分析",
+    "analyzeCharacter": "角色分析",
+    "analyzeAction": "动作分析",
+    "aspectRatio": "宽高比",
+    "frameRate": "帧率",
+    "imageA": "图片 A",
+    "imageB": "图片 B",
+    "autoSave": "自动保存",
+    "position": "位置",
+    "delete": "删除节点"
+  },
   "common": {
     "loading": "加载中...",
     "save": "保存",
@@ -24,13 +55,35 @@
     "zoomIn": "放大",
     "zoomOut": "缩小",
     "fitView": "适应视图",
-    "clearCanvas": "清空画布"
+    "clearCanvas": "清空画布",
+    "undo": "撤销",
+    "redo": "重做"
   },
   "nodes": {
+    "category": {
+      "input": "输入节点",
+      "ai": "AI 生成",
+      "storyboard": "分镜节点",
+      "character": "角色/场景",
+      "tools": "工具节点"
+    },
     "imageInput": "图片输入",
     "videoInput": "视频输入",
+    "textNode": "文字节点",
+    "novelInput": "小说输入",
     "aiImage": "AI 绘图",
     "aiVideo": "AI 视频",
+    "storyboardNode": "智能分镜",
+    "videoAnalyze": "视频拆解",
+    "characterDescription": "角色描述",
+    "sceneDescription": "场景描述",
+    "createCharacter": "创建角色",
+    "createScene": "创建场景",
+    "generateCharacterImage": "生成角色图片",
+    "generateSceneImage": "生成场景图片",
+    "generateCharacterVideo": "生成角色视频",
+    "generateSceneVideo": "生成场景视频",
+    "imageCompare": "图像对比",
     "preview": "预览",
     "saveLocal": "保存到本地"
   },
@@ -90,6 +143,10 @@
     "baseUrl": "接口地址",
     "apiKey": "API Key",
     "type": "类型",
-    "empty": "暂无模型配置"
+    "typeImage": "图片",
+    "typeVideo": "视频",
+    "name": "名称",
+    "empty": "暂无模型配置",
+    "confirmDelete": "确认删除此模型?"
   }
 }

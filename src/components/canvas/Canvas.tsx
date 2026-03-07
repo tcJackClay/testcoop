@@ -34,6 +34,22 @@ export default function Canvas() {
     selectNodesInBox, clearSelection, copyNodes, pasteNodes
   } = useCanvasStore();
 
+  // Handle wheel zoom with passive: false to allow preventDefault
+  const handleWheelNative = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
+    updateViewPort({ zoom: newZoom });
+  }, [viewPort.zoom, updateViewPort]);
+
+  // Attach wheel event listener with passive: false
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    
+    element.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheelNative);
+  }, [handleWheelNative]);
   // Zoom handlers
   const handleZoomIn = useCallback(() => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) }), [viewPort.zoom, updateViewPort]);
   const handleZoomOut = useCallback(() => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) }), [viewPort.zoom, updateViewPort]);
@@ -42,6 +58,7 @@ export default function Canvas() {
   // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
+
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     updateViewPort({ zoom: newZoom });

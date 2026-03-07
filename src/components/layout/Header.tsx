@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Settings, Zap, MessageSquare, Layers, Plus } from 'lucide-react';
+import { Settings, Zap, MessageSquare, Layers, Plus, LogIn, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '../../App';
+import { useAuthStore } from '../../stores/authStore';
 
 interface HeaderProps {
   viewMode: ViewMode;
@@ -31,6 +32,8 @@ export default function Header({
   const [projectName, setProjectName] = useState('未命名项目');
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  const { user, token, openLoginModal, logout } = useAuthStore();
 
   useEffect(() => {
     const saved = localStorage.getItem('project_name');
@@ -47,6 +50,10 @@ export default function Header({
       setIsEditing(false);
       localStorage.setItem('project_name', projectName);
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
@@ -113,7 +120,7 @@ export default function Header({
         ))}
       </div>
 
-      {/* Right Section: Performance + Chat + Settings */}
+      {/* Right Section: Performance + Chat + Settings + Auth */}
       <div className="flex items-center gap-2">
         {/* Performance Mode */}
         <button
@@ -147,6 +154,35 @@ export default function Header({
         >
           <Settings size={16} />
         </button>
+
+        {/* Login / User / Logout Button */}
+        {token && user ? (
+          <div className="flex items-center gap-1">
+            <button
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
+              title={`当前用户: ${user.username}`}
+            >
+              <User size={12} />
+              <span>{user.username}</span>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+              title="登出"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={openLoginModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            title="登录"
+          >
+            <LogIn size={12} />
+            <span>登录</span>
+          </button>
+        )}
       </div>
     </header>
   );

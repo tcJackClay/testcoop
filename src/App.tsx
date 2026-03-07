@@ -4,6 +4,7 @@ import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Canvas from './components/canvas/Canvas';
 import SettingsModal from './features/settings/SettingsModal';
+import LoginModal from './components/auth/LoginModal';
 import Storyboard from './features/storyboard/Storyboard';
 import History from './features/history/History';
 import Models from './features/models/Models';
@@ -106,6 +107,8 @@ export default function App() {
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
       )}
+
+      <LoginModal />
     </div>
   );
 }

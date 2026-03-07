@@ -1,17 +1,28 @@
 import { useState } from 'react';
-import { X, Globe, Palette } from 'lucide-react';
+import { X, Globe, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '../../stores/authStore';
 
 interface SettingsModalProps {
   onClose: () => void;
 }
 
+type TabType = 'api' | 'language' | 'dev';
+
 export default function SettingsModal({ onClose }: SettingsModalProps) {
   const { t, i18n } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'api' | 'theme' | 'language'>('api');
+  const [activeTab, setActiveTab] = useState<TabType>('api');
+  
+  const { user, isDevMode, toggleDevMode } = useAuthStore();
+  const isAdmin = user?.username === 'admin';
 
   const handleLanguageChange = (lang: string) => {
     i18n.changeLanguage(lang);
+  };
+
+  const testApi = (apiName: string, response: string) => {
+    console.log(`[DEV] 模拟${apiName}测试成功`);
+    alert(`[DEV] 模拟${apiName}测试成功\n\n${response}`);
   };
 
   return (
@@ -52,6 +63,19 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
             <Globe className="w-4 h-4 inline mr-1" />
             {t('settings.language')}
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('dev')}
+              className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'dev'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-white'
+              }`}
+            >
+              <Zap className="w-4 h-4 inline mr-1" />
+              开发者
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -61,7 +85,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               <p className="text-gray-400 text-sm">
                 API Configuration - Coming soon
               </p>
-              {/* API config form will be added here */}
             </div>
           )}
 
@@ -89,6 +112,68 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 <span>English</span>
                 {i18n.language === 'en' && <span className="text-xs">✓</span>}
               </button>
+            </div>
+          )}
+
+          {activeTab === 'dev' && isAdmin && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-700 rounded-lg">
+                <div>
+                  <h3 className="font-medium">开发者模式</h3>
+                  <p className="text-xs text-gray-400 mt-1">
+                    开启后可查看详细调用日志和模拟API测试
+                  </p>
+                </div>
+                <button
+                  onClick={toggleDevMode}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isDevMode ? 'bg-green-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isDevMode ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              
+              {isDevMode && (
+                <>
+                  <div className="p-4 bg-gray-900 rounded-lg">
+                    <h4 className="font-medium text-sm mb-2">开发者模式已启用</h4>
+                    <ul className="text-xs text-gray-400 space-y-1">
+                      <li>• API 调用将显示详细日志</li>
+                      <li>• 可使用模拟信号测试 API 连通性</li>
+                      <li>• 不会产生实际的 API 调用</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-900 rounded-lg">
+                    <h4 className="font-medium text-sm mb-3">模拟 API 测试</h4>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => testApi('登录', 'Token: mock_token_123\nUser: mock_user')}
+                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg"
+                      >
+                        测试登录 API
+                      </button>
+                      <button
+                        onClick={() => testApi('获取用户信息', 'User: admin (admin@example.com)')}
+                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg"
+                      >
+                        测试获取用户信息
+                      </button>
+                      <button
+                        onClick={() => testApi('模型列表', 'Models: GPT-4, Claude, Midjourney')}
+                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg"
+                      >
+                        测试模型列表
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

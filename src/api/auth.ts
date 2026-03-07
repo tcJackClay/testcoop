@@ -32,7 +32,7 @@ export const authApi = {
    * 用户登录
    */
   login: async (data: LoginRequest): Promise<ApiResponse<LoginResponse>> => {
-    const response = await apiClient.post('/api/auth/login', data)
+    const response = await apiClient.post('/auth/login', data)
     return response.data
   },
 
@@ -40,7 +40,7 @@ export const authApi = {
    * 用户注册
    */
   register: async (data: RegisterRequest): Promise<ApiResponse<LoginResponse>> => {
-    const response = await apiClient.post('/api/auth/register', data)
+    const response = await apiClient.post('/auth/register', data)
     return response.data
   },
 
@@ -48,7 +48,7 @@ export const authApi = {
    * 登出
    */
   logout: async (): Promise<ApiResponse<void>> => {
-    const response = await apiClient.post('/api/auth/logout')
+    const response = await apiClient.post('/auth/logout')
     return response.data
   },
 
@@ -56,7 +56,7 @@ export const authApi = {
    * 刷新Token
    */
   refreshToken: async (refreshToken: string): Promise<ApiResponse<LoginResponse>> => {
-    const response = await apiClient.post('/api/auth/refresh', { refreshToken })
+    const response = await apiClient.post('/auth/refresh', { refreshToken })
     return response.data
   },
 
@@ -64,7 +64,7 @@ export const authApi = {
    * 获取当前用户信息
    */
   getCurrentUser: async (): Promise<ApiResponse<LoginResponse['user']>> => {
-    const response = await apiClient.get('/api/auth/me')
+    const response = await apiClient.get('/auth/me')
     return response.data
   },
 }

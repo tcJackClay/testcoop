@@ -17,10 +17,20 @@ import {
   Play,
   Save,
   Upload,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
-import type { CanvasNode, NodeType } from '../../stores/canvasStore';
 import { useCanvasStore } from '../../stores/canvasStore';
+
+// Generation node types that support execution
+const generationNodeTypes = [
+  'aiImage',
+  'aiVideo',
+  'generateCharacterImage',
+  'generateSceneImage',
+  'generateCharacterVideo',
+  'generateSceneVideo'
+];
 
 const nodeIcons: Record<NodeType, React.ReactNode> = {
   imageInput: <Image className="w-4 h-4" />,
@@ -194,7 +204,7 @@ function renderNodeBody(node: CanvasNode) {
 }
 
 export default function NodeRenderer({ node }: NodeRendererProps) {
-  const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode } = useCanvasStore();
+  const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode, executeNode } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -288,6 +298,24 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       >
         <X size={12} />
       </button>
+
+      {/* Execute Button - Only for generation nodes */}
+      {generationNodeTypes.includes(node.type) && (
+        <button
+          className="absolute -top-2.5 -right-8 z-50 p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-green-400 hover:text-green-300 border-gray-700 hover:bg-gray-700"
+          onClick={(e) => {
+            e.stopPropagation();
+            executeNode(node.id);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {node.data.status === 'processing' ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Play size={12} />
+          )}
+        </button>
+      )}
 
       {/* Body */}
       <div className="p-3">

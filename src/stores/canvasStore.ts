@@ -1,3 +1,4 @@
+import { taskApi } from '../api/task';
 import { create } from 'zustand';
 
 // Node types
@@ -52,10 +53,6 @@ export interface CanvasState {
   viewPort: ViewPort;
   selectedNodeIds: string[];
   clipboardNodes: CanvasNode[];
-
-  // Undo/Redo
-  
-  // Undo/Redo
   undoStack: { nodes: CanvasNode[]; connections: Connection[] }[];
   redoStack: { nodes: CanvasNode[]; connections: Connection[] }[];
   
@@ -71,14 +68,11 @@ export interface CanvasState {
   selectAll: () => void;
   copyNodes: () => void;
   pasteNodes: (offset?: { x: number; y: number }) => void;
-
-  
   addConnection: (sourceId: string, targetId: string, sourceHandle?: string, targetHandle?: string) => void;
   deleteConnection: (id: string) => void;
-  
+  getNodeExecutionInput: (nodeId: string) => Record<string, unknown>;
+  executeNode: (nodeId: string) => Promise<void>;
   updateViewPort: (viewport: Partial<ViewPort>) => void;
-  
-  // Undo/Redo
   undo: () => void;
   redo: () => void;
   saveToUndoStack: () => void;
@@ -208,7 +202,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectAll: () => {
     const { nodes } = get();
     set({ selectedNodeIds: nodes.map((node) => node.id) });
-    set({ selectedNodeIds: nodes.map((node) => node.id) });
   },
 
   copyNodes: () => {
@@ -221,31 +214,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const { clipboardNodes, nodes, addNode } = get();
     if (clipboardNodes.length === 0) return;
     
-    // Save undo stack first
     get().saveToUndoStack();
     
-    // Calculate offset to avoid overlapping
     const maxX = Math.max(...nodes.map(n => n.position.x), 0);
     const maxY = Math.max(...nodes.map(n => n.position.y), 0);
     const pasteX = maxX + offset.x;
     const pasteY = maxY + offset.y;
     
-    // Create new nodes from clipboard
     const newNodes = clipboardNodes.map(node => ({
       ...node,
       id: `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       position: { x: node.position.x + pasteX, y: node.position.y + pasteY },
     }));
     
-    // Add all nodes to the store
     newNodes.forEach(node => {
       addNode(node.type, node.position);
     });
     
-    // Select the pasted nodes
     set({ selectedNodeIds: newNodes.map(n => n.id) });
   },
-
 
   addConnection: (sourceId, targetId, sourceHandle, targetHandle) => {
     const id = `conn_${sourceId}_${targetId}_${Date.now()}`;
@@ -260,6 +247,107 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set((state) => ({
       connections: state.connections.filter((c) => c.id !== id),
     }));
+  },
+
+  // 获取节点的输入数据（从上游连接节点传递）
+  getNodeInputData: (nodeId) => {
+    const { nodes, connections } = get();
+    
+    // 1. 查找连接到当前节点的源节点
+    const incomingConn = connections.find(c => c.targetId === nodeId);
+    if (!incomingConn) {
+      return null;
+    }
+    
+    // 2. 获取源节点
+    const sourceNode = nodes.find(n => n.id === incomingConn.sourceId);
+    if (!sourceNode) {
+      return null;
+    }
+    
+    // 3. 返回源节点的数据
+    return sourceNode.data;
+  },
+
+  // 获取节点的执行输入（优先使用上游数据，否则使用节点自身的 prompt 或 content）
+  getNodeExecutionInput: (nodeId) => {
+    const { nodes } = get();
+    
+    // 1. 尝试获取上游数据
+    const upstreamData = get().getNodeInputData(nodeId);
+    if (upstreamData) {
+      return upstreamData;
+    }
+    
+    // 2. 获取节点自身数据作为 fallback
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      // 优先使用 prompt 字段，其次使用 content 字段
+      const prompt = node.data.prompt as string | undefined;
+      const content = node.data.content as string | undefined;
+      if (prompt) return { prompt };
+      if (content) return { content };
+    }
+    
+    // 3. 都没有返回空对象
+    return {};
+  },
+
+  // 执行节点：调用任务 API 生成图片或视频
+  executeNode: async (nodeId) => {
+    const { nodes, updateNode } = get();
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    // 获取输入数据
+    const inputData = get().getNodeExecutionInput(nodeId);
+    const prompt = (inputData.prompt as string) || (inputData.content as string) || '';
+
+    // 跳过没有 prompt 的执行
+    if (!prompt) {
+      console.warn('No prompt available for node:', nodeId);
+      return;
+    }
+
+    // 确定任务类型
+    const isVideoNode = ['aiVideo', 'generateCharacterVideo', 'generateSceneVideo'].includes(node.type);
+    const taskType = isVideoNode ? 'video' : 'image';
+
+    // 默认 modelId (需要根据实际情况调整)
+    const modelId = 1;
+
+    try {
+      // 更新状态为执行中
+      updateNode(nodeId, { data: { ...node.data, status: 'processing' } });
+
+      // 调用 API
+      const response = await taskApi.create({
+        modelId,
+        prompt,
+        params: { nodeType: node.type, taskType }
+      });
+
+      if (response.data?.data) {
+        const taskResult = response.data.data;
+        // 更新状态和 taskId
+        updateNode(nodeId, { 
+          data: { 
+            ...node.data, 
+            status: taskResult.status,
+            taskId: taskResult.id
+          } 
+        });
+      }
+    } catch (error) {
+      // 更新状态为失败
+      updateNode(nodeId, { 
+        data: { 
+          ...node.data, 
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        } 
+      });
+    }
   },
 
   updateViewPort: (viewport) => {

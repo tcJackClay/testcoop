@@ -51,6 +51,9 @@ export interface CanvasState {
   connections: Connection[];
   viewPort: ViewPort;
   selectedNodeIds: string[];
+  clipboardNodes: CanvasNode[];
+
+  // Undo/Redo
   
   // Undo/Redo
   undoStack: { nodes: CanvasNode[]; connections: Connection[] }[];
@@ -65,6 +68,10 @@ export interface CanvasState {
   selectNode: (id: string, multi?: boolean) => void;
   clearSelection: () => void;
   selectNodesInBox: (box: { x: number; y: number; width: number; height: number }) => void;
+  selectAll: () => void;
+  copyNodes: () => void;
+  pasteNodes: (offset?: { x: number; y: number }) => void;
+
   
   addConnection: (sourceId: string, targetId: string, sourceHandle?: string, targetHandle?: string) => void;
   deleteConnection: (id: string) => void;
@@ -107,6 +114,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   connections: [],
   viewPort: { x: 0, y: 0, zoom: 1 },
   selectedNodeIds: [],
+  clipboardNodes: [],
   undoStack: [],
   redoStack: [],
 
@@ -196,6 +204,48 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     
     set({ selectedNodeIds: selectedIds });
   },
+
+  selectAll: () => {
+    const { nodes } = get();
+    set({ selectedNodeIds: nodes.map((node) => node.id) });
+    set({ selectedNodeIds: nodes.map((node) => node.id) });
+  },
+
+  copyNodes: () => {
+    const { nodes, selectedNodeIds } = get();
+    const nodesToCopy = nodes.filter(n => selectedNodeIds.includes(n.id));
+    set({ clipboardNodes: JSON.parse(JSON.stringify(nodesToCopy)) });
+  },
+
+  pasteNodes: (offset = { x: 50, y: 50 }) => {
+    const { clipboardNodes, nodes, addNode } = get();
+    if (clipboardNodes.length === 0) return;
+    
+    // Save undo stack first
+    get().saveToUndoStack();
+    
+    // Calculate offset to avoid overlapping
+    const maxX = Math.max(...nodes.map(n => n.position.x), 0);
+    const maxY = Math.max(...nodes.map(n => n.position.y), 0);
+    const pasteX = maxX + offset.x;
+    const pasteY = maxY + offset.y;
+    
+    // Create new nodes from clipboard
+    const newNodes = clipboardNodes.map(node => ({
+      ...node,
+      id: `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      position: { x: node.position.x + pasteX, y: node.position.y + pasteY },
+    }));
+    
+    // Add all nodes to the store
+    newNodes.forEach(node => {
+      addNode(node.type, node.position);
+    });
+    
+    // Select the pasted nodes
+    set({ selectedNodeIds: newNodes.map(n => n.id) });
+  },
+
 
   addConnection: (sourceId, targetId, sourceHandle, targetHandle) => {
     const id = `conn_${sourceId}_${targetId}_${Date.now()}`;

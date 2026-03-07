@@ -85,11 +85,32 @@ export default function Canvas() {
     undoStack,
     redoStack,
     selectNodesInBox,
-    clearSelection
+    clearSelection,
+    copyNodes,
+    pasteNodes
   } = useCanvasStore();
+
+
+  // Handle wheel zoom with passive: false to allow preventDefault
+  const handleWheelNative = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
+    updateViewPort({ zoom: newZoom });
+  }, [viewPort.zoom, updateViewPort]);
+
+  // Attach wheel event listener with passive: false
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    
+    element.addEventListener('wheel', handleWheelNative, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheelNative);
+  }, [handleWheelNative]);
 
   // Handle wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     updateViewPort({ zoom: newZoom });
@@ -153,30 +174,47 @@ export default function Canvas() {
 
   // Handle pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left || 0);
+    const y = e.clientY - (rect?.top || 0);
+    
+    // Ctrl+左键框选
+    if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      clearSelection();
+      setIsSelecting(true);
+      setSelectionStart({ x, y });
+      setSelectionBox({ x, y, width: 0, height: 0 });
+      return;
+    }
+    
+    // 中键或Alt+左键拖动画布
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX - viewPort.x, y: e.clientY - viewPort.y });
     } else if (e.button === 0 && e.target === containerRef.current) {
+      // 普通左键点击空白区域 - 清除选择（不启动框选）
       clearSelection();
-      setIsSelecting(true);
-      setSelectionStart({ x: e.clientX, y: e.clientY });
-      setSelectionBox({ x: e.clientX, y: e.clientY, width: 0, height: 0 });
     }
   }, [viewPort.x, viewPort.y, clearSelection]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left || 0);
+    const y = e.clientY - (rect?.top || 0);
+    
     if (isPanning) {
       updateViewPort({
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
     } else if (isSelecting) {
-      const x = Math.min(e.clientX, selectionStart.x);
-      const y = Math.min(e.clientY, selectionStart.y);
-      const width = Math.abs(e.clientX - selectionStart.x);
-      const height = Math.abs(e.clientY - selectionStart.y);
-      setSelectionBox({ x, y, width, height });
+      const selX = Math.min(x, selectionStart.x);
+      const selY = Math.min(y, selectionStart.y);
+      const width = Math.abs(x - selectionStart.x);
+      const height = Math.abs(y - selectionStart.y);
+      setSelectionBox({ x: selX, y: selY, width, height });
     }
   }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort]);
 
@@ -225,10 +263,18 @@ export default function Canvas() {
       if (e.key === 'Escape') {
         clearSelection();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        copyNodes();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        pasteNodes();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection]);
+  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection, copyNodes, pasteNodes]);
 
   const handleZoomIn = () => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) });
   const handleZoomOut = () => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) });

@@ -128,13 +128,6 @@ export default function AssetSidebar({ isOpen, onClose, onAssetSelect }: AssetSi
           </div>
         )}
       </div>
-
-      {/* Footer */}
-      <div className="p-3 border-t border-gray-700">
-        <button className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
-          管理资产
-        </button>
-      </div>
     </aside>
   );
 }

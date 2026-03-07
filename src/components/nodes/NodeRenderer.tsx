@@ -375,6 +375,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
       const newX = mouseX - dragOffset.current.x;
       const newY = mouseY - dragOffset.current.y;
+      console.log('[NodeDrag] moving to:', newX, newY, 'current zoom:', viewPort.zoom);
       moveNode(node.id, { x: newX, y: newY });
     }
   }, [isDragging, node.id, moveNode, viewPort]);

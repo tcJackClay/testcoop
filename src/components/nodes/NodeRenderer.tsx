@@ -351,7 +351,17 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
     e.stopPropagation();
     setIsDragging(true);
     
-    // Get the canvas container
+    // Use the outer container position, not the transformed canvas-content
+    const canvasGrid = document.querySelector('.canvas-grid') as HTMLElement;
+    if (canvasGrid) {
+      const rect = canvasGrid.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+      const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+      dragOffset.current = {
+        x: mouseX - node.position.x,
+        y: mouseY - node.position.y,
+      };
+    }
     const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
     if (canvasContainer) {
       const rect = canvasContainer.getBoundingClientRect();
@@ -369,7 +379,16 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     
-    const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
+    // Use the outer container position, not the transformed canvas-content
+    const canvasGrid = document.querySelector('.canvas-grid') as HTMLElement;
+    if (canvasGrid) {
+      const rect = canvasGrid.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+      const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+      const newX = mouseX - dragOffset.current.x;
+      const newY = mouseY - dragOffset.current.y;
+      moveNode(node.id, { x: newX, y: newY });
+    }
     if (canvasContainer) {
       const rect = canvasContainer.getBoundingClientRect();
       const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;

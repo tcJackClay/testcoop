@@ -162,8 +162,6 @@ function renderNodeBody(node: CanvasNode) {
       const status = node.data.status as string || 'idle';
       const aspectRatio = node.data.aspectRatio as string || '1:1';
       const resolution = node.data.resolution as string || '1K';
-      const [imageDimensions, setImageDimensions] = useState<{width: number; height: number} | null>(null);
-      console.log('[ImageNode] render, imageUrl:', imageUrl, 'imageDimensions:', imageDimensions);
       
       // 处理图片上传
       const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,14 +172,8 @@ function renderNodeBody(node: CanvasNode) {
         }
       };
       
-      const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-        console.log('[ImageNode] onLoad triggered, naturalWidth:', e.currentTarget.naturalWidth, 'naturalHeight:', e.currentTarget.naturalHeight);
-        setImageDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight });
-      };
-      
       return (
         <div className="space-y-2 min-w-[240px]">
-
           {/* Image Upload/Preview */}
           <div className="px-2">
             <input 
@@ -194,13 +186,40 @@ function renderNodeBody(node: CanvasNode) {
             {imageUrl ? (
               <label 
                 htmlFor={`image-upload-${node.id}`}
-                className="relative rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90"
-                style={{ aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '16/9' }}
-
-
+                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90 h-24"
               >
-                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" onLoad={handleImageLoad} />
-
+                <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <Upload className="w-6 h-6 text-white" />
+                </div>
+              </label>
+            ) : (
+              <label 
+                htmlFor={`image-upload-${node.id}`}
+                className="flex flex-col items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 hover:bg-gray-600/30 h-24"
+              >
+                <Upload className="w-6 h-6 text-gray-500" />
+                <span className="text-xs text-gray-500">点击上传</span>
+              </label>
+            )}
+          </div>
+          
+          {/* Image Upload/Preview */}
+          <div className="px-2">
+            <input 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              id={`image-upload-${node.id}`}
+              onChange={handleImageUpload}
+            />
+            {imageUrl ? (
+              <label 
+                htmlFor={`image-upload-${node.id}`}
+                className="relative block rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90"
+                style={{ aspectRatio: '16/9' }}
+              >
+                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                   <Upload className="w-6 h-6 text-white" />
                 </div>
@@ -268,6 +287,40 @@ function renderNodeBody(node: CanvasNode) {
               {status === 'processing' ? <><span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />生成中</> : <><Sparkles className="w-3 h-3" />生成</>}
             </button>
           </div>
+          {/* Status indicator */}
+          {/* Generate Button */}
+          <div className="px-2">
+            <button
+              className={`w-full py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${
+                status === 'processing' 
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
+                  : 'bg-pink-500 hover:bg-pink-600 text-white'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (status !== 'processing') {
+                  const store = useCanvasStore.getState();
+                  if (store.executeNode) {
+                    store.executeNode(node.id);
+                  }
+                }
+              }}
+              disabled={status === 'processing'}
+            >
+              {status === 'processing' ? (
+                <>
+                  <span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3" />
+                  生成图片
+                </>
+              )}
+            </button>
+          </div>
+          
           {/* Status indicator */}
           {status === 'failed' && (
             <div className="px-2 text-[10px] text-red-400">生成失败</div>
@@ -347,21 +400,10 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       return;
     }
     
-    e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
     
-    // Use the outer container position, not the transformed canvas-content
-    const canvasGrid = document.querySelector('.canvas-grid') as HTMLElement;
-    if (canvasGrid) {
-      const rect = canvasGrid.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-      const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-      dragOffset.current = {
-        x: mouseX - node.position.x,
-        y: mouseY - node.position.y,
-      };
-    }
+    // Get the canvas container
     const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
     if (canvasContainer) {
       const rect = canvasContainer.getBoundingClientRect();
@@ -379,23 +421,13 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     
-    // Use the outer container position, not the transformed canvas-content
-    const canvasGrid = document.querySelector('.canvas-grid') as HTMLElement;
-    if (canvasGrid) {
-      const rect = canvasGrid.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-      const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-      const newX = mouseX - dragOffset.current.x;
-      const newY = mouseY - dragOffset.current.y;
-      moveNode(node.id, { x: newX, y: newY });
-    }
+    const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
     if (canvasContainer) {
       const rect = canvasContainer.getBoundingClientRect();
       const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
       const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
       const newX = mouseX - dragOffset.current.x;
       const newY = mouseY - dragOffset.current.y;
-      console.log('[NodeDrag] moving to:', newX, newY, 'current zoom:', viewPort.zoom);
       moveNode(node.id, { x: newX, y: newY });
     }
   }, [isDragging, node.id, moveNode, viewPort]);

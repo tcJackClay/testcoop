@@ -12,12 +12,11 @@ interface ContextMenuProps {
 }
 
 const nodeTypeItems: Array<{ type: NodeType; label: string; icon: React.ReactNode }> = [
-  { type: 'imageInput', label: '图片输入', icon: <Image className="w-4 h-4" /> },
   { type: 'videoInput', label: '视频输入', icon: <Video className="w-4 h-4" /> },
   { type: 'textNode', label: '文字节点', icon: <FileText className="w-4 h-4" /> },
   { type: 'novelInput', label: '小说输入', icon: <BookOpen className="w-4 h-4" /> },
-  { type: 'aiImage', label: 'AI 绘图', icon: <Wand2 className="w-4 h-4" /> },
-  { type: 'aiVideo', label: 'AI 视频', icon: <Film className="w-4 h-4" /> },
+  { type: 'imageNode', label: '图片节点', icon: <Image className="w-4 h-4" /> },
+  { type: 'videoNode', label: '视频节点', icon: <Film className="w-4 h-4" /> },
   { type: 'storyboardNode', label: '智能分镜', icon: <Clapperboard className="w-4 h-4" /> },
   { type: 'videoAnalyze', label: '视频拆解', icon: <Sparkles className="w-4 h-4" /> },
   { type: 'characterDescription', label: '角色描述', icon: <Users className="w-4 h-4" /> },

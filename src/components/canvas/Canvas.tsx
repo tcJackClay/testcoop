@@ -64,6 +64,7 @@ export default function Canvas() {
     setIsSelecting,
     setSelectionBox,
     setSelectionStart,
+    setPanStart,
     setContextMenu,
     clearSelection,
     updateViewPort,

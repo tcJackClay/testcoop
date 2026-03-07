@@ -13,6 +13,7 @@ interface UseCanvasEventsProps {
   setIsSelecting: (val: boolean) => void;
   setSelectionBox: (box: { x: number; y: number; width: number; height: number } | null) => void;
   setSelectionStart: (pos: { x: number; y: number }) => void;
+  setPanStart: (pos: { x: number; y: number }) => void;
   setContextMenu: (menu: { visible: boolean; x: number; y: number; worldX: number; worldY: number }) => void;
   clearSelection: () => void;
   updateViewPort: (vp: { x?: number; y?: number; zoom?: number }) => void;
@@ -31,6 +32,7 @@ export function useCanvasEvents({
   setIsSelecting,
   setSelectionBox,
   setSelectionStart,
+  setPanStart,
   setContextMenu,
   clearSelection,
   updateViewPort,
@@ -103,7 +105,7 @@ export function useCanvasEvents({
     } else if (e.button === 0 && e.target === containerRef.current) {
       clearSelection();
     }
-  }, [viewPort.x, viewPort.y, clearSelection, containerRef, setIsPanning, setSelectionStart, setSelectionBox]);
+  }, [viewPort.x, viewPort.y, clearSelection, containerRef, setIsPanning, setSelectionStart, setSelectionBox, setPanStart]);
 
   // Handle mouse move
   const handleMouseMove = useCallback((e: React.MouseEvent) => {

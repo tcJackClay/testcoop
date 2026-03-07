@@ -64,10 +64,8 @@ export default function Header({
         <div className="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-md flex items-center justify-center">
           <Layers size={16} className="text-white" />
         </div>
-        
-        {/* App Name */}
         <span className="font-bold text-sm text-gray-200 tracking-wide">
-          Tapnow Studio
+          Huanu Canvas
         </span>
 
         {/* Project Name (editable) */}

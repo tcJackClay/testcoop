@@ -25,8 +25,7 @@ export default function CharactersPanel({ onClose }: { onClose: () => void }) {
       {/* Header */}
       <div className="h-12 border-b border-gray-700 flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-2">
-          <Users size={16} className="text-blue-400" />
-          <span className="text-sm font-medium">角色库</span>
+          <span className="text-sm font-medium">资产库</span>
         </div>
         <button
           onClick={onClose}

@@ -162,6 +162,7 @@ function renderNodeBody(node: CanvasNode) {
       const status = node.data.status as string || 'idle';
       const aspectRatio = node.data.aspectRatio as string || '1:1';
       const resolution = node.data.resolution as string || '1K';
+      const [imageDimensions, setImageDimensions] = useState<{width: number; height: number} | null>(null);
       
       // 处理图片上传
       const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,6 +171,10 @@ function renderNodeBody(node: CanvasNode) {
           const url = URL.createObjectURL(file);
           updateData('imageUrl', url);
         }
+      };
+      
+      const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        setImageDimensions({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight });
       };
       
       return (
@@ -187,11 +192,12 @@ function renderNodeBody(node: CanvasNode) {
             {imageUrl ? (
               <label 
                 htmlFor={`image-upload-${node.id}`}
-                className="relative flex items-center justify-center rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90 min-h-[160px]"
+                className="relative rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90"
+                style={{ aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '16/9' }}
 
 
               >
-                <img src={imageUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
+                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" onLoad={handleImageLoad} />
 
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                   <Upload className="w-6 h-6 text-white" />

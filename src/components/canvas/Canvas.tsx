@@ -171,30 +171,47 @@ export default function Canvas() {
 
   // Handle pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left || 0);
+    const y = e.clientY - (rect?.top || 0);
+    
+    // Ctrl+左键框选
+    if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      clearSelection();
+      setIsSelecting(true);
+      setSelectionStart({ x, y });
+      setSelectionBox({ x, y, width: 0, height: 0 });
+      return;
+    }
+    
+    // 中键或Alt+左键拖动画布
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX - viewPort.x, y: e.clientY - viewPort.y });
     } else if (e.button === 0 && e.target === containerRef.current) {
+      // 普通左键点击空白区域 - 清除选择（不启动框选）
       clearSelection();
-      setIsSelecting(true);
-      setSelectionStart({ x: e.clientX, y: e.clientY });
-      setSelectionBox({ x: e.clientX, y: e.clientY, width: 0, height: 0 });
     }
   }, [viewPort.x, viewPort.y, clearSelection]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const x = e.clientX - (rect?.left || 0);
+    const y = e.clientY - (rect?.top || 0);
+    
     if (isPanning) {
       updateViewPort({
         x: e.clientX - panStart.x,
         y: e.clientY - panStart.y,
       });
     } else if (isSelecting) {
-      const x = Math.min(e.clientX, selectionStart.x);
-      const y = Math.min(e.clientY, selectionStart.y);
-      const width = Math.abs(e.clientX - selectionStart.x);
-      const height = Math.abs(e.clientY - selectionStart.y);
-      setSelectionBox({ x, y, width, height });
+      const selX = Math.min(x, selectionStart.x);
+      const selY = Math.min(y, selectionStart.y);
+      const width = Math.abs(x - selectionStart.x);
+      const height = Math.abs(y - selectionStart.y);
+      setSelectionBox({ x: selX, y: selY, width, height });
     }
   }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort]);
 

@@ -30,13 +30,18 @@ export default function ProjectPanel({ onSelectProject, onBackToCanvas }: Projec
     try {
       setIsLoading(true);
       setError('');
+      
+      console.log('[ProjectPanel] 开始获取项目列表...');
       const data = await projectViewApi.getAll();
+      console.log('[ProjectPanel] 获取到的项目:', data);
+      
       setProjects(data);
+      
       // Load current project from localStorage
       const saved = localStorage.getItem('current_project_id');
       if (saved) setCurrentProjectId(parseInt(saved));
     } catch (err: any) {
-      console.error('加载项目失败:', err);
+      console.error('[ProjectPanel] 加载项目失败:', err);
       const errorMsg = err.response?.data?.message || err.message || '加载项目失败';
       setError(errorMsg);
     } finally {

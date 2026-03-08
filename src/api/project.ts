@@ -1,7 +1,7 @@
 /**
  * Project API Service
  * 项目管理 - 项目的增删改查
- * 参考 REQUEST_BODY_GUIDE 规范
+ *_GUIDE  参考 REQUEST_BODY规范
  */
 
 import { apiClient, ApiResponse } from './client'
@@ -57,7 +57,7 @@ export interface UpdateProjectRequest {
 }
 
 // 将后端响应转换为视图模型
-const convertToViewModel = (project: Project): ProjectView => {
+const convertToViewModel = (project: any): ProjectView => {
   let statusText = '未知';
   if (project.resourceStatus === '1' || project.resourceStatus === 'active') {
     statusText = '进行中';
@@ -69,8 +69,8 @@ const convertToViewModel = (project: Project): ProjectView => {
   
   return {
     id: project.id,
-    name: project.resourceName || '',
-    description: project.resourceContent || '',
+    name: project.resourceName || project.name || '',
+    description: project.resourceContent || project.description || '',
     status: project.status,
     statusText,
     createTime: project.createTime,
@@ -83,7 +83,7 @@ export const projectApi = {
    * 获取所有项目
    */
   getAll: async (): Promise<ApiResponse<Project[]>> => {
-    const response = await apiClient.get('/project')
+    const response = await apiClient.get('/project/list')
     return response.data
   },
 
@@ -143,7 +143,8 @@ export const projectApi = {
 export const projectViewApi = {
   getAll: async (): Promise<ProjectView[]> => {
     const response = await projectApi.getAll()
-    if (response.code === 200 && response.data) {
+    console.log('[projectViewApi.getAll] response:', response)
+    if (response.code === 0 && response.data) {
       return response.data.map(convertToViewModel)
     }
     return []
@@ -155,7 +156,7 @@ export const projectViewApi = {
       resourceContent: description || '',
       resourceStatus: '1',
     })
-    if (response.code === 200 && response.data) {
+    if (response.code === 0 && response.data) {
       return convertToViewModel(response.data)
     }
     return null
@@ -168,7 +169,7 @@ export const projectViewApi = {
       resourceContent: description,
       resourceStatus: status,
     })
-    if (response.code === 200 && response.data) {
+    if (response.code === 0 && response.data) {
       return convertToViewModel(response.data)
     }
     return null

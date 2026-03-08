@@ -20,6 +20,7 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import { useAssetStore } from '../../stores/assetStore';
+import { useCanvasStore } from '../../stores/canvasStore';
 import AssetCard from './AssetCard';
 import AssetSidebar from './AssetSidebar';
 import { mapCategoryToType, type AssetLibraryPanelProps, type AssetStats, type AssetCategory } from './AssetLibraryPanel.types';

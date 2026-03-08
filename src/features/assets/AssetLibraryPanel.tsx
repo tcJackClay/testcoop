@@ -20,9 +20,8 @@ import {
 } from 'lucide-react';
 import type { Image } from '../../api/image';
 import AssetCard from './AssetCard';
-import ContextMenu from './ContextMenu';
-import { useProjectStore } from '../../stores/projectStore';
 import { imageApi } from '../../api/image';
+import { useAssetStore } from '../../stores/assetStore';
 
 interface AssetLibraryPanelProps {
   onClose: () => void;

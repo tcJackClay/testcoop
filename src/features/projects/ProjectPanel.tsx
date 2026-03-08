@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderOpen, Edit, Trash2, Check, Folder, X, Loader2 } from 'lucide-react';
+import { Plus, FolderOpen, Edit, Trash2, Check, Folder, X, Loader2, Clock } from 'lucide-react';
 import { projectApi, projectViewApi, type ProjectView } from '../../api/project';
 import { useAuthStore } from '../../stores/authStore';
+import { useProjectStore } from '../../stores/projectStore';
 
 interface ProjectPanelProps {
-  onSelectProject?: (project: ProjectView) => void;
   onBackToCanvas?: () => void;
 }
 
-export default function ProjectPanel({ onSelectProject, onBackToCanvas }: ProjectPanelProps) {
+export default function ProjectPanel({ onBackToCanvas }: ProjectPanelProps) {
   const [projects, setProjects] = useState<ProjectView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectView | null>(null);
-  const [currentProjectId, setCurrentProjectId] = useState<number | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectView | null>(null);
 
   // Form state
   const [formName, setFormName] = useState('');
@@ -24,22 +24,15 @@ export default function ProjectPanel({ onSelectProject, onBackToCanvas }: Projec
   const [formError, setFormError] = useState('');
 
   const { token } = useAuthStore();
+  const { currentProjectId, setCurrentProject } = useProjectStore();
 
   // Load projects
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
       setError('');
-      
-      console.log('[ProjectPanel] 开始获取项目列表...');
       const data = await projectViewApi.getAll();
-      console.log('[ProjectPanel] 获取到的项目:', data);
-      
       setProjects(data);
-      
-      // Load current project from localStorage
-      const saved = localStorage.getItem('current_project_id');
-      if (saved) setCurrentProjectId(parseInt(saved));
     } catch (err: any) {
       console.error('[ProjectPanel] 加载项目失败:', err);
       const errorMsg = err.response?.data?.message || err.message || '加载项目失败';
@@ -59,6 +52,17 @@ export default function ProjectPanel({ onSelectProject, onBackToCanvas }: Projec
       fetchProjects();
     }
   }, [token]);
+
+  // 点击选择项目
+  const handleSelectProject = (project: ProjectView) => {
+    setSelectedProject(project);
+  };
+
+  // 双击进入画布
+  const handleDoubleClick = (project: ProjectView) => {
+    setCurrentProject(project);
+    onBackToCanvas?.();
+  };
 
   const handleCreate = () => {
     setEditingProject(null);
@@ -119,9 +123,8 @@ export default function ProjectPanel({ onSelectProject, onBackToCanvas }: Projec
     
     try {
       await projectApi.delete(projectId);
-      if (currentProjectId === projectId) {
-        setCurrentProjectId(null);
-        localStorage.removeItem('current_project_id');
+      if (selectedProject?.id === projectId) {
+        setSelectedProject(null);
       }
       await fetchProjects();
     } catch (err) {
@@ -130,23 +133,22 @@ export default function ProjectPanel({ onSelectProject, onBackToCanvas }: Projec
     }
   };
 
-  const handleSelectProject = (project: ProjectView) => {
-    setCurrentProjectId(project.id);
-    localStorage.setItem('current_project_id', project.id.toString());
-    onSelectProject?.(project);
+  // 设置当前项目（单击设为当前）
+  const handleSetCurrent = (project: ProjectView) => {
+    setCurrentProject(project);
   };
 
   return (
     <div className="h-full flex flex-col bg-gray-900">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="bg-blue-600 p-2 rounded-lg">
             <FolderOpen className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">项目管理</h1>
-            <p className="text-sm text-gray-400">管理您的项目</p>
+            <p className="text-sm text-gray-400">双击项目进入画布</p>
           </div>
         </div>
         <button
@@ -158,100 +160,176 @@ export default function ProjectPanel({ onSelectProject, onBackToCanvas }: Projec
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        {error && (
-          <div className="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
-            {error}
-          </div>
-        )}
-        
-        {isLoading && projects.length === 0 ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="flex flex-col items-center gap-3 text-gray-400">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span>加载中...</span>
+      {/* Content - 分两部分：项目列表 + 项目详情 */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 左侧：项目列表 */}
+        <div className="flex-1 overflow-auto p-6">
+          {error && (
+            <div className="mb-4 p-4 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
+              {error}
             </div>
-          </div>
-        ) : projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 bg-gray-800 rounded-xl border border-dashed border-gray-700">
-            <Folder className="w-12 h-12 text-gray-500 mb-3" />
-            <p className="text-gray-300 font-medium">暂无项目</p>
-            <p className="text-sm text-gray-500 mt-1">点击右上角"创建项目"开始</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                onClick={() => handleSelectProject(project)}
-                className={`
-                  bg-gray-800 rounded-xl border p-4 cursor-pointer transition-all hover:shadow-lg
-                  ${currentProjectId === project.id 
-                    ? 'border-blue-500 ring-2 ring-blue-500/20' 
-                    : 'border-gray-700 hover:border-blue-400'
-                  }
-                `}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className={`
-                      w-8 h-8 rounded-lg flex items-center justify-center
-                      ${currentProjectId === project.id ? 'bg-blue-600' : 'bg-gray-700'}
-                    `}>
-                      <Folder className={`w-4 h-4 ${currentProjectId === project.id ? 'text-white' : 'text-gray-400'}`} />
-                    </div>
-                    {currentProjectId === project.id && (
-                      <span className="flex items-center gap-1 text-xs text-blue-400 bg-blue-900/50 px-2 py-0.5 rounded-full">
-                        <Check className="w-3 h-3" />
-                        当前项目
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleEdit(project); }}
-                      className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded-lg transition-colors"
-                      title="编辑"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}
-                      className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
-                      title="删除"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                
-                <h3 className="font-semibold text-white mb-1 truncate">
-                  {project.name}
-                </h3>
-                
-                {project.description && (
-                  <p className="text-sm text-gray-400 line-clamp-2 mb-3">
-                    {project.description}
-                  </p>
-                )}
-                
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>
-                    {project.createTime 
-                      ? new Date(project.createTime).toLocaleDateString('zh-CN')
-                      : '-'
-                    }
-                  </span>
-                  <span className={`
-                    px-2 py-0.5 rounded-full text-xs
-                    ${project.statusText === '进行中' ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-400'}
-                  `}>
-                    {project.statusText}
-                  </span>
-                </div>
+          )}
+          
+          {isLoading && projects.length === 0 ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="flex flex-col items-center gap-3 text-gray-400">
+                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                <span>加载中...</span>
               </div>
-            ))}
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 bg-gray-800 rounded-xl border border-dashed border-gray-700">
+              <Folder className="w-12 h-12 text-gray-500 mb-3" />
+              <p className="text-gray-300 font-medium">暂无项目</p>
+              <p className="text-sm text-gray-500 mt-1">点击右上角"创建项目"开始</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+              {projects.map((project) => (
+                <div
+                  key={project.id}
+                  onClick={() => handleSelectProject(project)}
+                  onDoubleClick={() => handleDoubleClick(project)}
+                  className={`
+                    bg-gray-800 rounded-xl border p-4 cursor-pointer transition-all hover:shadow-lg
+                    ${currentProjectId === project.id 
+                      ? 'border-blue-500 ring-2 ring-blue-500/20' 
+                      : selectedProject?.id === project.id
+                        ? 'border-blue-400 bg-blue-900/20'
+                        : 'border-gray-700 hover:border-blue-400'
+                    }
+                  `}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`
+                        w-8 h-8 rounded-lg flex items-center justify-center
+                        ${currentProjectId === project.id ? 'bg-blue-600' : 'bg-gray-700'}
+                      `}>
+                        <Folder className={`w-4 h-4 ${currentProjectId === project.id ? 'text-white' : 'text-gray-400'}`} />
+                      </div>
+                      {currentProjectId === project.id && (
+                        <span className="flex items-center gap-1 text-xs text-blue-400 bg-blue-900/50 px-2 py-0.5 rounded-full">
+                          <Check className="w-3 h-3" />
+                          当前项目
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleEdit(project); }}
+                        className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded-lg transition-colors"
+                        title="编辑"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}
+                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
+                        title="删除"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <h3 className="font-semibold text-white mb-1 truncate">
+                    {project.name}
+                  </h3>
+                  
+                  {project.description && (
+                    <p className="text-sm text-gray-400 line-clamp-2 mb-3">
+                      {project.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>
+                      {project.createTime 
+                        ? new Date(project.createTime).toLocaleDateString('zh-CN')
+                        : '-'
+                      }
+                    </span>
+                    <span className={`
+                      px-2 py-0.5 rounded-full text-xs
+                      ${project.statusText === '进行中' ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-400'}
+                    `}>
+                      {project.statusText}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 右侧：项目详情 */}
+        {selectedProject && (
+          <div className="w-80 bg-gray-800 border-l border-gray-700 p-6 overflow-auto shrink-0">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                <Folder className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">{selectedProject.name}</h2>
+                <span className={`
+                  px-2 py-0.5 rounded-full text-xs
+                  ${selectedProject.statusText === '进行中' ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-400'}
+                `}>
+                  {selectedProject.statusText}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">项目描述</label>
+                <p className="text-sm text-gray-300">
+                  {selectedProject.description || '暂无描述'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">创建时间</label>
+                <p className="text-sm text-gray-300 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  {selectedProject.createTime 
+                    ? new Date(selectedProject.createTime).toLocaleString('zh-CN')
+                    : '-'
+                  }
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">更新时间</label>
+                <p className="text-sm text-gray-300 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  {selectedProject.updateTime 
+                    ? new Date(selectedProject.updateTime).toLocaleString('zh-CN')
+                    : '-'
+                  }
+                </p>
+              </div>
+
+              <button
+                onClick={() => handleSetCurrent(selectedProject)}
+                disabled={currentProjectId === selectedProject.id}
+                className={`w-full mt-4 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  currentProjectId === selectedProject.id
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {currentProjectId === selectedProject.id ? '已设为当前项目' : '设为当前项目'}
+              </button>
+
+              <button
+                onClick={() => handleDoubleClick(selectedProject)}
+                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+              >
+                进入画布
+              </button>
+            </div>
           </div>
         )}
       </div>

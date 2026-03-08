@@ -8,6 +8,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAssetStore } from '../../stores/assetStore';
+import { useCanvasStore } from '../../stores/canvasStore';
 import AssetCard from './AssetCard';
 import VariantDetailView from './VariantDetailView';
 import AssetSidebar from './AssetSidebar';

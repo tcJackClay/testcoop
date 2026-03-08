@@ -140,6 +140,21 @@ export default function AssetCard({
           <span>{category}</span>
         </div>
 
+        {/* Secondary Asset (Variant) Badge */}
+        {(() => {
+          // Check if this is a secondary asset (variant)
+          const ext1 = asset.ext1 ? (() => { try { return JSON.parse(asset.ext1); } catch { return null; } })() : null;
+          const isVariant = ext1 && ext1.parent;
+          if (isVariant) {
+            return (
+              <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white flex items-center gap-1">
+                <span>变体</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
         {/* Variants Badge */}
         {hasVariants && (
           <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white">

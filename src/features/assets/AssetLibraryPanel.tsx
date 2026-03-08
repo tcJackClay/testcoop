@@ -19,9 +19,10 @@ import {
   Loader2
 } from 'lucide-react';
 import type { Image } from '../../api/image';
-import { useAssetStore } from '../../stores/assetStore';
-import { useCanvasStore } from '../../stores/canvasStore';
 import AssetCard from './AssetCard';
+import ContextMenu from './ContextMenu';
+import { useProjectStore } from '../../stores/projectStore';
+import { imageApi } from '../../api/image';
 
 interface AssetLibraryPanelProps {
   onClose: () => void;
@@ -75,6 +76,60 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   
   const { addNode, nodes } = useCanvasStore();
   const [viewMode] = useState<'grid' | 'list'>('grid');
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    asset: Image;
+    position: { x: number; y: number };
+  } | null>(null);
+  
+  // Delete loading state
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  
+  // Handle right-click on asset
+  const handleContextMenu = (e: React.MouseEvent, asset: Image) => {
+    e.preventDefault();
+    // Adjust position to be relative to viewport
+    setContextMenu({
+      asset,
+      position: { x: e.clientX, y: e.clientY },
+    });
+  };
+  
+  // Close context menu
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
+  
+  // Add asset to canvas
+  const handleAddToCanvas = (asset: Image) => {
+    const position = getCanvasCenterPosition();
+    // Create a new node with the asset data pre-filled
+    addNode('createAsset', position, {
+      name: asset.name || asset.resourceName,
+      imageUrl: asset.url || asset.resourceContent,
+      assetType: asset.resourceType || 'character_primary',
+    });
+    console.log('Added asset to canvas:', asset.name);
+  };
+  
+  // Delete asset
+  const handleDeleteAsset = async (asset: Image) => {
+    if (!asset.id) return;
+    
+    setDeletingId(asset.id);
+    try {
+      await imageApi.delete(asset.id);
+      // Refresh the asset list
+      useAssetStore.getState().fetchAssets();
+      console.log('Asset deleted:', asset.name);
+    } catch (error) {
+      console.error('Failed to delete asset:', error);
+      alert('删除失败，请重试');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // 组件挂载时获取资产数据
   useEffect(() => {
@@ -224,6 +279,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
                   asset={asset as any}
                   onDragStart={handleDragStart}
                   onDragEnd={() => {}}
+                  onContextMenu={(e) => handleContextMenu(e, asset)}
                 />
               ))}
             </div>
@@ -273,6 +329,17 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
           </div>
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          asset={contextMenu.asset}
+          position={contextMenu.position}
+          onClose={handleCloseContextMenu}
+          onAddToCanvas={handleAddToCanvas}
+          onDelete={handleDeleteAsset}
+        />
+      )}
     </div>
   );
 }

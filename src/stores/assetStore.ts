@@ -27,14 +27,23 @@ interface AssetActions {
   getFilteredAssets: () => Image[];
 }
 type AssetStore = AssetState & AssetActions;
-const mapCategoryToType = (category?: string): string => {
-  if (!category) return '次要道具';
-  if (category.includes('主要') && category.includes('角色')) return '主要角色';
-  if (category.includes('次要') && category.includes('角色')) return '次要角色';
-  if (category.includes('主要') && category.includes('场景')) return '主要场景';
-  if (category.includes('次要') && category.includes('场景')) return '次要场景';
-  if (category.includes('主要') && category.includes('道具')) return '主要道具';
-  if (category.includes('次要') && category.includes('道具')) return '次要道具';
+// 从 assetType 字段映射到中文类型
+const mapAssetTypeToCategory = (assetType?: string): string => {
+  if (!assetType) return '次要道具';
+  // 处理如 character_primary, scene_primary 等格式
+  if (assetType.includes('character') && assetType.includes('primary')) return '主要角色';
+  if (assetType.includes('character') && assetType.includes('secondary')) return '次要角色';
+  if (assetType.includes('scene') && assetType.includes('primary')) return '主要场景';
+  if (assetType.includes('scene') && assetType.includes('secondary')) return '次要场景';
+  if (assetType.includes('prop') && assetType.includes('primary')) return '主要道具';
+  if (assetType.includes('prop') && assetType.includes('secondary')) return '次要道具';
+  // 兼容旧的命名方式
+  if (assetType.includes('主要') && assetType.includes('角色')) return '主要角色';
+  if (assetType.includes('次要') && assetType.includes('角色')) return '次要角色';
+  if (assetType.includes('主要') && assetType.includes('场景')) return '主要场景';
+  if (assetType.includes('次要') && assetType.includes('场景')) return '次要场景';
+  if (assetType.includes('主要') && assetType.includes('道具')) return '主要道具';
+  if (assetType.includes('次要') && assetType.includes('道具')) return '次要道具';
   return '次要道具';
 };
 export const useAssetStore = create<AssetStore>()(
@@ -133,21 +142,47 @@ export const useAssetStore = create<AssetStore>()(
         const projectId = useProjectStore.getState().currentProjectId;
         
         return assets.filter((asset) => {
+          // 项目过滤
           if (projectId && asset.projectId !== projectId) {
             return false;
           }
           
+          // 类型过滤 - 使用 mapAssetTypeToCategory 从正确的字段获取类型
           if (filterType !== 'all') {
-            const assetType = mapCategoryToType(asset.name);
-            if (assetType !== filterType) {
+            // 优先从 ext1 解析变体信息
+            let assetCategory = '次要道具';
+            if (asset.ext1) {
+              try {
+                const ext1Data = JSON.parse(asset.ext1);
+                if (ext1Data.parent) {
+                  // 有 parent 说明是变体（二级资产）
+                  const parentName = ext1Data.parent;
+                  // 从父资产名称推断类型
+                  if (parentName.includes('角色')) assetCategory = '次要角色';
+                  else if (parentName.includes('场景')) assetCategory = '次要场景';
+                  else if (parentName.includes('道具')) assetCategory = '次要道具';
+                }
+              } catch (e) {
+                // ext1 不是 JSON，尝试直接解析
+                assetCategory = mapAssetTypeToCategory(asset.ext1);
+              }
+            }
+            // 如果从 ext1 没找到，使用 resourceType
+            if (assetCategory === '次要道具' && asset.resourceType) {
+              assetCategory = mapAssetTypeToCategory(asset.resourceType);
+            }
+            
+            if (assetCategory !== filterType) {
               return false;
             }
           }
           
+          // 搜索过滤
           if (searchTerm) {
             const term = searchTerm.toLowerCase();
             const matchesSearch = 
               asset.name?.toLowerCase().includes(term) ||
+              (asset.resourceName && asset.resourceName.toLowerCase().includes(term)) ||
               (asset.format && asset.format.toLowerCase().includes(term));
             
             if (!matchesSearch) {

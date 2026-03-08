@@ -16,7 +16,8 @@ import {
   Gem,
   Package,
   HardDrive,
-  Loader2
+  Loader2,
+  ChevronLeft
 } from 'lucide-react';
 import type { Image } from '../../api/image';
 import AssetCard from './AssetCard';
@@ -84,6 +85,24 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   
   // Delete loading state
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  
+  // Variant detail view state
+  const [selectedPrimaryAsset, setSelectedPrimaryAsset] = useState<Image | null>(null);
+  
+  // Helper functions for asset filtering
+  const isSecondaryAsset = (asset: Image): boolean => {
+    return !!asset.parentId && asset.parentId.length > 0;
+  };
+  
+  const isPrimaryAsset = (asset: Image): boolean => {
+    return !isSecondaryAsset(asset);
+  };
+  
+  // Get variants (secondary assets) for a primary asset
+  const getVariantsForPrimary = (primaryAsset: Image): Image[] => {
+    const primaryName = primaryAsset.name || primaryAsset.resourceName;
+    return assets.filter((asset) => asset.parentId === primaryName);
+  };
   
   // Handle right-click on asset
   const handleContextMenu = (e: React.MouseEvent, asset: Image) => {
@@ -174,7 +193,8 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return result;
   }, [assets]);
 
-  const filteredAssets = getFilteredAssets();
+  // Filter to show only primary assets (exclude secondary assets with parentId)
+  const filteredAssets = getFilteredAssets().filter((asset) => isPrimaryAsset(asset));
   const totalAssets = filteredAssets.length;
 
   const getCount = (key: string): number => {
@@ -270,8 +290,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
                   <span className="text-[10px] text-gray-500">新建资产</span>
                 </div>
               </div>
-
-              {/* Asset Cards */}
               {filteredAssets.map((asset) => (
                 <AssetCard
                   key={asset.id}
@@ -279,8 +297,79 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
                   onDragStart={handleDragStart}
                   onDragEnd={() => {}}
                   onContextMenu={(e) => handleContextMenu(e, asset)}
+                  onClick={getVariantsForPrimary(asset).length > 0 ? () => setSelectedPrimaryAsset(asset) : undefined}
                 />
               ))}
+            </div>
+          )}
+
+          {/* Variant Detail View */}
+          {selectedPrimaryAsset && (
+            <div className="flex-1 flex flex-col">
+              {/* Back button and title */}
+              <div className="mb-4 flex items-center justify-between">
+                <button
+                  onClick={() => setSelectedPrimaryAsset(null)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-blue-300 rounded hover:bg-gray-700 transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                  <span>返回资产库</span>
+                </button>
+              </div>
+              
+              {/* Primary asset display */}
+              <div className="mb-4">
+                <h3 className="text-xs font-medium text-white mb-2">{selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}</h3>
+                <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
+                  {selectedPrimaryAsset.url || selectedPrimaryAsset.resourceContent ? (
+                    <img 
+                      src={selectedPrimaryAsset.url || selectedPrimaryAsset.resourceContent}
+                      alt={selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon size={32} className="text-gray-500" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Variants section */}
+              {(() => {
+                const variants = getVariantsForPrimary(selectedPrimaryAsset);
+                if (variants.length === 0) return null;
+                return (
+                  <div className="flex-1 overflow-y-auto">
+                    <h4 className="text-[10px] text-gray-400 mb-2">变体 ({variants.length})</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {variants.map((variant) => (
+                        <div
+                          key={variant.id}
+                          className="flex flex-col gap-1"
+                        >
+                          <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
+                            {variant.url || variant.resourceContent ? (
+                              <img 
+                                src={variant.url || variant.resourceContent}
+                                alt={variant.name || variant.resourceName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ImageIcon size={20} className="text-gray-500" />
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-gray-400 text-center truncate">
+                            {variant.name || variant.resourceName || '变体'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

@@ -102,14 +102,9 @@ function renderNodeBody(node: CanvasNode) {
     
     case 'aiVideo':
     case 'generateCharacterVideo':
-    case 'generateSceneVideo':
-    case 'generateCharacterVideo':
-    case 'generateSceneVideo':
     case 'aiImage':
-    case 'aiVideo':
     case 'generateCharacterImage':
     case 'generateSceneImage':
-    case 'generateCharacterVideo':
     case 'generateSceneVideo':
       return (
         <input

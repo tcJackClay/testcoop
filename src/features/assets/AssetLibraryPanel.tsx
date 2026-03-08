@@ -203,16 +203,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
                 </div>
               </div>
 
-              {/* Asset Cards */}
-              <div 
-                onClick={() => console.log('Add new asset')}
-                className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-gray-600 cursor-pointer hover:border-blue-500 hover:bg-blue-500/10 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
-                  <Plus size={16} className="text-gray-500" />
-                </div>
-                <span className="text-[10px] text-gray-500">新建资产</span>
-              </div>
 
               {/* Asset Cards */}
               {filteredAssets.map((asset) => (

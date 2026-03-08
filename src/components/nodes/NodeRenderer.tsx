@@ -327,6 +327,7 @@ function renderNodeBody(node: CanvasNode) {
       const description = node.data.description as string || '';
       const status = node.data.status as string || 'idle';
       const uploadedFile = node.data.uploadedFile as File | null;
+      const imageUrl = node.data.imageUrl as string || '';
       
       // 资产类型选项
       const assetTypeOptions = [

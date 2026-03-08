@@ -20,8 +20,8 @@ import {
 } from 'lucide-react';
 import type { Image } from '../../api/image';
 import AssetCard from './AssetCard';
-import { imageApi } from '../../api/image';
 import { useAssetStore } from '../../stores/assetStore';
+import { useCanvasStore } from '../../stores/canvasStore';
 
 interface AssetLibraryPanelProps {
   onClose: () => void;

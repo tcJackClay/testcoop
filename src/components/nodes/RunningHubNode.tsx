@@ -3,8 +3,9 @@
  * 适配 aigc-coop 的自定义画布系统
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, Pause, AlertCircle, CheckCircle, Loader2, X, ChevronDown, Sparkles } from 'lucide-react';
+import { Play, Pause, AlertCircle, CheckCircle, Loader2, X, ChevronDown } from 'lucide-react';
 import { runningHubApi, runningHubConfig, DEFAULT_FUNCTIONS, type RHNodeField, type RunningHubFunction } from '../../api/runningHub';
+import { DynamicFieldRenderer } from './DynamicFieldRenderer';
 
 interface RunningHubNodeProps {
   nodeId: string;
@@ -28,7 +29,7 @@ interface RunningHubNodeProps {
 }
 
 export default function RunningHubNode({ nodeId, data, updateData }: RunningHubNodeProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [showFunctionSelector, setShowFunctionSelector] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -47,13 +48,13 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
   }, []);
 
   const currentFunction = data.function || functions[0];
-  const isConfigured = currentFunction && (Object.keys(data.inputs || {}).length > 0 || nodeFields.length > 0);
+  const themeColor = currentFunction?.color || '#6366f1';
+  const isConfigured = !!currentFunction;
 
   const handleFunctionSelect = useCallback(async (func: RunningHubFunction) => {
     updateData('function', func);
     updateData('inputs', {});
     setShowFunctionSelector(false);
-    setIsExpanded(true);
     setProgress(0);
     setError(null);
     setLocalPreviews({});
@@ -74,7 +75,8 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
     }
   }, [updateData]);
 
-  const handleInputChange = useCallback((fieldName: string, value: any) => {
+  // 供 DynamicFieldRenderer 使用的回调
+  const handleFieldInputChange = useCallback((_nodeId: string, fieldName: string, value: any) => {
     const inputKey = `${nodeId}-${fieldName}`;
     const currentInputs = (data.inputs as Record<string, any>) || {};
     updateData('inputs', { ...currentInputs, [inputKey]: value });
@@ -145,82 +147,88 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
   }, [nodeId, data]);
 
   return (
-    <div className="min-w-[280px] max-w-[400px] bg-white rounded-xl shadow-md border border-slate-200">
-      {/* Header */}
-      <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-xl">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: currentFunction?.color || '#6366f1' }}>
-            🤖
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-700">RunningHub</span>
-            <p className="text-[9px] text-slate-400">{currentFunction?.name || '选择功能'}</p>
-          </div>
+    <div 
+      className="min-w-[280px] max-w-[400px] rounded-xl shadow-md border-2 transition-all"
+      style={{ 
+        backgroundColor: 'white',
+        borderColor: themeColor,
+      }}
+    >
+      {/* 功能选择 + 操作按钮 */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 rounded-t-xl">
+        {/* 功能选择下拉框 */}
+        <div className="relative flex-1">
+          <button
+            onClick={() => setShowFunctionSelector(!showFunctionSelector)}
+            className="flex items-center gap-2 text-left"
+          >
+            <span className="text-sm">{currentFunction?.icon || '🎨'}</span>
+            <span className="text-xs text-slate-700">{currentFunction?.name || '选择功能'}</span>
+            <ChevronDown className={`w-3 h-3 text-slate-400 ${showFunctionSelector ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showFunctionSelector && (
+            <div className="absolute z-10 w-64 left-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              <div className="flex flex-wrap gap-1 p-2 border-b border-slate-100">
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => { setActiveCategory(cat); }}
+                    className={`px-2 py-1 text-[10px] rounded ${activeCategory === cat ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              {(activeCategory === '全部' ? functions : functions.filter(f => f.category === activeCategory)).map(func => (
+                <button
+                  key={func.id}
+                  onClick={() => handleFunctionSelect(func)}
+                  className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 text-left"
+                >
+                  <span className="text-sm">{func.icon}</span>
+                  <div className="flex-1">
+                    <div className="text-xs text-slate-700">{func.name}</div>
+                    <div className="text-[9px] text-slate-400">{func.description}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* 状态和操作按钮 */}
         <div className="flex items-center gap-1">
-          {data.status === 'completed' && <span className="flex items-center gap-1 text-[10px] text-green-500"><CheckCircle className="w-3 h-3" />完成</span>}
-          {data.status === 'failed' && <span className="flex items-center gap-1 text-[10px] text-red-500"><AlertCircle className="w-3 h-3" />失败</span>}
-          <button onClick={handleDelete} className="p-1 rounded hover:bg-slate-200">
+          {data.status === 'completed' && (
+            <span className="flex items-center gap-1 text-[10px] text-green-500">
+              <CheckCircle className="w-3 h-3" />完成
+            </span>
+          )}
+          {data.status === 'failed' && (
+            <span className="flex items-center gap-1 text-[10px] text-red-500">
+              <AlertCircle className="w-3 h-3" />失败
+            </span>
+          )}
+          <button onClick={handleDelete} className="p-1 rounded hover:bg-slate-100">
             <X className="w-3 h-3 text-slate-400" />
           </button>
-          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 rounded hover:bg-slate-200">
+          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 rounded hover:bg-slate-100">
             <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Function Selector */}
-      <div className="relative">
-        <button
-          onClick={() => setShowFunctionSelector(!showFunctionSelector)}
-          className="w-full px-3 py-2 flex items-center justify-between bg-slate-50 hover:bg-slate-100 border-b border-slate-100 text-left"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm">{currentFunction?.icon || '🎨'}</span>
-            <span className="text-xs text-slate-700">{currentFunction?.name || '选择功能'}</span>
-          </div>
-          <ChevronDown className={`w-3 h-3 text-slate-400 ${showFunctionSelector ? 'rotate-180' : ''}`} />
-        </button>
-
-        {showFunctionSelector && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-            <div className="flex flex-wrap gap-1 p-2 border-b border-slate-100">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => { setActiveCategory(cat); }}
-                  className={`px-2 py-1 text-[10px] rounded ${activeCategory === cat ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-            {(activeCategory === '全部' ? functions : functions.filter(f => f.category === activeCategory)).map(func => (
-              <button
-                key={func.id}
-                onClick={() => handleFunctionSelect(func)}
-                className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 text-left"
-              >
-                <span className="text-sm">{func.icon}</span>
-                <div className="flex-1">
-                  <div className="text-xs text-slate-700">{func.name}</div>
-                  <div className="text-[9px] text-slate-400">{func.description}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Expanded Content */}
       {isExpanded && (
         <div className="p-3 space-y-2">
+          {/* 加载状态 */}
           {isLoadingNodeInfo && (
             <div className="flex items-center gap-2 text-[10px] text-slate-500">
               <Loader2 className="w-3 h-3 animate-spin" />加载节点配置...
             </div>
           )}
 
+          {/* 功能描述 */}
           <p className="text-[10px] text-slate-500 bg-slate-50 rounded p-2">{currentFunction?.description}</p>
 
           {/* Cover Images */}
@@ -247,41 +255,15 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
                     {field.fieldName}
                     {field.description && <span className="text-slate-400 font-normal ml-1">- {field.description}</span>}
                   </label>
-                  {/* 简化版 - 只支持文本输入 */}
-                  {field.fieldType === 'STRING' || field.fieldType === 'TEXT' ? (
-                    <textarea
-                      placeholder={field.description || `请输入${field.fieldName}`}
-                      value={data.inputs?.[`${nodeId}-${field.fieldName}`] || field.fieldValue || ''}
-                      onChange={(e) => handleInputChange(field.fieldName, e.target.value)}
-                      rows={2}
-                      className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded resize-none"
-                    />
-                  ) : field.fieldType === 'LIST' ? (
-                    <select
-                      value={data.inputs?.[`${nodeId}-${field.fieldName}`] || field.fieldValue || ''}
-                      onChange={(e) => handleInputChange(field.fieldName, e.target.value)}
-                      className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded"
-                    >
-                      <option value="">请选择{field.fieldName}</option>
-                      {field.fieldData && (() => {
-                        try {
-                          const parsed = JSON.parse(field.fieldData);
-                          const opts = Array.isArray(parsed) ? parsed : [];
-                          return opts.map((opt: any, i: number) => (
-                            <option key={i} value={typeof opt === 'string' ? opt : opt.value}>{typeof opt === 'string' ? opt : opt.label}</option>
-                          ));
-                        } catch { return null; }
-                      })()}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      placeholder={`请输入${field.fieldName}`}
-                      value={data.inputs?.[`${nodeId}-${field.fieldName}`] || field.fieldValue || ''}
-                      onChange={(e) => handleInputChange(field.fieldName, e.target.value)}
-                      className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded"
-                    />
-                  )}
+                  <DynamicFieldRenderer
+                    field={field}
+                    nodeId={nodeId}
+                    data={{ inputs: data.inputs || {} }}
+                    onInputChange={handleFieldInputChange}
+                    localPreviews={localPreviews}
+                    setLocalPreviews={setLocalPreviews}
+                    currentFunction={currentFunction}
+                  />
                 </div>
               ))
             ) : (
@@ -289,7 +271,10 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
                 type="text"
                 placeholder="输入提示词..."
                 value={data.inputs?.prompt || ''}
-                onChange={(e) => handleInputChange('prompt', e.target.value)}
+                onChange={(e) => {
+                  const inputKey = `${nodeId}-prompt`;
+                  updateData('inputs', { ...data.inputs, [inputKey]: e.target.value });
+                }}
                 className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded"
               />
             )}
@@ -300,10 +285,13 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-slate-500">处理中...</span>
-                <span className="text-primary font-medium">{progress}%</span>
+                <span className="font-medium" style={{ color: themeColor }}>{progress}%</span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+                <div 
+                  className="h-full transition-all" 
+                  style={{ width: `${progress}%`, backgroundColor: themeColor }} 
+                />
               </div>
             </div>
           )}
@@ -329,7 +317,8 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
               <button
                 onClick={handleExecute}
                 disabled={!isConfigured}
-                className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs rounded ${isConfigured ? 'bg-primary text-white hover:bg-primary/90' : 'bg-slate-200 text-slate-400'}`}
+                className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs rounded text-white ${isConfigured ? 'hover:opacity-90' : 'bg-slate-200 text-slate-400'}`}
+                style={{ backgroundColor: isConfigured ? themeColor : undefined }}
               >
                 <Play className="w-3 h-3" />生成
               </button>

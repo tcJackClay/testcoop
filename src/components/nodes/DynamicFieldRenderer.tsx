@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import type { RHNodeField } from '../../api/runningHub';
 
 interface DynamicFieldRendererProps {
@@ -8,7 +8,7 @@ interface DynamicFieldRendererProps {
   onInputChange: (nodeId: string, fieldName: string, value: any) => void;
   localPreviews: Record<string, string>;
   setLocalPreviews: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  currentFunction: { webappId: string } | undefined;
+  currentFunction?: { webappId: string };
 }
 
 export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
@@ -18,9 +18,32 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
   onInputChange,
   localPreviews,
   setLocalPreviews,
-  currentFunction,
 }) => {
   const inputKey = `${field.nodeId}-${field.fieldName}`;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 文件选择处理（仅本地预览）
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // 创建本地预览 URL
+    const localPreviewUrl = URL.createObjectURL(file);
+    
+    // 更新本地预览状态
+    setLocalPreviews((prev: Record<string, string>) => ({
+      ...prev,
+      [inputKey]: localPreviewUrl
+    }));
+
+    // 将本地预览 URL 作为输入值
+    onInputChange(field.nodeId, field.fieldName, localPreviewUrl);
+
+    // 清空 input 以允许再次选择相同文件
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [inputKey, onInputChange, setLocalPreviews, field]);
 
   // STRING type - multiline text
   if (field.fieldType === 'STRING') {
@@ -89,12 +112,14 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
     const previewUrl = localPreviews[inputKey] || data.inputs[inputKey];
 
     return (
-      <div>
+      <div className="relative">
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           className="hidden"
           id={`rh-upload-${nodeId}-${field.fieldName}`}
+          onChange={handleFileSelect}
         />
         {previewUrl ? (
           <div className="relative aspect-video rounded-lg overflow-hidden bg-slate-100 mb-2">
@@ -126,10 +151,12 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
     return (
       <div>
         <input
+          ref={fileInputRef}
           type="file"
           accept={field.fieldType === 'AUDIO' ? 'audio/*' : 'video/*'}
           className="hidden"
           id={`rh-upload-${nodeId}-${field.fieldName}`}
+          onChange={handleFileSelect}
         />
         {previewUrl ? (
           <div className="space-y-2">

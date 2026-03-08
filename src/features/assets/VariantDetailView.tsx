@@ -1,20 +1,21 @@
 import { ChevronLeft, Image as ImageIcon } from 'lucide-react';
 import type { Image } from '../../api/image';
-import AssetCard from './AssetCard';
+
+interface Variant {
+  id: number;
+  name?: string;
+  resourceName?: string;
+  url?: string;
+  resourceContent?: string;
+}
 
 interface VariantDetailViewProps {
   selectedPrimaryAsset: Image;
+  variants: Variant[];
   onBack: () => void;
-  getVariantsForPrimary: (primaryAsset: Image) => Image[];
 }
 
-export default function VariantDetailView({
-  selectedPrimaryAsset,
-  onBack,
-  getVariantsForPrimary,
-}: VariantDetailViewProps) {
-  const variants = getVariantsForPrimary(selectedPrimaryAsset);
-
+export default function VariantDetailView({ selectedPrimaryAsset, variants, onBack }: VariantDetailViewProps) {
   return (
     <div className="flex-1 flex flex-col">
       {/* Back button and title */}

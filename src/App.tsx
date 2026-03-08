@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Canvas from './components/canvas/Canvas';
@@ -23,10 +23,32 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
   const [rightPanel, setRightPanel] = useState<RightPanelType>(null);
+  const [isInitialMount, setIsInitialMount] = useState(true);
   
   const { addNode } = useCanvasStore();
   const { token } = useAuthStore();
   const { currentProject } = useProjectStore();
+  const prevTokenRef = useRef(token);
+
+  // 初始跳转：只在首次挂载时检查
+  useEffect(() => {
+    if (isInitialMount) {
+      if (!token) {
+        setViewMode('login');
+      } else if (!currentProject) {
+        setViewMode('projects');
+      }
+      setIsInitialMount(false);
+    }
+  }, [isInitialMount, token, currentProject]);
+
+  // 登录成功后跳转到项目列表
+  useEffect(() => {
+    if (!isInitialMount && !prevTokenRef.current && token && viewMode === 'login') {
+      setViewMode('projects');
+    }
+    prevTokenRef.current = token;
+  }, [token, viewMode, isInitialMount]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
     // 未登录只能访问登录页面
@@ -50,16 +72,6 @@ export default function App() {
   const handleRightPanelChange = useCallback((type: RightPanelType) => {
     setRightPanel(prev => prev === type ? null : type);
   }, []);
-
-  // 初始跳转：只在新加载时检查一次
-  const initialized = useState(() => {
-    if (!token) {
-      setViewMode('login');
-    } else if (!currentProject) {
-      setViewMode('projects');
-    }
-    return true;
-  });
 
   // 判断是否显示 sidebar（只在 canvas 模式下显示）
   const showSidebar = viewMode === 'canvas';

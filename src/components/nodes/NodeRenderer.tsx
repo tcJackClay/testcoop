@@ -21,6 +21,10 @@ import {
   Loader2
 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useAssetStore } from '../../stores/assetStore';
+import { imageApi } from '../../api/image';
+import { vectorApi } from '../../api/vector';
 
 // Generation node types that support execution
 const generationNodeTypes = [
@@ -326,8 +330,8 @@ function renderNodeBody(node: CanvasNode) {
       const isVariant = node.data.isVariant as boolean || false;
       const parentAssetId = node.data.parentAssetId as number | null;
       const description = node.data.description as string || '';
-      const imageUrl = node.data.imageUrl as string || '';
       const status = node.data.status as string || 'idle';
+      const uploadedFile = node.data.uploadedFile as File | null;
       
       // 资产类型选项
       const assetTypeOptions = [
@@ -339,9 +343,18 @@ function renderNodeBody(node: CanvasNode) {
         { key: 'prop_secondary', label: '次要道具' },
       ];
       
-      // 从画布节点中获取主要资产作为父资产选项
-      // 这里简化处理，实际应该从资产库获取
-      const primaryAssets: { id: number; name: string }[] = [];
+      // 从资产库获取主要资产作为父资产选项
+      const allAssets = useAssetStore.getState().assets;
+      const primaryAssets = allAssets
+        .filter(a => {
+          const ext1 = a.ext1 ? JSON.parse(a.ext1) : {};
+          // 主要资产是没有 parent 的，或者 resourceType 包含 primary
+          return !ext1.parent && (
+            a.resourceType?.includes('primary') || 
+            !a.resourceType?.includes('secondary')
+          );
+        })
+        .map(a => ({ id: a.id!, name: a.name || a.resourceName }));
       
       const handleVariantChange = (checked: boolean) => {
         updateData('isVariant', checked);
@@ -407,6 +420,40 @@ function renderNodeBody(node: CanvasNode) {
             </select>
           )}
           
+          {/* Image Upload / Preview Area */}
+          <div 
+            className="w-full h-24 bg-gray-700 border border-gray-600 rounded flex items-center justify-center overflow-hidden cursor-pointer hover:bg-gray-600"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              id={`asset-upload-${node.id}`}
+              onChange={async (e) => {
+                e.stopPropagation();
+                const file = e.target.files?.[0];
+                if (file) {
+                  // Create object URL for preview
+                  const objectUrl = URL.createObjectURL(file);
+                  updateData('imageUrl', objectUrl);
+                  updateData('uploadedFile', file);
+                }
+              }}
+            />
+            {imageUrl ? (
+              <label htmlFor={`asset-upload-${node.id}`} className="w-full h-full cursor-pointer">
+                <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
+              </label>
+            ) : (
+              <label htmlFor={`asset-upload-${node.id}`} className="text-center cursor-pointer">
+                <Upload className="w-6 h-6 text-gray-500 mx-auto" />
+                <span className="text-[10px] text-gray-500">点击上传图片</span>
+              </label>
+            )}
+          </div>
+          
           {/* Description Input */}
           <textarea
             className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white resize-none"
@@ -420,12 +467,111 @@ function renderNodeBody(node: CanvasNode) {
           {/* Save Button */}
           <button
             className={`w-full py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${status === 'saving' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
               if (status !== 'saving') {
+                // Validate required fields
+                if (!name.trim()) {
+                  alert('请输入资产名称');
+                  return;
+                }
+                if (!imageUrl) {
+                  alert('请先上传或生成图片');
+                  return;
+                }
+                
                 updateData('status', 'saving');
-                console.log('Saving asset:', { name, assetType, isVariant, parentAssetId, description, imageUrl });
-                // TODO: 调用 API 保存资产
+                
+                try {
+                  // Get current project ID
+                  const projectId = useProjectStore.getState().currentProjectId;
+                  if (!projectId) {
+                    alert('请先选择项目');
+                    updateData('status', 'idle');
+                    return;
+                  }
+                  
+                  // Get parent asset name if isVariant
+                  let parentAssetName: string | null = null;
+                  if (isVariant && parentAssetId) {
+                    const parentAsset = useAssetStore.getState().assets.find(a => a.id === parentAssetId);
+                    parentAssetName = parentAsset?.name || null;
+                  }
+                  
+                  // Build ext1 JSON for variant info
+                  const ext1Json = {
+                    variant: isVariant ? name : null,
+                    parent: parentAssetName,
+                  };
+                  
+                  // Upload image to vector image bed
+                  let uploadedUrl = imageUrl;
+                  
+                  // If we have a directly uploaded file, upload it
+                  if (uploadedFile) {
+                    try {
+                      const uploadResult = await vectorApi.uploadImageFile(uploadedFile);
+                      if (uploadResult.code === 0 && uploadResult.data) {
+                        uploadedUrl = uploadResult.data.imageUrl;
+                      } else {
+                        console.error('图片上传失败:', uploadResult);
+                        alert('图片上传失败');
+                        updateData('status', 'idle');
+                        return;
+                      }
+                    } catch (uploadError) {
+                      console.error('图片上传错误:', uploadError);
+                      alert('图片上传失败');
+                      updateData('status', 'idle');
+                      return;
+                    }
+                  } else if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
+                    // Convert base64/blob to file and upload
+                    try {
+                      const response = await fetch(imageUrl);
+                      const blob = await response.blob();
+                      const file = new File([blob], `${name}.png`, { type: 'image/png' });
+                      const uploadResult = await vectorApi.uploadImageFile(file);
+                      if (uploadResult.code === 0 && uploadResult.data) {
+                        uploadedUrl = uploadResult.data.imageUrl;
+                      } else {
+                        console.error('图片上传失败:', uploadResult);
+                        alert('图片上传失败');
+                        updateData('status', 'idle');
+                        return;
+                      }
+                    } catch (uploadError) {
+                      console.error('图片上传错误:', uploadError);
+                      alert('图片上传失败');
+                      updateData('status', 'idle');
+                      return;
+                    }
+                  }
+                  
+                  // Create asset via API
+                  const result = await imageApi.create({
+                    resourceName: name,
+                    resourceType: 'image',
+                    resourceContent: uploadedUrl,
+                    projectId: projectId,
+                    ext1: JSON.stringify(ext1Json),
+                  });
+                  
+                  if (result) {
+                    console.log('资产创建成功:', result);
+                    updateData('status', 'saved');
+                    // Refresh asset list
+                    useAssetStore.getState().fetchAssets();
+                    setTimeout(() => updateData('status', 'idle'), 2000);
+                  } else {
+                    alert('资产创建失败');
+                    updateData('status', 'idle');
+                  }
+                } catch (error) {
+                  console.error('保存资产错误:', error);
+                  alert('保存失败，请重试');
+                  updateData('status', 'idle');
+                }
               }
             }}
             disabled={status === 'saving'}

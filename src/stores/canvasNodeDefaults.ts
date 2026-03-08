@@ -41,10 +41,10 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
     data: {
       label: 'Create Asset',
       name: '',
-      type: '角色',
+      type: '主要角色',
+      isSecondary: false,
       description: '',
       imageUrl: '',
-      tags: [],
       status: 'idle'
     }
   },

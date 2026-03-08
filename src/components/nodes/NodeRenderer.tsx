@@ -320,6 +320,122 @@ function renderNodeBody(node: CanvasNode) {
       );
     }
     
+    case 'createAsset': {
+      const name = node.data.name as string || '';
+      const type = node.data.type as string || '主要角色';
+      const isSecondary = node.data.isSecondary as boolean || false;
+      const description = node.data.description as string || '';
+      const imageUrl = node.data.imageUrl as string || '';
+      const status = node.data.status as string || 'idle';
+      
+      // 根据 isSecondary 自动调整 type
+      const handleTypeChange = (newType: string) => {
+        const prefix = newType.includes('主要') ? '主要' : '次要';
+        let category = '角色';
+        if (newType.includes('场景')) category = '场景';
+        if (newType.includes('道具')) category = '道具';
+        updateData('type', prefix + category);
+      };
+      
+      const handleSecondaryChange = (checked: boolean) => {
+        updateData('isSecondary', checked);
+        // 自动调整类型
+        if (checked) {
+          // 切换到二级
+          if (type.includes('主要')) {
+            const category = type.replace('主要', '');
+            updateData('type', '次要' + category);
+          }
+        } else {
+          // 切换到一级
+          if (type.includes('次要')) {
+            const category = type.replace('次要', '');
+            updateData('type', '主要' + category);
+          }
+        }
+      };
+      
+      return (
+        <div className="space-y-2 min-w-[240px]">
+          {/* Name Input */}
+          <input
+            type="text"
+            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+            placeholder="资产名称..."
+            value={name}
+            onChange={(e) => updateData('name', e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Is Secondary Checkbox - 放在类型前面 */}
+          <label className="flex items-center gap-2 text-xs text-white cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isSecondary}
+              onChange={(e) => handleSecondaryChange(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-3 h-3"
+            />
+            <span>二级资产</span>
+          </label>
+          
+          {/* Type Select - 根据 isSecondary 显示不同选项 */}
+          <select
+            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+            value={type}
+            onChange={(e) => handleTypeChange(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isSecondary ? (
+              <>
+                <option value="次要角色">次要角色</option>
+                <option value="次要场景">次要场景</option>
+                <option value="次要道具">次要道具</option>
+              </>
+            ) : (
+              <>
+                <option value="主要角色">主要角色</option>
+                <option value="主要场景">主要场景</option>
+                <option value="主要道具">主要道具</option>
+              </>
+            )}
+          </select>
+          
+          {/* Description Input */}
+          
+          {/* Description Input */}
+          <textarea
+            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white resize-none"
+            rows={2}
+            placeholder="描述..."
+            value={description}
+            onChange={(e) => updateData('description', e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Save Button */}
+          <button
+            className={`w-full py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${status === 'saving' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (status !== 'saving') {
+                updateData('status', 'saving');
+                console.log('Saving asset:', { name, type, isSecondary, description, imageUrl });
+                // TODO: 调用 API 保存资产
+              }
+            }}
+            disabled={status === 'saving'}
+          >
+            {status === 'saving' ? (
+              <><span className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />保存中</>
+            ) : (
+              <><Sparkles className="w-3 h-3" />保存到资产库</>
+            )}
+          </button>
+        </div>
+      );
+    }
+    
     case 'saveLocal':
       return (
         <div className="flex items-center gap-2 text-xs text-gray-400">

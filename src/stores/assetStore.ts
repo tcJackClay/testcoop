@@ -110,7 +110,30 @@ export const useAssetStore = create<AssetStore>()(
         
         try {
           const images = await imageApi.getAll(projectId);
-          set({ assets: images || [], isLoading: false });
+          
+          // 解析 parentId 和 variants
+          const processedAssets = (images || []).map((image) => {
+            let parentId = '';
+            let variants: string[] = [];
+            
+            if (image.ext1) {
+              try {
+                const ext1Data = JSON.parse(image.ext1);
+                parentId = ext1Data.parent || ext1Data.parentId || '';
+                if (ext1Data.variants && Array.isArray(ext1Data.variants)) {
+                  variants = ext1Data.variants.filter((v: any) => typeof v === 'string' && v.length > 0);
+                }
+              } catch (e) {}
+            }
+            
+            return {
+              ...image,
+              parentId,
+              variants,
+            };
+          });
+          
+          set({ assets: processedAssets, isLoading: false });
         } catch (error) {
           console.error('Failed to fetch assets:', error);
           set({ error: '网络错误，请稍后重试', isLoading: false });

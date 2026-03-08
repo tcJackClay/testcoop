@@ -29,6 +29,9 @@ export interface Image {
   height?: number
   size?: number
   format?: string
+  // 变体相关字段
+  parentId?: string;  // 父资产名称（二级资产引用主要资产）
+  variants?: string[]; // 主要资产的变体名称数组
 }
 
 export interface CreateImageRequest {

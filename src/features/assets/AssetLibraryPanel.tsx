@@ -1,21 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
-import { 
-  X, 
-  Plus, 
-  Search, 
+import {
+  X,
+  Plus,
+  Search,
   Filter,
   Image as ImageIcon,
-  Grid,
-  List,
   Upload,
-  Folder,
-  Star,
-  User,
-  Mountain,
-  MapPin,
-  Gem,
-  Package,
-  HardDrive,
   Loader2,
 } from 'lucide-react';
 import { useAssetStore } from '../../stores/assetStore';

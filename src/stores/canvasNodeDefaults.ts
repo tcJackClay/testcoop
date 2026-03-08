@@ -15,6 +15,7 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
   storyboardNode: { type: 'storyboardNode', data: { label: 'Storyboard' } },
   aiVideo: { type: 'aiVideo', data: { label: 'AI Video', prompt: '', modelId: '' } },
   imageCompare: { type: 'imageCompare', data: { label: 'Image Compare', imageA: '', imageB: '' } },
+  preview: { type: 'preview', data: { label: 'Preview' } },
   imageNode: { 
     type: 'imageNode', 
     data: { 

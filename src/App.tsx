@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Canvas from './components/canvas/Canvas';
@@ -24,35 +24,17 @@ export default function App() {
   const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
   const [rightPanel, setRightPanel] = useState<RightPanelType>(null);
   
-  const { nodes, deleteNode, clearSelection, addNode } = useCanvasStore();
+  const { addNode } = useCanvasStore();
   const { token } = useAuthStore();
   const { currentProject } = useProjectStore();
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // 初始化后监听登录状态和项目选择状态，自动切换视图
-  useEffect(() => {
-    setIsInitialized(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isInitialized) return;
-    
-    if (!token) {
-      // 未登录，跳转到登录页面
-      setViewMode('login');
-    } else if (!currentProject) {
-      // 已登录但未选择项目，停留在项目列表
-      setViewMode('projects');
-    }
-    // 已登录且已选择项目，可以进入其他视图
-  }, [token, currentProject, isInitialized]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
-    // 只有登录后才能切换到项目视图
-    if (mode === 'login' || token) {
-      setViewMode(mode);
-    }
-  }, [token]);
+    // 未登录只能访问登录页面
+    if (!token && mode !== 'login') return;
+    // 未选择项目只能访问项目列表
+    if (!currentProject && mode !== 'login' && mode !== 'projects') return;
+    setViewMode(mode);
+  }, [token, currentProject]);
 
   const handleAddNode = useCallback((type: NodeType) => {
     const x = 100 + Math.random() * 200;
@@ -68,6 +50,16 @@ export default function App() {
   const handleRightPanelChange = useCallback((type: RightPanelType) => {
     setRightPanel(prev => prev === type ? null : type);
   }, []);
+
+  // 初始跳转：只在新加载时检查一次
+  const initialized = useState(() => {
+    if (!token) {
+      setViewMode('login');
+    } else if (!currentProject) {
+      setViewMode('projects');
+    }
+    return true;
+  });
 
   // 判断是否显示 sidebar（只在 canvas 模式下显示）
   const showSidebar = viewMode === 'canvas';

@@ -101,12 +101,11 @@ export default function AssetCard({
   const imageUrl = getImageUrl(asset);
   
   const hasImage = imageUrl && (
-    imageUrl.startsWith('http') || 
-    imageUrl.startsWith('data:') ||
     imageUrl.startsWith('/')
   );
-
   const hasVariants = 'variants' in asset && asset.variants && asset.variants.length > 0;
+  // Check if this is a secondary asset (has parentId)
+  const isSecondaryAsset = 'parentId' in asset && !!asset.parentId;
 
   return (
     <div
@@ -139,21 +138,16 @@ export default function AssetCard({
           {categoryIcons[category]}
           <span>{category}</span>
         </div>
-
-        {/* Secondary Asset (Variant) Badge */}
-        {(() => {
-          // Check if this is a secondary asset (variant)
-          const ext1 = asset.ext1 ? (() => { try { return JSON.parse(asset.ext1); } catch { return null; } })() : null;
-          const isVariant = ext1 && ext1.parent;
-          if (isVariant) {
-            return (
-              <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white flex items-center gap-1">
-                <span>变体</span>
-              </div>
-            );
-          }
-          return null;
-        })()}
+        {/* Variant Badge - shows 变体 for secondary assets, shows count for primary assets with variants */}
+        {isSecondaryAsset ? (
+          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white">
+            变体
+          </div>
+        ) : hasVariants ? (
+          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white">
+            {asset.variants?.length} 变体
+          </div>
+        ) : null}
 
         {/* Variants Badge */}
         {hasVariants && (

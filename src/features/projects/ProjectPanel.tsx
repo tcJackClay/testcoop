@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Folder, Loader2 } from 'lucide-react';
+import { Plus, Folder, FolderOpen, Loader2 } from 'lucide-react';
 import { projectApi, projectViewApi, type ProjectView } from '../../api/project';
 import { useAuthStore } from '../../stores/authStore';
 import { useProjectStore } from '../../stores/projectStore';

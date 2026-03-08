@@ -31,7 +31,8 @@ export type NodeType =
   | 'generateCharacterImage'
   | 'generateSceneImage'
   | 'imageInput'
-  | 'saveLocal';
+  | 'saveLocal'
+  | 'promptNode';
 
 export interface Connection {
   id: string;

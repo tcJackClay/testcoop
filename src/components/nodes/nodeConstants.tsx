@@ -20,6 +20,7 @@ import type { NodeType } from '../../stores/canvasStore';
 export const generationNodeTypes: NodeType[] = [
   'imageNode',
   'videoNode',
+  'promptNode',
 ];
 
 // 节点图标映射
@@ -46,6 +47,7 @@ export const nodeIcons: Record<NodeType, React.ReactNode> = {
   createAsset: <Image className="w-4 h-4" />,
   generateCharacterImage: <Wand2 className="w-4 h-4" />,
   generateSceneImage: <Wand2 className="w-4 h-4" />,
+  promptNode: <Wand2 className="w-4 h-4" />,
 };
 
 // 节点颜色映射
@@ -72,6 +74,7 @@ export const nodeColors: Record<string, string> = {
   createAsset: 'border-teal-500 bg-teal-500/10',
   generateCharacterImage: 'border-pink-300 bg-pink-300/10',
   generateSceneImage: 'border-pink-300 bg-pink-300/10',
+  promptNode: 'border-pink-500 bg-pink-500/10',
 };
 
 // 资产类型选项

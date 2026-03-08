@@ -6,6 +6,7 @@ import { nodeIcons, nodeColors, generationNodeTypes } from './nodeConstants';
 import ImageNode from './ImageNode';
 import VideoNode from './VideoNode';
 import CreateAssetNode from './CreateAssetNode';
+import PromptNode from './PromptNode';
 
 interface NodeRendererProps {
   node: CanvasNode;
@@ -100,6 +101,9 @@ function renderNodeBody(node: CanvasNode) {
 
     case 'createAsset':
       return <CreateAssetNode nodeId={node.id} data={node.data} updateData={updateData} />;
+
+    case 'promptNode':
+      return <PromptNode nodeId={node.id} data={node.data} updateData={updateData} />;
 
     case 'saveLocal':
       return (

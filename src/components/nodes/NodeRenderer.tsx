@@ -159,6 +159,10 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 function ImageNodeBody({ node, updateData }: { node: CanvasNode; updateData: (k: string, v: unknown) => void }) {
   const [dimensions, setDimensions] = useState<{w: number; h: number} | null>(null);
   const url = node.data.imageUrl as string;
+  const prompt = node.data.prompt as string || '';
+  const status = node.data.status as string || 'idle';
+  const aspectRatio = node.data.aspectRatio as string || '1:1';
+  const resolution = node.data.resolution as string || '1K';
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -171,8 +175,16 @@ function ImageNodeBody({ node, updateData }: { node: CanvasNode; updateData: (k:
     setDimensions({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
   };
 
+  const handleGenerate = () => {
+    if (status !== 'processing') {
+      updateData('status', 'processing');
+      console.log('Generating image with prompt:', prompt, 'aspectRatio:', aspectRatio, 'resolution:', resolution);
+    }
+  };
+
   return (
     <div className="space-y-2 min-w-[240px]">
+      {/* Image Upload/Preview */}
       <div className="px-2">
         <input type="file" accept="image/*" className="hidden" id={`img-${node.id}`} onChange={handleUpload} />
         {url ? (
@@ -183,11 +195,63 @@ function ImageNodeBody({ node, updateData }: { node: CanvasNode; updateData: (k:
             </div>
           </label>
         ) : (
-          <label htmlFor={`img-${node.id}`} className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500">
+          <label htmlFor={`img-${node.id}`} className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-500 hover:bg-gray-600/30">
             <Upload className="w-8 h-8 text-gray-500" />
-            <span className="text-xs text-gray-500">点击上传图片</span>
+            <span className="text-xs text-gray-500">点击或拖拽上传</span>
           </label>
         )}
+      </div>
+      
+      {/* Prompt Input */}
+      <div className="px-2">
+        <textarea
+          className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white resize-none"
+          rows={2}
+          placeholder="描述你想要生成的画面..."
+          value={prompt}
+          onChange={(e) => updateData('prompt', e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+      
+      {/* Settings + Generate Button */}
+      <div className="px-2 flex gap-2 items-center">
+        <select
+          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+          value={aspectRatio}
+          onChange={(e) => updateData('aspectRatio', e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="1:1">1:1</option>
+          <option value="16:9">16:9</option>
+          <option value="9:16">9:16</option>
+          <option value="4:3">4:3</option>
+          <option value="3:4">3:4</option>
+        </select>
+        <select
+          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+          value={resolution}
+          onChange={(e) => updateData('resolution', e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="1K">1K</option>
+          <option value="2K">2K</option>
+          <option value="4K">4K</option>
+        </select>
+        <button
+          className={`flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${status === 'processing' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600 text-white'}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleGenerate();
+          }}
+          disabled={status === 'processing'}
+        >
+          {status === 'processing' ? (
+            <><Loader2 className="w-3 h-3 animate-spin" />生成中</>
+          ) : (
+            '生成'
+          )}
+        </button>
       </div>
     </div>
   );

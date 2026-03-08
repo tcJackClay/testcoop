@@ -1,21 +1,28 @@
 import { HardDrive } from 'lucide-react';
-import { categories, type AssetCategory } from './assetTypes';
 
-interface AssetSidebarProps {
-  filterType: string;
-  setFilterType: (type: AssetCategory | 'all') => void;
+interface Category {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
 }
 
-export default function AssetSidebar({ filterType, setFilterType }: AssetSidebarProps) {
+interface AssetSidebarProps {
+  categories: Category[];
+  filterType: string;
+  setFilterType: (type: string) => void;
+}
+
+export default function AssetSidebar({ categories, filterType, setFilterType }: AssetSidebarProps) {
   return (
     <div className="w-12 border-l border-gray-700 bg-gray-800 flex flex-col items-center py-2">
       {categories.map((cat) => (
         <button
           key={cat.key}
-          onClick={() => setFilterType(cat.key as AssetCategory | 'all')}
+          onClick={() => setFilterType(cat.key)}
           className={`w-full py-2 flex flex-col items-center gap-1 transition-colors ${
-            filterType === cat.key
-              ? 'bg-blue-500/20'
+            filterType === cat.key 
+              ? 'bg-blue-500/20' 
               : 'hover:bg-gray-700'
           }`}
           title={cat.label}

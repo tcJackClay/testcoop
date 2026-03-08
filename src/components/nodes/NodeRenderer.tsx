@@ -322,36 +322,31 @@ function renderNodeBody(node: CanvasNode) {
     
     case 'createAsset': {
       const name = node.data.name as string || '';
-      const type = node.data.type as string || '主要角色';
-      const isSecondary = node.data.isSecondary as boolean || false;
+      const assetType = node.data.assetType as string || 'character_primary';
+      const isVariant = node.data.isVariant as boolean || false;
+      const parentAssetId = node.data.parentAssetId as number | null;
       const description = node.data.description as string || '';
       const imageUrl = node.data.imageUrl as string || '';
       const status = node.data.status as string || 'idle';
       
-      // 根据 isSecondary 自动调整 type
-      const handleTypeChange = (newType: string) => {
-        const prefix = newType.includes('主要') ? '主要' : '次要';
-        let category = '角色';
-        if (newType.includes('场景')) category = '场景';
-        if (newType.includes('道具')) category = '道具';
-        updateData('type', prefix + category);
-      };
+      // 资产类型选项
+      const assetTypeOptions = [
+        { key: 'character_primary', label: '主要角色' },
+        { key: 'scene_primary', label: '主要场景' },
+        { key: 'prop_primary', label: '主要道具' },
+        { key: 'character_secondary', label: '次要角色' },
+        { key: 'scene_secondary', label: '次要场景' },
+        { key: 'prop_secondary', label: '次要道具' },
+      ];
       
-      const handleSecondaryChange = (checked: boolean) => {
-        updateData('isSecondary', checked);
-        // 自动调整类型
-        if (checked) {
-          // 切换到二级
-          if (type.includes('主要')) {
-            const category = type.replace('主要', '');
-            updateData('type', '次要' + category);
-          }
-        } else {
-          // 切换到一级
-          if (type.includes('次要')) {
-            const category = type.replace('次要', '');
-            updateData('type', '主要' + category);
-          }
+      // 从画布节点中获取主要资产作为父资产选项
+      // 这里简化处理，实际应该从资产库获取
+      const primaryAssets: { id: number; name: string }[] = [];
+      
+      const handleVariantChange = (checked: boolean) => {
+        updateData('isVariant', checked);
+        if (!checked) {
+          updateData('parentAssetId', null);
         }
       };
       
@@ -367,41 +362,50 @@ function renderNodeBody(node: CanvasNode) {
             onClick={(e) => e.stopPropagation()}
           />
           
-          {/* Is Secondary Checkbox - 放在类型前面 */}
+          {/* 资产类型选择 - 仅在非变体时显示 */}
+          {!isVariant && (
+            <select
+              className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              value={assetType}
+              onChange={(e) => updateData('assetType', e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {assetTypeOptions.map((type) => (
+                <option key={type.key} value={type.key}>{type.label}</option>
+              ))}
+            </select>
+          )}
+          
+          {/* 是否变体复选框 */}
           <label className="flex items-center gap-2 text-xs text-white cursor-pointer">
             <input
               type="checkbox"
-              checked={isSecondary}
-              onChange={(e) => handleSecondaryChange(e.target.checked)}
+              checked={isVariant}
+              onChange={(e) => handleVariantChange(e.target.checked)}
               onClick={(e) => e.stopPropagation()}
               className="w-3 h-3"
             />
-            <span>二级资产</span>
+            <span>创建为二级资产（变体）</span>
           </label>
           
-          {/* Type Select - 根据 isSecondary 显示不同选项 */}
-          <select
-            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
-            value={type}
-            onChange={(e) => handleTypeChange(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {isSecondary ? (
-              <>
-                <option value="次要角色">次要角色</option>
-                <option value="次要场景">次要场景</option>
-                <option value="次要道具">次要道具</option>
-              </>
-            ) : (
-              <>
-                <option value="主要角色">主要角色</option>
-                <option value="主要场景">主要场景</option>
-                <option value="主要道具">主要道具</option>
-              </>
-            )}
-          </select>
-          
-          {/* Description Input */}
+          {/* 父资产选择器 - 仅在选择变体时显示 */}
+          {isVariant && (
+            <select
+              className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
+              value={parentAssetId || ''}
+              onChange={(e) => updateData('parentAssetId', Number(e.target.value) || null)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <option value="">请选择父资产</option>
+              {primaryAssets.length > 0 ? (
+                primaryAssets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>{asset.name}</option>
+                ))
+              ) : (
+                <option value="" disabled>暂无主要资产</option>
+              )}
+            </select>
+          )}
           
           {/* Description Input */}
           <textarea
@@ -420,7 +424,7 @@ function renderNodeBody(node: CanvasNode) {
               e.stopPropagation();
               if (status !== 'saving') {
                 updateData('status', 'saving');
-                console.log('Saving asset:', { name, type, isSecondary, description, imageUrl });
+                console.log('Saving asset:', { name, assetType, isVariant, parentAssetId, description, imageUrl });
                 // TODO: 调用 API 保存资产
               }
             }}

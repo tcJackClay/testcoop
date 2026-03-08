@@ -41,8 +41,9 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
     data: {
       label: 'Create Asset',
       name: '',
-      type: '主要角色',
-      isSecondary: false,
+      assetType: 'character_primary',
+      isVariant: false,
+      parentAssetId: null,
       description: '',
       imageUrl: '',
       status: 'idle'

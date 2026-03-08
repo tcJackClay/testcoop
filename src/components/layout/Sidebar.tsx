@@ -82,8 +82,8 @@ export default function Sidebar({
     { type: 'saveLocal', icon: <HardDrive size={16} />, label: '保存到本地' },
   ];
 
-  // Dynamic position: move right when leftPanel is open
-  const sidebarLeft = leftPanel ? 'left-16' : 'left-4';
+  // Dynamic position: move right when leftPanel is open (after 144px leftPanel)
+  const sidebarLeft = leftPanel ? 'left-[148px]' : 'left-4';
 
   return (
     <aside className={`fixed ${sidebarLeft} top-1/2 -translate-y-1/2 bg-gray-800/95 backdrop-blur rounded-2xl shadow-2xl border border-gray-700 flex flex-col items-center py-2 gap-1 z-50 w-10 transition-all duration-200`}>

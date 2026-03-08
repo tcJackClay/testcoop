@@ -12,7 +12,6 @@ import { useCanvasStore } from '../../stores/canvasStore';
 import AssetCard from './AssetCard';
 import AssetSidebar from './AssetSidebar';
 import ContextMenu from './ContextMenu';
-import AssetSidebar from './AssetSidebar';
 import {
   categories,
   mapCategoryToType,

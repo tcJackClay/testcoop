@@ -25,7 +25,13 @@ export type NodeType =
   | 'preview'
   | 'imageNode'
   | 'videoNode'
-  | 'createAsset';
+  | 'createAsset'
+  | 'aiVideo'
+  | 'aiImage'
+  | 'generateCharacterImage'
+  | 'generateSceneImage'
+  | 'imageInput'
+  | 'saveLocal';
 
 export interface Connection {
   id: string;

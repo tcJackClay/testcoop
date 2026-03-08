@@ -1,12 +1,11 @@
 import React from 'react';
 import {
-  Image, 
-  Video, 
-  Wand2, 
-  Film, 
-  Eye, 
+  Image,
+  Video,
+  Wand2,
+  Film,
+  Eye,
   HardDrive,
-  GripVertical,
   FileText,
   BookOpen,
   Users,
@@ -14,15 +13,16 @@ import {
   Sparkles,
   Clapperboard,
   GitCompare,
-  Play,
-  Save,
-  Upload,
-  X,
-  Loader2
 } from 'lucide-react';
 import type { NodeType } from '../../stores/canvasStore';
 
-// Node type icons
+// 支持执行的节点类型
+export const generationNodeTypes: NodeType[] = [
+  'imageNode',
+  'videoNode',
+];
+
+// 节点图标映射
 export const nodeIcons: Record<NodeType, React.ReactNode> = {
   videoInput: <Video className="w-4 h-4" />,
   textNode: <FileText className="w-4 h-4" />,
@@ -43,9 +43,12 @@ export const nodeIcons: Record<NodeType, React.ReactNode> = {
   aiImage: <Wand2 className="w-4 h-4" />,
   preview: <Eye className="w-4 h-4" />,
   imageInput: <Image className="w-4 h-4" />,
+  createAsset: <Image className="w-4 h-4" />,
+  generateCharacterImage: <Wand2 className="w-4 h-4" />,
+  generateSceneImage: <Wand2 className="w-4 h-4" />,
 };
 
-// Node type colors
+// 节点颜色映射
 export const nodeColors: Record<string, string> = {
   videoInput: 'border-purple-500 bg-purple-500/10',
   textNode: 'border-gray-500 bg-gray-500/10',
@@ -66,4 +69,33 @@ export const nodeColors: Record<string, string> = {
   aiImage: 'border-blue-500 bg-blue-500/10',
   preview: 'border-indigo-500 bg-indigo-500/10',
   imageInput: 'border-pink-500 bg-pink-500/10',
+  createAsset: 'border-teal-500 bg-teal-500/10',
+  generateCharacterImage: 'border-pink-300 bg-pink-300/10',
+  generateSceneImage: 'border-pink-300 bg-pink-300/10',
 };
+
+// 资产类型选项
+export const assetTypeOptions = [
+  { key: 'character_primary', label: '主要角色' },
+  { key: 'scene_primary', label: '主要场景' },
+  { key: 'prop_primary', label: '主要道具' },
+  { key: 'character_secondary', label: '次要角色' },
+  { key: 'scene_secondary', label: '次要场景' },
+  { key: 'prop_secondary', label: '次要道具' },
+];
+
+// 宽高比选项
+export const aspectRatioOptions = [
+  { value: '1:1', label: '1:1' },
+  { value: '16:9', label: '16:9' },
+  { value: '9:16', label: '9:16' },
+  { value: '4:3', label: '4:3' },
+  { value: '3:4', label: '3:4' },
+];
+
+// 分辨率选项
+export const resolutionOptions = [
+  { value: '1K', label: '1K' },
+  { value: '2K', label: '2K' },
+  { value: '4K', label: '4K' },
+];

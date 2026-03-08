@@ -15,7 +15,6 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
   storyboardNode: { type: 'storyboardNode', data: { label: 'Storyboard' } },
   aiVideo: { type: 'aiVideo', data: { label: 'AI Video', prompt: '', modelId: '' } },
   imageCompare: { type: 'imageCompare', data: { label: 'Image Compare', imageA: '', imageB: '' } },
-  preview: { type: 'preview', data: { label: 'Preview' } },
   imageNode: { 
     type: 'imageNode', 
     data: { 
@@ -35,6 +34,18 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
       prompt: '',
       status: 'idle'
     } 
+  },
+  createAsset: {
+    type: 'createAsset',
+    data: {
+      label: 'Create Asset',
+      name: '',
+      type: '角色',
+      description: '',
+      imageUrl: '',
+      tags: [],
+      status: 'idle'
+    }
   },
 };
 

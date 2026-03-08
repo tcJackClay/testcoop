@@ -24,7 +24,8 @@ export type NodeType =
   | 'imageCompare'
   | 'preview'
   | 'imageNode'
-  | 'videoNode';
+  | 'videoNode'
+  | 'createAsset';
 
 export interface Connection {
   id: string;

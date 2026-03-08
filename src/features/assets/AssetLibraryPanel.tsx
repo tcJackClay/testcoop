@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { Image } from '../../api/image';
 import { useAssetStore } from '../../stores/assetStore';
+import { useCanvasStore } from '../../stores/canvasStore';
 import AssetCard from './AssetCard';
 
 interface AssetLibraryPanelProps {
@@ -72,12 +73,31 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     getFilteredAssets,
   } = useAssetStore();
   
+  const { addNode, nodes } = useCanvasStore();
   const [viewMode] = useState<'grid' | 'list'>('grid');
 
   // 组件挂载时获取资产数据
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
+
+  // 计算画布中心位置
+  const getCanvasCenterPosition = () => {
+    if (nodes.length === 0) {
+      return { x: 100, y: 100 };
+    }
+    // 找到最右下的节点位置，在其旁边添加新节点
+    const maxX = Math.max(...nodes.map(n => n.position.x + (n.width || 200)));
+    const maxY = Math.max(...nodes.map(n => n.position.y + (n.height || 100)));
+    return { x: maxX + 50, y: maxY };
+  };
+
+  // 添加资产节点到画布
+  const handleAddAssetNode = () => {
+    const position = getCanvasCenterPosition();
+    addNode('createAsset', position);
+    console.log('Added createAsset node to canvas at position:', position);
+  };
 
   // Calculate stats
   const stats: AssetStats = useMemo(() => {
@@ -184,7 +204,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
             }`}>
               {/* Add New Card */}
               <div 
-                onClick={() => console.log('Add new asset')}
+                onClick={handleAddAssetNode}
                 className="flex flex-col aspect-square rounded-lg border-2 border-dashed border-gray-600 cursor-pointer hover:border-blue-500 hover:bg-blue-500/10 transition-colors"
               >
                 <div className="flex-1 flex items-center justify-center">

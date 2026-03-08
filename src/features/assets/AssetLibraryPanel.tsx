@@ -17,49 +17,19 @@ import {
   Package,
   HardDrive,
   Loader2,
-  ChevronLeft
 } from 'lucide-react';
-import type { Image } from '../../api/image';
-import AssetCard from './AssetCard';
 import { useAssetStore } from '../../stores/assetStore';
-import { useCanvasStore } from '../../stores/canvasStore';
-
-interface AssetLibraryPanelProps {
-  onClose: () => void;
-}
-
-interface AssetStats {
-  主要角色: number;
-  次要角色: number;
-  主要场景: number;
-  次要场景: number;
-  主要道具: number;
-  次要道具: number;
-}
-
-type AssetCategory = '主要角色' | '次要角色' | '主要场景' | '次要场景' | '主要道具' | '次要道具';
-
-const categories = [
-  { key: 'all', label: '所有资产', icon: <Folder size={12} />, color: 'text-gray-400' },
-  { key: '主要角色', label: '主要角色', icon: <Star size={12} />, color: 'text-blue-400' },
-  { key: '次要角色', label: '次要角色', icon: <User size={12} />, color: 'text-blue-400' },
-  { key: '主要场景', label: '主要场景', icon: <Mountain size={12} />, color: 'text-green-400' },
-  { key: '次要场景', label: '次要场景', icon: <MapPin size={12} />, color: 'text-green-400' },
-  { key: '主要道具', label: '主要道具', icon: <Gem size={12} />, color: 'text-orange-400' },
-  { key: '次要道具', label: '次要道具', icon: <Package size={12} />, color: 'text-orange-400' },
-];
-
-// 映射后端 category 到前端类型
-const mapCategoryToType = (category?: string): string => {
-  if (!category) return '次要道具';
-  if (category.includes('主要') && category.includes('角色')) return '主要角色';
-  if (category.includes('次要') && category.includes('角色')) return '次要角色';
-  if (category.includes('主要') && category.includes('场景')) return '主要场景';
-  if (category.includes('次要') && category.includes('场景')) return '次要场景';
-  if (category.includes('主要') && category.includes('道具')) return '主要道具';
-  if (category.includes('次要') && category.includes('道具')) return '次要道具';
-  return '次要道具';
-};
+import AssetCard from './AssetCard';
+import VariantDetailView from './VariantDetailView';
+import AssetSidebar from './AssetSidebar';
+import {
+  categories,
+  mapCategoryToType,
+  isPrimaryAsset,
+  type AssetLibraryPanelProps,
+  type AssetStats,
+  type AssetCategory,
+} from './assetTypes';
 
 export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   const {
@@ -305,72 +275,11 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
 
           {/* Variant Detail View */}
           {selectedPrimaryAsset && (
-            <div className="flex-1 flex flex-col">
-              {/* Back button and title */}
-              <div className="mb-4 flex items-center justify-between">
-                <button
-                  onClick={() => setSelectedPrimaryAsset(null)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-blue-300 rounded hover:bg-gray-700 transition-colors"
-                >
-                  <ChevronLeft size={14} />
-                  <span>返回资产库</span>
-                </button>
-              </div>
-              
-              {/* Primary asset display */}
-              <div className="mb-4">
-                <h3 className="text-xs font-medium text-white mb-2">{selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}</h3>
-                <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
-                  {selectedPrimaryAsset.url || selectedPrimaryAsset.resourceContent ? (
-                    <img 
-                      src={selectedPrimaryAsset.url || selectedPrimaryAsset.resourceContent}
-                      alt={selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon size={32} className="text-gray-500" />
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Variants section */}
-              {(() => {
-                const variants = getVariantsForPrimary(selectedPrimaryAsset);
-                if (variants.length === 0) return null;
-                return (
-                  <div className="flex-1 overflow-y-auto">
-                    <h4 className="text-[10px] text-gray-400 mb-2">变体 ({variants.length})</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {variants.map((variant) => (
-                        <div
-                          key={variant.id}
-                          className="flex flex-col gap-1"
-                        >
-                          <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
-                            {variant.url || variant.resourceContent ? (
-                              <img 
-                                src={variant.url || variant.resourceContent}
-                                alt={variant.name || variant.resourceName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <ImageIcon size={20} className="text-gray-500" />
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-gray-400 text-center truncate">
-                            {variant.name || variant.resourceName || '变体'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
+            <VariantDetailView
+              selectedPrimaryAsset={selectedPrimaryAsset}
+              onBack={() => setSelectedPrimaryAsset(null)}
+              getVariantsForPrimary={getVariantsForPrimary}
+            />
           )}
         </div>
 
@@ -387,36 +296,11 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
         </div>
       </div>
 
-      {/* Sidebar - Right with vertical text */}
-      <div className="w-12 border-l border-gray-700 bg-gray-800 flex flex-col items-center py-2">
-        {categories.map((cat) => (
-          <button
-            key={cat.key}
-            onClick={() => setFilterType(cat.key as any)}
-            className={`w-full py-2 flex flex-col items-center gap-1 transition-colors ${
-              filterType === cat.key 
-                ? 'bg-blue-500/20' 
-                : 'hover:bg-gray-700'
-            }`}
-            title={cat.label}
-          >
-            <span className={filterType === cat.key ? 'text-blue-300' : cat.color}>
-              {cat.icon}
-            </span>
-            <span className={`text-[8px] writing-vertical ${filterType === cat.key ? 'text-blue-300' : 'text-gray-500'}`}>
-              {cat.label.replace('主要', '').replace('次要', '')}
-            </span>
-          </button>
-        ))}
-
-        {/* Storage */}
-        <div className="mt-auto pt-2 border-t border-gray-700 w-full px-1">
-          <div className="flex flex-col items-center gap-1">
-            <HardDrive size={12} className="text-gray-500" />
-            <span className="text-[8px] text-gray-500 writing-vertical">容量</span>
-          </div>
-        </div>
-      </div>
+      {/* Sidebar */}
+      <AssetSidebar
+        filterType={filterType}
+        setFilterType={setFilterType}
+      />
 
       {/* Context Menu */}
       {contextMenu && (

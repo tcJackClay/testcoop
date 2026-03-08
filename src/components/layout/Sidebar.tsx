@@ -66,62 +66,13 @@ export default function Sidebar({
     }
   };
 
-  const nodeTypes: { type: NodeType; icon: React.ReactNode; label: string }[] = [
-    { type: 'imageInput', icon: <Image size={16} />, label: '图片输入' },
-    { type: 'videoInput', icon: <Video size={16} />, label: '视频输入' },
-    { type: 'textNode', icon: <FileText size={16} />, label: '文字节点' },
-    { type: 'novelInput', icon: <BookOpen size={16} />, label: '小说输入' },
-    { type: 'promptNode', icon: <Wand2 size={16} />, label: '提示词节点' },
-    { type: 'aiVideo', icon: <Film size={16} />, label: 'AI 视频' },
-    { type: 'storyboardNode', icon: <Clapperboard size={16} />, label: '智能分镜' },
-    { type: 'videoAnalyze', icon: <Sparkles size={16} />, label: '视频拆解' },
-    { type: 'characterDescription', icon: <Users size={16} />, label: '角色描述' },
-    { type: 'sceneDescription', icon: <Mountain size={16} />, label: '场景描述' },
-    { type: 'createAsset', icon: <Image size={16} />, label: '创建资产' },
-    { type: 'imageCompare', icon: <GitCompare size={16} />, label: '图像对比' },
-    { type: 'preview', icon: <Eye size={16} />, label: '预览窗口' },
-    { type: 'saveLocal', icon: <HardDrive size={16} />, label: '保存到本地' },
-  ];
- 
+
   // Dynamic position: move right when leftPanel is open (after 200px leftPanel)
   const sidebarLeft = leftPanel ? 'left-[204px]' : 'left-4';
 
   return (
     <aside className={`fixed ${sidebarLeft} top-1/2 -translate-y-1/2 bg-gray-800/95 backdrop-blur rounded-2xl shadow-2xl border border-gray-700 flex flex-col items-center py-2 gap-1 z-50 w-10 transition-all duration-200`}>
-      {/* Add Node Button */}
-      <div className="relative">
-        <button
-          onClick={() => setShowAddMenu(!showAddMenu)}
-          className="p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-all"
-          title={t('添加节点')}
-        >
-          <Plus size={16} />
-        </button>
-        
-        {/* Add Node Menu */}
-        {showAddMenu && (
-          <div 
-            className="absolute left-full ml-2 top-0 w-44 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 z-50"
-            onMouseLeave={() => setShowAddMenu(false)}
-          >
-            {nodeTypes.map((item) => (
-              <div
-                key={item.type}
-                draggable
-                onDragStart={(e) => handleDragStart(e, item.type)}
-                onClick={(e) => {
-                  handleClick(e, item.type);
-                  setShowAddMenu(false);
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700 hover:text-white cursor-pointer transition-colors"
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+
 
       {/* Tool Buttons */}
       <button

@@ -5,6 +5,7 @@ import Sidebar from './components/layout/Sidebar';
 import Canvas from './components/canvas/Canvas';
 import SettingsModal from './features/settings/SettingsModal';
 import LoginModal from './components/auth/LoginModal';
+import LoginPage from './components/auth/LoginPage';
 import Storyboard from './features/storyboard/Storyboard';
 import History from './features/history/History';
 import Models from './features/models/Models';
@@ -15,7 +16,7 @@ import { useCanvasStore, type NodeType } from './stores/canvasStore';
 import { useAuthStore } from './stores/authStore';
 import { useProjectStore } from './stores/projectStore';
 
-export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models' | 'projects';
+export type ViewMode = 'login' | 'canvas' | 'storyboard' | 'history' | 'models' | 'projects';
 
 export default function App() {
   const { t } = useTranslation();
@@ -32,8 +33,8 @@ export default function App() {
   // 监听登录状态和项目选择状态，自动切换视图
   useEffect(() => {
     if (!token) {
-      // 未登录，跳转到项目列表（显示登录提示）
-      setViewMode('projects');
+      // 未登录，跳转到登录页面
+      setViewMode('login');
     } else if (!currentProject) {
       // 已登录但未选择项目，停留在项目列表
       setViewMode('projects');
@@ -42,11 +43,11 @@ export default function App() {
   }, [token, currentProject]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
-    // 只有选择项目后才能切换到其他视图
-    if (mode === 'projects' || currentProject) {
+    // 只有登录后才能切换到项目视图
+    if (mode === 'login' || token) {
       setViewMode(mode);
     }
-  }, [currentProject]);
+  }, [token]);
 
   const handleAddNode = useCallback((type: NodeType) => {
     const x = 100 + Math.random() * 200;
@@ -74,17 +75,20 @@ export default function App() {
 
   // 判断是否显示 sidebar（只在 canvas 模式下显示）
   const showSidebar = viewMode === 'canvas';
+  const showHeader = viewMode !== 'login';
 
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
-      <Header
-        viewMode={viewMode}
-        onViewChange={handleViewChange}
-        onSettingsClick={() => setShowSettings(true)}
-        onChatClick={() => handleRightPanelChange('chat')}
-        chatOpen={rightPanel === 'chat'}
-        onProjectClick={() => setViewMode('projects')}
-      />
+      {showHeader && (
+        <Header
+          viewMode={viewMode}
+          onViewChange={handleViewChange}
+          onSettingsClick={() => setShowSettings(true)}
+          onChatClick={() => handleRightPanelChange('chat')}
+          chatOpen={rightPanel === 'chat'}
+          onProjectClick={() => setViewMode('projects')}
+        />
+      )}
       
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar - 只在 canvas 模式下显示 */}
@@ -108,6 +112,11 @@ export default function App() {
         )}
 
         <main className="flex-1 flex overflow-hidden">
+          {viewMode === 'login' && (
+            <div className="flex-1 flex items-center justify-center">
+              <LoginPage />
+            </div>
+          )}
           {viewMode === 'canvas' && (
             <div className="flex-1 flex">
               <div className="flex-1">

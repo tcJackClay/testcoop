@@ -24,7 +24,15 @@ import { useCanvasStore } from '../../stores/canvasStore';
 import AssetCard from './AssetCard';
 import { mapCategoryToType, type AssetLibraryPanelProps, type AssetStats, type AssetCategory } from './AssetLibraryPanel.types';
 
-
+const categories = [
+  { key: 'all', label: '所有资产', icon: <Folder size={12} />, color: 'text-gray-400' },
+  { key: '主要角色', label: '主要角色', icon: <Star size={12} />, color: 'text-blue-400' },
+  { key: '次要角色', label: '次要角色', icon: <User size={12} />, color: 'text-blue-400' },
+  { key: '主要场景', label: '主要场景', icon: <Mountain size={12} />, color: 'text-green-400' },
+  { key: '次要场景', label: '次要场景', icon: <MapPin size={12} />, color: 'text-green-400' },
+  { key: '主要道具', label: '主要道具', icon: <Gem size={12} />, color: 'text-orange-400' },
+  { key: '次要道具', label: '次要道具', icon: <Package size={12} />, color: 'text-orange-400' },
+];
 export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   const {
     assets,

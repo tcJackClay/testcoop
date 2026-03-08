@@ -10,7 +10,12 @@ import {
   ListOrdered,
   ChevronDown,
   Check,
-  File
+  File,
+  Users,
+  Network,
+  BookOpen,
+  ScrollText,
+  Box
 } from 'lucide-react';
 
 interface ScriptPanelProps {
@@ -18,25 +23,21 @@ interface ScriptPanelProps {
 }
 
 type ActionType = 'extractAssets' | 'analyzeScript' | 'splitEpisodes';
+type ResultTab = 'assets' | 'bios' | 'relationships' | 'outline' | 'script';
 
 export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const { t } = useTranslation();
   const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedAction, setSelectedAction] = useState<ActionType>('extractAssets');
-  
-  // Dropdown states
-  const [openDropdown, setOpenDropdown] = useState<ActionType | null>(null);
+  const [activeResultTab, setActiveResultTab] = useState<ResultTab>('assets');
+  const [showActionDropdown, setShowActionDropdown] = useState(false);
+  const [hasResults, setHasResults] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    try {
-      setScriptFile(file);
-    } catch (error) {
-      console.error('Failed to read file:', error);
-    }
+    setScriptFile(file);
   };
 
   const handleAnalyze = async () => {
@@ -46,6 +47,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     try {
       console.log('Action:', selectedAction, 'file:', scriptFile.name);
       await new Promise(resolve => setTimeout(resolve, 2000));
+      setHasResults(true);
       
       switch (selectedAction) {
         case 'extractAssets':
@@ -86,6 +88,16 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     },
   ];
 
+  const resultTabs = [
+    { key: 'assets', label: '资产', icon: <Box size={10} /> },
+    { key: 'bios', label: '人物', icon: <Users size={10} /> },
+    { key: 'relationships', label: '关系', icon: <Network size={10} /> },
+    { key: 'outline', label: '大纲', icon: <BookOpen size={10} /> },
+    { key: 'script', label: '剧本', icon: <ScrollText size={10} /> },
+  ];
+
+  const selectedOption = actionOptions.find(o => o.key === selectedAction);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -102,56 +114,102 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {/* Action Dropdowns */}
-        {actionOptions.map((option) => (
-          <div key={option.key} className="relative">
-            <button
-              onClick={() => setOpenDropdown(openDropdown === option.key ? null : option.key)}
-              className={`w-full p-2 rounded-lg border transition-all flex items-center gap-2 text-left ${
-                selectedAction === option.key
-                  ? 'bg-blue-500/20 border-blue-500/50' 
-                  : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
-              }`}
-            >
-              <div className={`p-1.5 rounded ${selectedAction === option.key ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                {option.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-[11px] font-medium ${selectedAction === option.key ? 'text-blue-300' : 'text-gray-300'}`}>
-                  {option.label}
-                </div>
-                <div className="text-[9px] text-gray-500 truncate">
-                  {option.desc}
-                </div>
-              </div>
-              <ChevronDown size={12} className={`text-gray-500 transition-transform ${openDropdown === option.key ? 'rotate-180' : ''}`} />
-            </button>
+      {/* Top: Result Tabs (5 tabs like huanu-workbench-frontend) */}
+      {hasResults && (
+        <div className="border-b border-gray-700 shrink-0">
+          <div className="flex">
+            {resultTabs.slice(0, 3).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveResultTab(tab.key as ResultTab)}
+                className={`flex-1 py-1.5 text-[9px] flex items-center justify-center gap-1 transition-colors ${
+                  activeResultTab === tab.key
+                    ? 'bg-blue-500/20 text-blue-300 border-b-2 border-blue-500'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex">
+            {resultTabs.slice(3).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveResultTab(tab.key as ResultTab)}
+                className={`flex-1 py-1.5 text-[9px] flex items-center justify-center gap-1 transition-colors ${
+                  activeResultTab === tab.key
+                    ? 'bg-blue-500/20 text-blue-300 border-b-2 border-blue-500'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-            {/* Dropdown Menu */}
-            {openDropdown === option.key && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+      {/* Content - Analysis Results */}
+      <div className="flex-1 overflow-y-auto p-2">
+        {hasResults ? (
+          <div className="text-[10px] text-gray-400 text-center py-4">
+            {activeResultTab === 'assets' && '资产整理内容...'}
+            {activeResultTab === 'bios' && '人物小传内容...'}
+            {activeResultTab === 'relationships' && '人物关系内容...'}
+            {activeResultTab === 'outline' && '故事大纲内容...'}
+            {activeResultTab === 'script' && '当前剧本内容...'}
+          </div>
+        ) : (
+          <div className="text-[10px] text-gray-500 text-center py-4">
+            上传剧本并分析后显示结果
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Section - Action Dropdown & Upload */}
+      <div className="p-2 border-t border-gray-700 space-y-2 shrink-0">
+        {/* Single Action Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowActionDropdown(!showActionDropdown)}
+            className="w-full p-2 rounded-lg border border-gray-600 bg-gray-800/50 flex items-center gap-2 text-left hover:border-gray-500 transition-colors"
+          >
+            <div className="p-1 rounded bg-gray-700 text-gray-400">
+              {selectedOption?.icon}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-gray-300">{selectedOption?.label}</div>
+              <div className="text-[8px] text-gray-500 truncate">{selectedOption?.desc}</div>
+            </div>
+            <ChevronDown size={12} className={`text-gray-500 transition-transform ${showActionDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showActionDropdown && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+              {actionOptions.map(option => (
                 <button
+                  key={option.key}
                   onClick={() => {
                     setSelectedAction(option.key as ActionType);
-                    setOpenDropdown(null);
+                    setShowActionDropdown(false);
                   }}
                   className="w-full px-3 py-2 text-left text-[10px] text-gray-300 hover:bg-gray-700 flex items-center gap-2"
                 >
                   {selectedAction === option.key && <Check size={10} className="text-blue-400" />}
-                  <span className={selectedAction === option.key ? 'text-blue-300' : ''}>选择{option.label}</span>
+                  <div className={selectedAction === option.key ? 'text-blue-300' : ''}>
+                    {option.label}
+                  </div>
                 </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      {/* Bottom Section - Upload & Analyze */}
-      <div className="p-3 border-t border-gray-700 space-y-2 shrink-0">
         {/* Upload */}
-        <div className={`border-2 border-dashed rounded-lg p-3 text-center transition-colors ${
+        <div className={`border-2 border-dashed rounded-lg p-2 text-center transition-colors ${
           scriptFile ? 'border-green-500/50 bg-green-500/10' : 'border-gray-600 hover:border-blue-500/50'
         }`}>
           <input
@@ -164,22 +222,16 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
           <label htmlFor="script-upload-panel" className="cursor-pointer flex flex-col items-center gap-1">
             {scriptFile ? (
               <>
-                <File size={16} className="text-green-400" />
+                <File size={14} className="text-green-400" />
                 <span className="text-[10px] text-green-300 font-medium truncate max-w-full">
                   {scriptFile.name}
-                </span>
-                <span className="text-[9px] text-gray-500">
-                  点击重新上传
                 </span>
               </>
             ) : (
               <>
-                <Upload size={16} className="text-gray-500" />
+                <Upload size={14} className="text-gray-500" />
                 <span className="text-[10px] text-gray-400">
                   上传剧本文件
-                </span>
-                <span className="text-[9px] text-gray-500">
-                  支持 .txt, .md, .json
                 </span>
               </>
             )}

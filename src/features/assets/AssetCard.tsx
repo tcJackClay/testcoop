@@ -87,6 +87,12 @@ const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
 
 // 获取 imageUrl
 const getImageUrl = (asset: AssetWithVariants | Image): string | undefined => {
+  // 优先使用 resourceContent (API返回的实际图片URL)
+  if (asset.resourceContent) return asset.resourceContent;
+  // 兼容其他字段
+  return asset.imageUrl || ('url' in asset ? asset.url : undefined);
+};
+const getImageUrl = (asset: AssetWithVariants | Image): string | undefined => {
   return asset.imageUrl || ('url' in asset ? asset.url : undefined);
 };
 
@@ -96,7 +102,11 @@ export default function AssetCard({
   onDragEnd, 
   onContextMenu,
   onClick 
-}: AssetCardProps) {
+  const category = inferCategory(asset);
+  const imageUrl = getImageUrl(asset);
+  
+  // 检查是否有有效的图片URL
+  const hasImage = !!imageUrl && imageUrl.length > 0;
   const category = inferCategory(asset);
   const imageUrl = getImageUrl(asset);
   

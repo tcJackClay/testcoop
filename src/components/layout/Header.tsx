@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Settings, Zap, MessageSquare, Layers, Plus, LogIn, LogOut, User } from 'lucide-react';
+import { Settings, Zap, MessageSquare, Layers, LogIn, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '../../App';
 import { useAuthStore } from '../../stores/authStore';
+import { useProjectStore } from '../../stores/projectStore';
 
 interface HeaderProps {
   viewMode: ViewMode;
@@ -10,7 +10,6 @@ interface HeaderProps {
   onSettingsClick: () => void;
   onChatClick?: () => void;
   chatOpen?: boolean;
-  onNewProject?: () => void;
   onProjectClick?: () => void;
 }
 
@@ -27,16 +26,24 @@ export default function Header({
   onSettingsClick, 
   onChatClick, 
   chatOpen,
-  onNewProject,
   onProjectClick
 }: HeaderProps) {
   const { t } = useTranslation();
-  const [projectName] = useState('未命名项目');
   
   const { user, token, openLoginModal, logout } = useAuthStore();
+  const { currentProject } = useProjectStore();
 
   const handleLogout = async () => {
     await logout();
+  };
+
+  // 检查是否可以切换视图（需要先选择项目）
+  const canNavigate = !!currentProject;
+
+  const handleNavClick = (mode: ViewMode) => {
+    if (canNavigate || mode === 'projects') {
+      onViewChange(mode);
+    }
   };
 
   return (
@@ -54,20 +61,13 @@ export default function Header({
         {/* Project Name (clickable to open projects) */}
         <span
           onClick={onProjectClick}
-          className="ml-2 text-xs text-gray-500 cursor-pointer hover:underline"
-          title="点击管理项目"
+          className={`ml-2 text-xs cursor-pointer hover:underline ${
+            currentProject ? 'text-white' : 'text-yellow-400'
+          }`}
+          title={currentProject ? '点击管理项目' : '请先选择项目'}
         >
-          {projectName}
+          {currentProject ? currentProject.name : '未选择项目'}
         </span>
-
-        {/* New Project Button */}
-        <button
-          onClick={onNewProject}
-          className="p-1 rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
-          title="新建空项目"
-        >
-          <Plus size={12} />
-        </button>
       </div>
 
       {/* Center Section: Navigation Tabs */}
@@ -75,12 +75,16 @@ export default function Header({
         {navItems.map((item) => (
           <button
             key={item.key}
-            onClick={() => onViewChange(item.key)}
+            onClick={() => handleNavClick(item.key)}
+            disabled={!canNavigate && item.key !== 'projects'}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
               viewMode === item.key
                 ? 'bg-blue-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                : canNavigate || item.key === 'projects'
+                  ? 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  : 'text-gray-600 cursor-not-allowed'
             }`}
+            title={!canNavigate && item.key !== 'projects' ? '请先选择项目' : ''}
           >
             {t(item.labelKey)}
           </button>
@@ -102,12 +106,15 @@ export default function Header({
         {onChatClick && (
           <button
             onClick={onChatClick}
+            disabled={!canNavigate}
             className={`p-2 rounded-md transition-colors ${
               chatOpen
                 ? 'bg-blue-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                : canNavigate
+                  ? 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  : 'text-gray-600 cursor-not-allowed'
             }`}
-            title="AI 对话"
+            title={!canNavigate ? '请先选择项目' : 'AI 对话'}
           >
             <MessageSquare size={16} />
           </button>

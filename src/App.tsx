@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
@@ -12,22 +12,41 @@ import ProjectPanel from './features/projects/ProjectPanel';
 import LeftPanel, { type LeftPanelType } from './components/leftPanel/LeftPanel';
 import RightPanel, { type RightPanelType } from './components/rightPanel/RightPanel';
 import { useCanvasStore, type NodeType } from './stores/canvasStore';
+import { useAuthStore } from './stores/authStore';
+import { useProjectStore } from './stores/projectStore';
 
 export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models' | 'projects';
 
 export default function App() {
   const { t } = useTranslation();
-  const [viewMode, setViewMode] = useState<ViewMode>('canvas');
+  const [viewMode, setViewMode] = useState<ViewMode>('projects');
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
   const [rightPanel, setRightPanel] = useState<RightPanelType>(null);
   
   const { selectedNodeIds, nodes, deleteNode, clearSelection, addNode } = useCanvasStore();
+  const { token } = useAuthStore();
+  const { currentProject } = useProjectStore();
+
+  // 监听登录状态和项目选择状态，自动切换视图
+  useEffect(() => {
+    if (!token) {
+      // 未登录，跳转到项目列表（显示登录提示）
+      setViewMode('projects');
+    } else if (!currentProject) {
+      // 已登录但未选择项目，停留在项目列表
+      setViewMode('projects');
+    }
+    // 已登录且已选择项目，可以进入其他视图
+  }, [token, currentProject]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-  }, []);
+    // 只有选择项目后才能切换到其他视图
+    if (mode === 'projects' || currentProject) {
+      setViewMode(mode);
+    }
+  }, [currentProject]);
 
   const handleAddNode = useCallback((type: NodeType) => {
     const x = 100 + Math.random() * 200;
@@ -64,7 +83,6 @@ export default function App() {
         onSettingsClick={() => setShowSettings(true)}
         onChatClick={() => handleRightPanelChange('chat')}
         chatOpen={rightPanel === 'chat'}
-        onNewProject={handleNewProject}
         onProjectClick={() => setViewMode('projects')}
       />
       

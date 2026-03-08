@@ -82,21 +82,7 @@ export default function Sidebar({
     { type: 'preview', icon: <Eye size={16} />, label: '预览窗口' },
     { type: 'saveLocal', icon: <HardDrive size={16} />, label: '保存到本地' },
   ];
-    { type: 'imageInput', icon: <Image size={16} />, label: '图片输入' },
-    { type: 'videoInput', icon: <Video size={16} />, label: '视频输入' },
-    { type: 'textNode', icon: <FileText size={16} />, label: '文字节点' },
-    { type: 'novelInput', icon: <BookOpen size={16} />, label: '小说输入' },
-    { type: 'aiImage', icon: <Wand2 size={16} />, label: 'AI 绘图' },
-    { type: 'aiVideo', icon: <Film size={16} />, label: 'AI 视频' },
-    { type: 'storyboardNode', icon: <Clapperboard size={16} />, label: '智能分镜' },
-    { type: 'videoAnalyze', icon: <Sparkles size={16} />, label: '视频拆解' },
-    { type: 'characterDescription', icon: <Users size={16} />, label: '角色描述' },
-    { type: 'sceneDescription', icon: <Mountain size={16} />, label: '场景描述' },
-    { type: 'imageCompare', icon: <GitCompare size={16} />, label: '图像对比' },
-    { type: 'preview', icon: <Eye size={16} />, label: '预览窗口' },
-    { type: 'saveLocal', icon: <HardDrive size={16} />, label: '保存到本地' },
-  ];
-
+ 
   // Dynamic position: move right when leftPanel is open (after 200px leftPanel)
   const sidebarLeft = leftPanel ? 'left-[204px]' : 'left-4';
 

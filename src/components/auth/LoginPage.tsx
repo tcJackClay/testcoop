@@ -59,12 +59,6 @@ export default function LoginPage() {
         await register({ username, email, password });
       }
     } catch (err) {
-      if (mode === 'login') {
-        await login(username, password);
-      } else {
-        await register(username, email, password);
-      }
-    } catch (err) {
       // Error is handled by authStore
     }
   };

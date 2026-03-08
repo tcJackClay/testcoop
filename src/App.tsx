@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Canvas from './components/canvas/Canvas';
@@ -19,14 +18,13 @@ import { useProjectStore } from './stores/projectStore';
 export type ViewMode = 'login' | 'canvas' | 'storyboard' | 'history' | 'models' | 'projects';
 
 export default function App() {
-  const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('projects');
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
   const [rightPanel, setRightPanel] = useState<RightPanelType>(null);
   
-  const { selectedNodeIds, nodes, deleteNode, clearSelection, addNode } = useCanvasStore();
+  const { nodes, deleteNode, clearSelection, addNode } = useCanvasStore();
   const { token } = useAuthStore();
   const { currentProject } = useProjectStore();
   const [isInitialized, setIsInitialized] = useState(false);
@@ -48,19 +46,6 @@ export default function App() {
     }
     // 已登录且已选择项目，可以进入其他视图
   }, [token, currentProject, isInitialized]);
-  const { currentProject } = useProjectStore();
-
-  // 监听登录状态和项目选择状态，自动切换视图
-  useEffect(() => {
-    if (!token) {
-      // 未登录，跳转到登录页面
-      setViewMode('login');
-    } else if (!currentProject) {
-      // 已登录但未选择项目，停留在项目列表
-      setViewMode('projects');
-    }
-    // 已登录且已选择项目，可以进入其他视图
-  }, [token, currentProject]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
     // 只有登录后才能切换到项目视图
@@ -75,15 +60,6 @@ export default function App() {
     addNode(type, { x, y });
     setViewMode('canvas');
   }, [addNode]);
-
-  const handleNewProject = useCallback(() => {
-    if (nodes.length > 0) {
-      if (confirm('确定要新建项目吗？当前内容将被清空。')) {
-        nodes.forEach(node => deleteNode(node.id));
-        clearSelection();
-      }
-    }
-  }, [nodes, deleteNode, clearSelection]);
 
   const handleLeftPanelChange = useCallback((type: LeftPanelType) => {
     setLeftPanel(prev => prev === type ? null : type);

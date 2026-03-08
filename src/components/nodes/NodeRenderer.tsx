@@ -342,7 +342,7 @@ function renderNodeBody(node: CanvasNode) {
       const allAssets = useAssetStore.getState().assets;
       const primaryAssets = allAssets
         .filter(a => {
-          const ext1 = a.ext1 ? (() => { try { return JSON.parse(a.ext1!); } catch { return {}; } })() : {};
+          const ext1 = a.ext1 ? JSON.parse(a.ext1) : {};
           // 主要资产是没有 parent 的，或者 resourceType 包含 primary
           return !ext1.parent && (
             a.resourceType?.includes('primary') || 

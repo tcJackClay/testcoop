@@ -26,17 +26,17 @@ interface AssetActions {
   setError: (error: string | null) => void;
   getFilteredAssets: () => Image[];
 }
-type AssetStore = AssetState & AssetActions;
 // 从 assetType 字段映射到中文类型
 const mapAssetTypeToCategory = (assetType?: string): string => {
   if (!assetType) return '次要道具';
+  const lowerType = assetType.toLowerCase();
   // 处理如 character_primary, scene_primary 等格式
-  if (assetType.includes('character') && assetType.includes('primary')) return '主要角色';
-  if (assetType.includes('character') && assetType.includes('secondary')) return '次要角色';
-  if (assetType.includes('scene') && assetType.includes('primary')) return '主要场景';
-  if (assetType.includes('scene') && assetType.includes('secondary')) return '次要场景';
-  if (assetType.includes('prop') && assetType.includes('primary')) return '主要道具';
-  if (assetType.includes('prop') && assetType.includes('secondary')) return '次要道具';
+  if (lowerType.includes('character') && lowerType.includes('primary')) return '主要角色';
+  if (lowerType.includes('character') && lowerType.includes('secondary')) return '次要角色';
+  if (lowerType.includes('scene') && lowerType.includes('primary')) return '主要场景';
+  if (lowerType.includes('scene') && lowerType.includes('secondary')) return '次要场景';
+  if (lowerType.includes('prop') && lowerType.includes('primary')) return '主要道具';
+  if (lowerType.includes('prop') && lowerType.includes('secondary')) return '次要道具';
   // 兼容旧的命名方式
   if (assetType.includes('主要') && assetType.includes('角色')) return '主要角色';
   if (assetType.includes('次要') && assetType.includes('角色')) return '次要角色';
@@ -44,6 +44,46 @@ const mapAssetTypeToCategory = (assetType?: string): string => {
   if (assetType.includes('次要') && assetType.includes('场景')) return '次要场景';
   if (assetType.includes('主要') && assetType.includes('道具')) return '主要道具';
   if (assetType.includes('次要') && assetType.includes('道具')) return '次要道具';
+  return '次要道具';
+};
+
+// 从资产对象获取分类
+const getAssetCategory = (asset: any, allAssets: any[]): string => {
+  // 1. 首先检查 ext1 JSON 中的信息
+  if (asset.ext1) {
+    try {
+      const ext1Data = JSON.parse(asset.ext1);
+      // 检查是否是变体（有 parent 字段）
+      if (ext1Data.parent) {
+        // 是变体，从父资产推断类型
+        const parentAsset = allAssets.find(a => a.name === ext1Data.parent || a.resourceName === ext1Data.parent);
+        if (parentAsset) {
+          const parentCategory = mapAssetTypeToCategory(parentAsset.resourceType);
+          // 将主要改为次要
+          return parentCategory.replace('主要', '次要');
+        }
+        // 如果找不到父资产，从 parent 名称推断
+        const parentName = ext1Data.parent;
+        if (parentName.includes('角色')) return '次要角色';
+        if (parentName.includes('场景')) return '次要场景';
+        if (parentName.includes('道具')) return '次要道具';
+      }
+      // 检查 ext1 中是否有直接的 type 字段
+      if (ext1Data.type) {
+        return mapAssetTypeToCategory(ext1Data.type);
+      }
+    } catch (e) {
+      // ext1 不是有效 JSON，尝试直接解析
+      return mapAssetTypeToCategory(asset.ext1);
+    }
+  }
+  
+  // 2. 使用 resourceType 字段
+  if (asset.resourceType && asset.resourceType !== 'image') {
+    return mapAssetTypeToCategory(asset.resourceType);
+  }
+  
+  // 3. 默认返回次要道具
   return '次要道具';
 };
 export const useAssetStore = create<AssetStore>()(
@@ -146,35 +186,12 @@ export const useAssetStore = create<AssetStore>()(
           if (projectId && asset.projectId !== projectId) {
             return false;
           }
-          
-          // 类型过滤 - 使用 mapAssetTypeToCategory 从正确的字段获取类型
+          // 类型过滤 - 使用 getAssetCategory 获取正确的分类
           if (filterType !== 'all') {
-            // 优先从 ext1 解析变体信息
-            let assetCategory = '次要道具';
-            if (asset.ext1) {
-              try {
-                const ext1Data = JSON.parse(asset.ext1);
-                if (ext1Data.parent) {
-                  // 有 parent 说明是变体（二级资产）
-                  const parentName = ext1Data.parent;
-                  // 从父资产名称推断类型
-                  if (parentName.includes('角色')) assetCategory = '次要角色';
-                  else if (parentName.includes('场景')) assetCategory = '次要场景';
-                  else if (parentName.includes('道具')) assetCategory = '次要道具';
-                }
-              } catch (e) {
-                // ext1 不是 JSON，尝试直接解析
-                assetCategory = mapAssetTypeToCategory(asset.ext1);
-              }
-            }
-            // 如果从 ext1 没找到，使用 resourceType
-            if (assetCategory === '次要道具' && asset.resourceType) {
-              assetCategory = mapAssetTypeToCategory(asset.resourceType);
-            }
-            
+            const assetCategory = getAssetCategory(asset, assets);
             if (assetCategory !== filterType) {
               return false;
-            }
+          }
           }
           
           // 搜索过滤

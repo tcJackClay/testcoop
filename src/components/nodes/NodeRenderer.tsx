@@ -544,14 +544,14 @@ function renderNodeBody(node: CanvasNode) {
                       console.error('图片上传错误:', uploadError);
                       alert('图片上传失败');
                       updateData('status', 'idle');
-                      return;
                     }
                   }
                   
                   // Create asset via API
+                  // resourceType 存储资产类型 (character_primary, scene_primary, etc.)
                   const result = await imageApi.create({
                     resourceName: name,
-                    resourceType: 'image',
+                    resourceType: isVariant ? 'character_secondary' : assetType,
                     resourceContent: uploadedUrl,
                     projectId: projectId,
                     ext1: JSON.stringify(ext1Json),

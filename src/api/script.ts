@@ -82,8 +82,46 @@ export const scriptApi = {
   /**
    * 提交剧本审批
    */
+  /**
+   * 提交剧本审批
+   */
   commit: async (id: number): Promise<ApiResponse<void>> => {
     const response = await apiClient.post(`/api/script/${id}/commit`)
+    return response.data
+  },
+
+  /**
+   * AI 分析剧本
+   * 参考 huanu-workbench-frontend 实现
+   */
+  analyze: async (data: {
+    scriptContent: string
+    projectId: number
+    options?: {
+      extractAssets?: boolean
+      generateOutline?: boolean
+      generateCharacterBios?: boolean
+      analyzeRelationships?: boolean
+    }
+    styleConfig?: {
+      visualStyle?: string
+      aspectRatio?: string
+    }
+  }): Promise<ApiResponse<any>> => {
+    const response = await apiClient.post('/api/script/analyze', data)
+    return response.data
+  },
+
+  /**
+   * 剧本分集
+   * 参考 huanu-workbench-frontend 实现
+   */
+  splitEpisodes: async (data: {
+    content: string
+    projectId: number
+    episodeCount?: number
+  }): Promise<ApiResponse<any>> => {
+    const response = await apiClient.post('/api/script/split-episodes', data)
     return response.data
   },
 }

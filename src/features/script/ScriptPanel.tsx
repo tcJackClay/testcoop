@@ -15,8 +15,11 @@ import {
   Network,
   BookOpen,
   ScrollText,
-  Box
+  Box,
+  Loader2
 } from 'lucide-react';
+import { scriptApi } from '../../api/script';
+import { useProjectStore } from '../../stores/projectStore';
 
 interface ScriptPanelProps {
   onClose: () => void;
@@ -27,41 +30,92 @@ type ResultTab = 'assets' | 'bios' | 'relationships' | 'outline' | 'script';
 
 export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const { t } = useTranslation();
+  const { currentProjectId } = useProjectStore();
+  
   const [scriptFile, setScriptFile] = useState<File | null>(null);
+  const [scriptContent, setScriptContent] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
   const [selectedAction, setSelectedAction] = useState<ActionType>('extractAssets');
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>('assets');
   const [showActionDropdown, setShowActionDropdown] = useState(false);
   const [hasResults, setHasResults] = useState(false);
+  
+  // 分析结果
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     setScriptFile(file);
+    
+    // 读取文件内容
+    const content = await file.text();
+    setScriptContent(content);
   };
 
   const handleAnalyze = async () => {
-    if (!scriptFile) return;
+    if (!scriptContent || !currentProjectId) {
+      alert('请先上传剧本文件');
+      return;
+    }
     
     setIsAnalyzing(true);
+    setAnalysisProgress(0);
+    setHasResults(false);
+    
     try {
-      console.log('Action:', selectedAction, 'file:', scriptFile.name);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setHasResults(true);
+      console.log('Action:', selectedAction, 'projectId:', currentProjectId);
       
+      // 根据选择的操作调用不同的 API
       switch (selectedAction) {
         case 'extractAssets':
-          alert('资产提取功能开发中...');
+        case 'analyzeScript': {
+          // 剧本分析
+          setAnalysisProgress(30);
+          const response = await scriptApi.analyze({
+            scriptContent: scriptContent,
+            projectId: currentProjectId,
+            options: {
+              extractAssets: true,
+              generateOutline: true,
+              generateCharacterBios: true,
+              analyzeRelationships: true,
+            }
+          });
+          setAnalysisProgress(80);
+          
+          if (response.data?.code === 0) {
+            setAnalysisResult(response.data.data);
+            setHasResults(true);
+            setAnalysisProgress(100);
+          } else {
+            alert(response.data?.msg || '分析失败');
+          }
           break;
-        case 'analyzeScript':
-          alert('剧本分析功能开发中...');
+        }
+        case 'splitEpisodes': {
+          // 剧本分集
+          setAnalysisProgress(30);
+          const response = await scriptApi.splitEpisodes({
+            content: scriptContent,
+            projectId: currentProjectId,
+          });
+          setAnalysisProgress(80);
+          
+          if (response.data?.code === 0) {
+            setAnalysisResult(response.data.data);
+            setHasResults(true);
+            setAnalysisProgress(100);
+          } else {
+            alert(response.data?.msg || '分集失败');
+          }
           break;
-        case 'splitEpisodes':
-          alert('剧集分集功能开发中...');
-          break;
+        }
       }
     } catch (error) {
       console.error('Script analysis failed:', error);
+      alert('操作失败，请稍后重试');
     } finally {
       setIsAnalyzing(false);
     }

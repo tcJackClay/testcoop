@@ -144,6 +144,30 @@ export default function Canvas() {
   // Drag and drop
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    
+    // 检查是否是资产库拖拽
+    const assetData = e.dataTransfer.getData('application/json');
+    if (assetData && containerRef.current) {
+      try {
+        const asset = JSON.parse(assetData);
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
+        const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+        
+        // 创建图片节点
+        addNode('imageNode', { 
+          x, 
+          y,
+          imageUrl: asset.imageUrl || asset.resourceContent,
+          label: asset.name || 'Asset'
+        });
+        return;
+      } catch (err) {
+        console.error('解析资产数据失败:', err);
+      }
+    }
+    
+    // 原有的节点拖拽
     const nodeType = e.dataTransfer.getData('application/reactflow');
     if (nodeType && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();

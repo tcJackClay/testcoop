@@ -301,16 +301,24 @@ class RunningHubApiService {
 
   private getHeaders(): HeadersInit {
     let authToken = runningHubConfig.getApiKey();
-    try {
-      const authStorage = localStorage.getItem('auth-storage');
-      if (authStorage) {
-        const parsed = JSON.parse(authStorage);
-        if (parsed.state?.token) {
-          authToken = parsed.state.token;
+    
+    // 优先从 localStorage 读取 token (与其他 API 一致)
+    const storedToken = localStorage.getItem('auth_token');
+    if (storedToken) {
+      authToken = storedToken;
+    } else {
+      // 备选：从 auth-storage 读取
+      try {
+        const authStorage = localStorage.getItem('auth-storage');
+        if (authStorage) {
+          const parsed = JSON.parse(authStorage);
+          if (parsed.state?.token) {
+            authToken = parsed.state.token;
+          }
         }
+      } catch (e) {
+        console.warn('[RunningHub] 读取认证 token 失败');
       }
-    } catch (e) {
-      console.warn('[RunningHub] 读取认证 token 失败');
     }
     
     return {

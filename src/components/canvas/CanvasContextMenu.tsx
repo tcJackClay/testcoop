@@ -18,6 +18,7 @@ const nodeTypeItems: Array<{ type: NodeType; label: string; icon: React.ReactNod
   { type: 'imageNode', label: '图片节点', icon: <Image className="w-4 h-4" /> },
   { type: 'videoNode', label: '视频节点', icon: <Film className="w-4 h-4" /> },
   { type: 'createAsset', label: '创建资产', icon: <Image className="w-4 h-4" /> },
+  { type: 'runninghub', label: 'RunningHub', icon: <Sparkles className="w-4 h-4" /> },
   { type: 'storyboardNode', label: '智能分镜', icon: <Clapperboard className="w-4 h-4" /> },
   { type: 'videoAnalyze', label: '视频拆解', icon: <Sparkles className="w-4 h-4" /> },
   { type: 'characterDescription', label: '角色描述', icon: <Users className="w-4 h-4" /> },

@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   X, 
   Plus, 
   Search, 
   Filter,
-  Image,
+  Image as ImageIcon,
   Grid,
   List,
   Upload,
@@ -15,61 +15,27 @@ import {
   MapPin,
   Gem,
   Package,
-  HardDrive
+  HardDrive,
+  Loader2
 } from 'lucide-react';
-import type { AssetWithVariants, AssetStats, AssetCategory } from '../../types/asset';
+import type { Image } from '../../api/image';
+import { useAssetStore } from '../../stores/assetStore';
 import AssetCard from './AssetCard';
 
 interface AssetLibraryPanelProps {
   onClose: () => void;
 }
 
-// Mock data
-const MOCK_ASSETS: AssetWithVariants[] = [
-  {
-    id: '1',
-    name: '主角-少年',
-    description: '热血少年主角',
-    category: '主要角色',
-    imageUrl: '',
-    variants: ['少年', '成年', '老年'],
-  },
-  {
-    id: '2',
-    name: '女主-公主',
-    description: '王国公主',
-    category: '主要角色',
-    imageUrl: '',
-  },
-  {
-    id: '3',
-    name: '反派-国王',
-    description: '黑化国王',
-    category: '次要角色',
-    imageUrl: '',
-  },
-  {
-    id: '4',
-    name: '城堡',
-    description: '王城场景',
-    category: '主要场景',
-    imageUrl: '',
-  },
-  {
-    id: '5',
-    name: '森林',
-    description: '魔法森林',
-    category: '次要场景',
-    imageUrl: '',
-  },
-  {
-    id: '6',
-    name: '圣剑',
-    description: '神器武器',
-    category: '主要道具',
-    imageUrl: '',
-  },
-];
+interface AssetStats {
+  主要角色: number;
+  次要角色: number;
+  主要场景: number;
+  次要场景: number;
+  主要道具: number;
+  次要道具: number;
+}
+
+type AssetCategory = '主要角色' | '次要角色' | '主要场景' | '次要场景' | '主要道具' | '次要道具';
 
 const categories = [
   { key: 'all', label: '所有资产', icon: <Folder size={12} />, color: 'text-gray-400' },
@@ -81,11 +47,37 @@ const categories = [
   { key: '次要道具', label: '次要道具', icon: <Package size={12} />, color: 'text-orange-400' },
 ];
 
+// 映射后端 category 到前端类型
+const mapCategoryToType = (category?: string): string => {
+  if (!category) return '次要道具';
+  if (category.includes('主要') && category.includes('角色')) return '主要角色';
+  if (category.includes('次要') && category.includes('角色')) return '次要角色';
+  if (category.includes('主要') && category.includes('场景')) return '主要场景';
+  if (category.includes('次要') && category.includes('场景')) return '次要场景';
+  if (category.includes('主要') && category.includes('道具')) return '主要道具';
+  if (category.includes('次要') && category.includes('道具')) return '次要道具';
+  return '次要道具';
+};
+
 export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
-  const [assets] = useState<AssetWithVariants[]>(MOCK_ASSETS);
-  const [filterType, setFilterType] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const {
+    assets,
+    isLoading,
+    error,
+    filterType,
+    searchTerm,
+    fetchAssets,
+    setFilterType,
+    setSearchTerm,
+    getFilteredAssets,
+  } = useAssetStore();
+  
   const [viewMode] = useState<'grid' | 'list'>('grid');
+
+  // 组件挂载时获取资产数据
+  useEffect(() => {
+    fetchAssets();
+  }, [fetchAssets]);
 
   // Calculate stats
   const stats: AssetStats = useMemo(() => {
@@ -97,43 +89,26 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
       主要道具: 0,
       次要道具: 0,
     };
+    
     assets.forEach(asset => {
-      if (result[asset.category] !== undefined) {
-        result[asset.category]++;
+      const type = mapCategoryToType(asset.name);
+      if (result[type as AssetCategory] !== undefined) {
+        result[type as AssetCategory]++;
       }
     });
+    
     return result;
   }, [assets]);
 
-  const totalAssets = assets.length;
+  const filteredAssets = getFilteredAssets();
+  const totalAssets = filteredAssets.length;
 
   const getCount = (key: string): number => {
     if (key === 'all') return totalAssets;
     return stats[key as AssetCategory] || 0;
   };
 
-  // Filter assets
-  const filteredAssets = useMemo(() => {
-    let result = assets;
-
-    // Filter by category
-    if (filterType !== 'all') {
-      result = result.filter(a => a.category === filterType);
-    }
-
-    // Filter by search
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(a => 
-        a.name.toLowerCase().includes(term) ||
-        a.description?.toLowerCase().includes(term)
-      );
-    }
-
-    return result;
-  }, [assets, filterType, searchTerm]);
-
-  const handleDragStart = (asset: AssetWithVariants) => {
+  const handleDragStart = (asset: Image) => {
     console.log('Drag start:', asset.name);
   };
 
@@ -145,7 +120,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
         <div className="h-10 border-b border-gray-700 flex items-center justify-between px-3 shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium">资产库</span>
-            <span className="text-[10px] text-gray-500">({filteredAssets.length})</span>
+            <span className="text-[10px] text-gray-500">({totalAssets})</span>
           </div>
           <button
             onClick={onClose}
@@ -174,17 +149,36 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
               <Filter size={12} />
             </button>
           </div>
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <Loader2 size={14} className="text-blue-400 animate-spin" />
+          )}
         </div>
 
         {/* Content Grid */}
         <div className="flex-1 overflow-y-auto p-3">
-          {filteredAssets.length === 0 ? (
+          {error && (
+            <div className="text-center text-red-400 py-4">
+              <p className="text-xs">{error}</p>
+              <button 
+                onClick={() => fetchAssets()}
+                className="mt-2 text-[10px] text-blue-400 hover:text-blue-300"
+              >
+                点击重试
+              </button>
+            </div>
+          )}
+          
+          {!error && totalAssets === 0 && !isLoading && (
             <div className="text-center text-gray-500 py-8">
-              <Image size={32} className="mx-auto mb-2 opacity-50" />
+              <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
               <p className="text-xs">暂无资产</p>
               <p className="text-[10px] mt-1">点击下方按钮添加资产</p>
             </div>
-          ) : (
+          )}
+          
+          {!error && totalAssets > 0 && (
             <div className={`grid gap-3 ${
               viewMode === 'grid' ? 'grid-cols-2' : 'grid-cols-1'
             }`}>
@@ -203,12 +197,11 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
                 </div>
               </div>
 
-
               {/* Asset Cards */}
               {filteredAssets.map((asset) => (
                 <AssetCard
                   key={asset.id}
-                  asset={asset}
+                  asset={asset as any}
                   onDragStart={handleDragStart}
                   onDragEnd={() => {}}
                 />
@@ -224,7 +217,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
             <span>上传资产</span>
           </button>
           <button className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-[10px] transition-colors">
-            <Image size={12} />
+            <ImageIcon size={12} />
             <span>导入</span>
           </button>
         </div>
@@ -235,7 +228,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
         {categories.map((cat) => (
           <button
             key={cat.key}
-            onClick={() => setFilterType(cat.key)}
+            onClick={() => setFilterType(cat.key as any)}
             className={`w-full py-2 flex flex-col items-center gap-1 transition-colors ${
               filterType === cat.key 
                 ? 'bg-blue-500/20' 

@@ -1,14 +1,13 @@
-import { useState, useRef } from 'react';
-import { Trash2, Download, Image, Plus, Eye } from 'lucide-react';
-import type { Image } from '../../api/image';
+import { Trash2, Download, Plus, Eye } from 'lucide-react';
+import type { Image as AssetImage } from '../../api/image';
 
 interface ContextMenuProps {
-  asset: Image;
+  asset: AssetImage;
   position: { x: number; y: number };
   onClose: () => void;
-  onAddToCanvas: (asset: Image) => void;
-  onDelete: (asset: Image) => void;
-  onViewDetails?: (asset: Image) => void;
+  onAddToCanvas: (asset: AssetImage) => void;
+  onDelete: (asset: AssetImage) => void;
+  onViewDetails?: (asset: AssetImage) => void;
 }
 
 export default function ContextMenu({ 

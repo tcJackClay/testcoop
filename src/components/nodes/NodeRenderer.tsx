@@ -105,6 +105,14 @@ function renderNodeBody(node: CanvasNode) {
     case 'promptNode':
       return <PromptNode nodeId={node.id} data={node.data} updateData={updateData} />;
 
+    case 'runninghub':
+      // RunningHub 节点需要特殊处理，使用占位符
+      return (
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <Sparkles className="w-3 h-3" />
+          <span>RunningHub 节点</span>
+        </div>
+      );
     case 'saveLocal':
       return (
         <div className="flex items-center gap-2 text-xs text-gray-400">

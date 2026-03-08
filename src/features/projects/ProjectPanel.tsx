@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, FolderOpen, Edit, Trash2, Check, Folder, X, Loader2, Clock } from 'lucide-react';
+import { Plus, Folder, FolderOpen, Loader2 } from 'lucide-react';
 import { projectApi, projectViewApi, type ProjectView } from '../../api/project';
 import { useAuthStore } from '../../stores/authStore';
 import { useProjectStore } from '../../stores/projectStore';
-
-interface ProjectPanelProps {
-  onBackToCanvas?: () => void;
-}
+import ProjectCard from './ProjectCard';
+import ProjectDetail from './ProjectDetail';
+import ProjectModal from './ProjectModal';
+import type { ProjectPanelProps } from './projectTypes';
 
 export default function ProjectPanel({ onBackToCanvas }: ProjectPanelProps) {
   const [projects, setProjects] = useState<ProjectView[]>([]);
@@ -186,78 +186,16 @@ export default function ProjectPanel({ onBackToCanvas }: ProjectPanelProps) {
           ) : (
             <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
               {projects.map((project) => (
-                <div
+                <ProjectCard
                   key={project.id}
-                  onClick={() => handleSelectProject(project)}
-                  onDoubleClick={() => handleDoubleClick(project)}
-                  className={`
-                    bg-gray-800 rounded-xl border p-4 cursor-pointer transition-all hover:shadow-lg
-                    ${currentProjectId === project.id 
-                      ? 'border-blue-500 ring-2 ring-blue-500/20' 
-                      : selectedProject?.id === project.id
-                        ? 'border-blue-400 bg-blue-900/20'
-                        : 'border-gray-700 hover:border-blue-400'
-                    }
-                  `}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`
-                        w-8 h-8 rounded-lg flex items-center justify-center
-                        ${currentProjectId === project.id ? 'bg-blue-600' : 'bg-gray-700'}
-                      `}>
-                        <Folder className={`w-4 h-4 ${currentProjectId === project.id ? 'text-white' : 'text-gray-400'}`} />
-                      </div>
-                      {currentProjectId === project.id && (
-                        <span className="flex items-center gap-1 text-xs text-blue-400 bg-blue-900/50 px-2 py-0.5 rounded-full">
-                          <Check className="w-3 h-3" />
-                          当前项目
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleEdit(project); }}
-                        className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded-lg transition-colors"
-                        title="编辑"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}
-                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
-                        title="删除"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <h3 className="font-semibold text-white mb-1 truncate">
-                    {project.name}
-                  </h3>
-                  
-                  {project.description && (
-                    <p className="text-sm text-gray-400 line-clamp-2 mb-3">
-                      {project.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>
-                      {project.createTime 
-                        ? new Date(project.createTime).toLocaleDateString('zh-CN')
-                        : '-'
-                      }
-                    </span>
-                    <span className={`
-                      px-2 py-0.5 rounded-full text-xs
-                      ${project.statusText === '进行中' ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-400'}
-                    `}>
-                      {project.statusText}
-                    </span>
-                  </div>
-                </div>
+                  project={project}
+                  currentProjectId={currentProjectId}
+                  selectedProjectId={selectedProject?.id ?? null}
+                  onSelect={handleSelectProject}
+                  onDoubleClick={handleDoubleClick}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
               ))}
             </div>
           )}
@@ -265,173 +203,28 @@ export default function ProjectPanel({ onBackToCanvas }: ProjectPanelProps) {
 
         {/* 右侧：项目详情 */}
         {selectedProject && (
-          <div className="w-80 bg-gray-800 border-l border-gray-700 p-6 overflow-auto shrink-0">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                <Folder className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white">{selectedProject.name}</h2>
-                <span className={`
-                  px-2 py-0.5 rounded-full text-xs
-                  ${selectedProject.statusText === '进行中' ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-400'}
-                `}>
-                  {selectedProject.statusText}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">项目描述</label>
-                <p className="text-sm text-gray-300">
-                  {selectedProject.description || '暂无描述'}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">创建时间</label>
-                <p className="text-sm text-gray-300 flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  {selectedProject.createTime 
-                    ? new Date(selectedProject.createTime).toLocaleString('zh-CN')
-                    : '-'
-                  }
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">更新时间</label>
-                <p className="text-sm text-gray-300 flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  {selectedProject.updateTime 
-                    ? new Date(selectedProject.updateTime).toLocaleString('zh-CN')
-                    : '-'
-                  }
-                </p>
-              </div>
-
-              <button
-                onClick={() => handleSetCurrent(selectedProject)}
-                disabled={currentProjectId === selectedProject.id}
-                className={`w-full mt-4 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  currentProjectId === selectedProject.id
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-              >
-                {currentProjectId === selectedProject.id ? '已设为当前项目' : '设为当前项目'}
-              </button>
-
-              <button
-                onClick={() => handleDoubleClick(selectedProject)}
-                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-              >
-                进入画布
-              </button>
-            </div>
-          </div>
+          <ProjectDetail
+            project={selectedProject}
+            onDelete={handleDelete}
+          />
         )}
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && handleCloseModal()}
-        >
-          <div className="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-              <h2 className="text-lg font-semibold text-white">
-                {editingProject ? '编辑项目' : '创建项目'}
-              </h2>
-              <button 
-                onClick={handleCloseModal}
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="p-6">
-              {formError && (
-                <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded-lg text-red-200 text-sm">
-                  {formError}
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {/* Project Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    项目名称 <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder="请输入项目名称"
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                    项目描述
-                  </label>
-                  <textarea
-                    value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
-                    placeholder="请输入项目描述（可选）"
-                    rows={3}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none"
-                  />
-                </div>
-
-                {/* Status (only for edit) */}
-                {editingProject && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                      项目状态
-                    </label>
-                    <select
-                      value={formStatus}
-                      onChange={(e) => setFormStatus(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="1">进行中</option>
-                      <option value="2">已完成</option>
-                      <option value="0">已归档</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  取消
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {editingProject ? '保存' : '创建'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProjectModal
+        isOpen={showModal}
+        editingProject={editingProject}
+        formName={formName}
+        formDescription={formDescription}
+        formStatus={formStatus}
+        isSubmitting={isSubmitting}
+        formError={formError}
+        onNameChange={setFormName}
+        onDescriptionChange={setFormDescription}
+        onStatusChange={setFormStatus}
+        onSubmit={handleSubmit}
+        onClose={handleCloseModal}
+      />
     </div>
   );
 }

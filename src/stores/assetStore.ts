@@ -284,7 +284,7 @@ export const useAssetStore = create<AssetStore>()(
             const assetCategory = getAssetCategory(asset, assets);
             if (assetCategory !== filterType) {
               return false;
-          }
+            }
           }
           
           // 搜索过滤

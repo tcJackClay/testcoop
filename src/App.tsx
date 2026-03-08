@@ -29,6 +29,26 @@ export default function App() {
   const { selectedNodeIds, nodes, deleteNode, clearSelection, addNode } = useCanvasStore();
   const { token } = useAuthStore();
   const { currentProject } = useProjectStore();
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // 初始化后监听登录状态和项目选择状态，自动切换视图
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    if (!token) {
+      // 未登录，跳转到登录页面
+      setViewMode('login');
+    } else if (!currentProject) {
+      // 已登录但未选择项目，停留在项目列表
+      setViewMode('projects');
+    }
+    // 已登录且已选择项目，可以进入其他视图
+  }, [token, currentProject, isInitialized]);
+  const { currentProject } = useProjectStore();
 
   // 监听登录状态和项目选择状态，自动切换视图
   useEffect(() => {

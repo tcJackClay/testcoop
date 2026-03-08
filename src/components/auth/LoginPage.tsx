@@ -54,6 +54,12 @@ export default function LoginPage() {
 
     try {
       if (mode === 'login') {
+        await login({ username, password });
+      } else {
+        await register({ username, email, password });
+      }
+    } catch (err) {
+      if (mode === 'login') {
         await login(username, password);
       } else {
         await register(username, email, password);

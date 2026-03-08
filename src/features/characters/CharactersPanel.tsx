@@ -21,7 +21,7 @@ export default function CharactersPanel({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <div className="w-72 bg-gray-800 border-l border-gray-700 flex flex-col animate-in slide-in-from-right">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="h-12 border-b border-gray-700 flex items-center justify-between px-3 shrink-0">
         <div className="flex items-center gap-2">

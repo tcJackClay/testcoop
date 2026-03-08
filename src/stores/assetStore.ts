@@ -110,12 +110,15 @@ export const useAssetStore = create<AssetStore>()(
         
         try {
           const images = await imageApi.getAll(projectId);
+          console.log(`[资产列表] 获取到 ${images?.length || 0} 条数据, 第一条:`, images?.[0]);
           
-          // 解析 parentId 和 variants
-          const processedAssets = (images || []).map((image) => {
+          // 遍历每个资产，获取图片 base64
+          const processedAssets = await Promise.all((images || []).map(async (image) => {
             let parentId = '';
             let variants: string[] = [];
+            let imageUrl = '';
             
+            // 解析 ext1
             if (image.ext1) {
               try {
                 const ext1Data = JSON.parse(image.ext1);
@@ -126,12 +129,79 @@ export const useAssetStore = create<AssetStore>()(
               } catch (e) {}
             }
             
+            // 获取图片 base64
+            // 参考 huanu-workbench-frontend 的实现
+            if (image.id) {
+              try {
+                const imageResource: any = await imageApi.getImage(image.id);
+                console.log(`[资产${image.id}] getImage返回:`, imageResource);
+                
+                // 优先从 resourceContent 获取
+                let base64 = imageResource?.resourceContent;
+                
+                // 如果 resourceContent 不存在，尝试直接使用 imageResource（可能是 base64 字符串本身）
+                if (!base64 && typeof imageResource === 'string' && imageResource.length > 100) {
+                  base64 = imageResource;
+                }
+                
+                // 解析 JSON 格式 {data: 'iVBORw0...'} 或 {image: '...'}
+                if (base64 && base64.startsWith('{')) {
+                  try {
+                    const jsonContent = JSON.parse(base64);
+                    // 优先使用 image 字段，其次使用 data 字段
+                    base64 = jsonContent.image || jsonContent.data || '';
+                    console.log(`[资产${image.id}] 解析JSON后 base64长度:`, base64?.length);
+                  } catch (e) {
+                    console.warn(`[assetStore] 解析图片JSON失败, id=${image.id}:`, e);
+                  }
+                }
+                
+                // 转换为 data URL
+                if (base64) {
+                  if (base64.startsWith('data:')) {
+                    imageUrl = base64;
+                  } else {
+                    // 检测图片类型
+                    let mimeType = 'image/png';
+                    if (base64.startsWith('/9j/')) mimeType = 'image/jpeg';
+                    else if (base64.startsWith('iVBOR')) mimeType = 'image/png';
+                    else if (base64.startsWith('UklGR')) mimeType = 'image/webp';
+                    imageUrl = `data:${mimeType};base64,${base64}`;
+                  }
+                  console.log(`[资产${image.id}] ✓ 获取图片成功, imageUrl长度=${imageUrl.length}`);
+                } else {
+                  console.warn(`[资产${image.id}] 警告: base64为空, imageResource=`, imageResource);
+                }
+              } catch (e) {
+                console.error(`[assetStore] 获取图片${image.id}失败:`, e);
+              }
+            }
+            
+            // 备用：也从列表API的 resourceContent 解析（huanu-workbench-frontend 也有此逻辑）
+            if (!imageUrl && image.resourceContent) {
+              let listBase64 = image.resourceContent;
+              if (listBase64.startsWith('{')) {
+                try {
+                  const jsonContent = JSON.parse(listBase64);
+                  listBase64 = jsonContent.image || jsonContent.data || '';
+                  if (listBase64) {
+                    let mimeType = 'image/png';
+                    if (listBase64.startsWith('/9j/')) mimeType = 'image/jpeg';
+                    else if (listBase64.startsWith('iVBOR')) mimeType = 'image/png';
+                    else if (listBase64.startsWith('UklGR')) mimeType = 'image/webp';
+                    imageUrl = `data:${mimeType};base64,${listBase64}`;
+                  }
+                } catch (e) {}
+              }
+            }
+            
             return {
               ...image,
+              resourceContent: imageUrl || image.resourceContent,
               parentId,
               variants,
             };
-          });
+          }));
           
           set({ assets: processedAssets, isLoading: false });
         } catch (error) {

@@ -30,20 +30,14 @@ const categoryColors: Record<AssetCategory, string> = {
   '次要道具': 'bg-orange-400',
 };
 
-// 从 asset 对象推断 category 类型 - 使用与 assetStore 相同的逻辑
+// 从 asset 对象推断 category 类型
 const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
-  // 如果是 AssetWithVariants，直接使用 category
-  if ('category' in asset && asset.category) {
-    return asset.category as AssetCategory;
-  }
-  
   // 1. 首先检查 ext1 JSON 中的信息
   if (asset.ext1) {
     try {
       const ext1Data = JSON.parse(asset.ext1);
       // 检查是否是变体（有 parent 字段）
       if (ext1Data.parent) {
-        // 是变体，从 parent 名称推断
         const parentName = ext1Data.parent;
         if (parentName.includes('角色')) return '次要角色';
         if (parentName.includes('场景')) return '次要场景';
@@ -87,12 +81,9 @@ const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
 
 // 获取 imageUrl
 const getImageUrl = (asset: AssetWithVariants | Image): string | undefined => {
-  // 优先使用 resourceContent (API返回的实际图片URL)
+  // 优先使用 resourceContent (API返回的实际图片URL/ base64)
   if (asset.resourceContent) return asset.resourceContent;
   // 兼容其他字段
-  return asset.imageUrl || ('url' in asset ? asset.url : undefined);
-};
-const getImageUrl = (asset: AssetWithVariants | Image): string | undefined => {
   return asset.imageUrl || ('url' in asset ? asset.url : undefined);
 };
 
@@ -102,17 +93,12 @@ export default function AssetCard({
   onDragEnd, 
   onContextMenu,
   onClick 
+}: AssetCardProps) {
   const category = inferCategory(asset);
   const imageUrl = getImageUrl(asset);
   
   // 检查是否有有效的图片URL
   const hasImage = !!imageUrl && imageUrl.length > 0;
-  const category = inferCategory(asset);
-  const imageUrl = getImageUrl(asset);
-  
-  const hasImage = imageUrl && (
-    imageUrl.startsWith('/')
-  );
   const hasVariants = 'variants' in asset && asset.variants && asset.variants.length > 0;
   // Check if this is a secondary asset (has parentId)
   const isSecondaryAsset = 'parentId' in asset && !!asset.parentId;
@@ -148,6 +134,7 @@ export default function AssetCard({
           {categoryIcons[category]}
           <span>{category}</span>
         </div>
+        
         {/* Variant Badge - shows 变体 for secondary assets, shows count for primary assets with variants */}
         {isSecondaryAsset ? (
           <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white">
@@ -158,13 +145,6 @@ export default function AssetCard({
             {asset.variants?.length} 变体
           </div>
         ) : null}
-
-        {/* Variants Badge */}
-        {hasVariants && (
-          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white">
-            {asset.variants?.length} 变体
-          </div>
-        )}
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">

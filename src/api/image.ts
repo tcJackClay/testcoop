@@ -118,6 +118,36 @@ export const imageApi = {
   },
 
   /**
+   * 获取单个图片(包含base64数据)
+   * 后端返回格式：{ data: { id, resourceName, resourceContent, ... } }
+   */
+  getImage: async (id: number): Promise<Image | null> => {
+    try {
+      const response = await apiClient.get<ApiResponse<Image>>(`/image/${id}`)
+      
+      const res = response.data
+      console.log('[imageApi.getImage] 原始响应:', res)
+      
+      // 处理两种响应格式：
+      // 1. { code: 0, data: { id, resourceName, resourceContent, ... } }
+      // 2. { data: { id, resourceName, resourceContent, ... } }
+      if (res.code === 0 && res.data) {
+        return convertToImage(res.data)
+      }
+      if (res.data) {
+        // 检查是否是直接 base64 字符串
+        if (typeof res.data === 'string') {
+          return { id, resourceName: '', resourceType: 'image', resourceContent: res.data } as Image
+        }
+        return convertToImage(res.data)
+      }
+      return null
+    } catch (error) {
+      console.error('[imageApi.getImage] 获取图片失败:', error)
+      return null
+    }
+  },
+  /**
    * 创建图片
    */
   create: async (data: CreateImageRequest): Promise<Image | null> => {

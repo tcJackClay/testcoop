@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Settings, Zap, MessageSquare, Layers, Plus, LogIn, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '../../App';
@@ -11,6 +11,7 @@ interface HeaderProps {
   onChatClick?: () => void;
   chatOpen?: boolean;
   onNewProject?: () => void;
+  onProjectClick?: () => void;
 }
 
 const navItems: { key: ViewMode; labelKey: string }[] = [
@@ -26,31 +27,13 @@ export default function Header({
   onSettingsClick, 
   onChatClick, 
   chatOpen,
-  onNewProject
+  onNewProject,
+  onProjectClick
 }: HeaderProps) {
   const { t } = useTranslation();
-  const [projectName, setProjectName] = useState('未命名项目');
-  const [isEditing, setIsEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [projectName] = useState('未命名项目');
   
   const { user, token, openLoginModal, logout } = useAuthStore();
-
-  useEffect(() => {
-    const saved = localStorage.getItem('project_name');
-    if (saved) setProjectName(saved);
-  }, []);
-
-  const handleBlur = () => {
-    setIsEditing(false);
-    localStorage.setItem('project_name', projectName);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      setIsEditing(false);
-      localStorage.setItem('project_name', projectName);
-    }
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -68,28 +51,14 @@ export default function Header({
           Huanu Canvas
         </span>
 
-        {/* Project Name (editable) */}
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            className="ml-2 px-2 py-0.5 text-xs bg-gray-800 border border-gray-700 text-gray-200 rounded outline-none"
-            style={{ minWidth: '100px', maxWidth: '200px' }}
-            autoFocus
-          />
-        ) : (
-          <span
-            onClick={() => setIsEditing(true)}
-            className="ml-2 text-xs text-gray-500 cursor-pointer hover:underline"
-            title="点击编辑项目名称"
-          >
-            {projectName}
-          </span>
-        )}
+        {/* Project Name (clickable to open projects) */}
+        <span
+          onClick={onProjectClick}
+          className="ml-2 text-xs text-gray-500 cursor-pointer hover:underline"
+          title="点击管理项目"
+        >
+          {projectName}
+        </span>
 
         {/* New Project Button */}
         <button

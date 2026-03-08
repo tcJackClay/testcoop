@@ -8,11 +8,12 @@ import LoginModal from './components/auth/LoginModal';
 import Storyboard from './features/storyboard/Storyboard';
 import History from './features/history/History';
 import Models from './features/models/Models';
+import ProjectPanel from './features/projects/ProjectPanel';
 import LeftPanel, { type LeftPanelType } from './components/leftPanel/LeftPanel';
 import RightPanel, { type RightPanelType } from './components/rightPanel/RightPanel';
 import { useCanvasStore, type NodeType } from './stores/canvasStore';
 
-export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models';
+export type ViewMode = 'canvas' | 'storyboard' | 'history' | 'models' | 'projects';
 
 export default function App() {
   const { t } = useTranslation();
@@ -52,6 +53,9 @@ export default function App() {
     setRightPanel(prev => prev === type ? null : type);
   }, []);
 
+  // 判断是否显示 sidebar（只在 canvas 模式下显示）
+  const showSidebar = viewMode === 'canvas';
+
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
       <Header
@@ -61,20 +65,24 @@ export default function App() {
         onChatClick={() => handleRightPanelChange('chat')}
         chatOpen={rightPanel === 'chat'}
         onNewProject={handleNewProject}
+        onProjectClick={() => setViewMode('projects')}
       />
       
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          viewMode={viewMode}
-          onViewChange={handleViewChange}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          onAddNode={handleAddNode}
-          leftPanel={leftPanel}
-          rightPanel={rightPanel}
-          onLeftPanelChange={handleLeftPanelChange}
-          onRightPanelChange={handleRightPanelChange}
-        />
+        {/* Sidebar - 只在 canvas 模式下显示 */}
+        {showSidebar && (
+          <Sidebar
+            viewMode={viewMode}
+            onViewChange={handleViewChange}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onAddNode={handleAddNode}
+            leftPanel={leftPanel}
+            rightPanel={rightPanel}
+            onLeftPanelChange={handleLeftPanelChange}
+            onRightPanelChange={handleRightPanelChange}
+          />
+        )}
         
         {/* Left Panel */}
         {leftPanel && viewMode === 'canvas' && (
@@ -92,6 +100,7 @@ export default function App() {
           {viewMode === 'storyboard' && <Storyboard />}
           {viewMode === 'history' && <History />}
           {viewMode === 'models' && <Models />}
+          {viewMode === 'projects' && <ProjectPanel onBackToCanvas={() => setViewMode('canvas')} />}
         </main>
 
         {/* Right Panel */}

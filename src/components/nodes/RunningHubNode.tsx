@@ -1,14 +1,33 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
-import { Button } from '@heroui/react';
-import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Play, Pause, AlertCircle, CheckCircle, Loader2, X, ChevronDown } from 'lucide-react';
-import { runningHubApi, runningHubConfig, DEFAULT_FUNCTIONS, type RHNodeField, type RunningHubNodeData, type RunningHubFunction } from '../../api/runningHub';
-import { FunctionSelector } from './FunctionSelector';
-import { DynamicFieldRenderer } from './DynamicFieldRenderer';
+/**
+ * RunningHub 节点组件
+ * 适配 aigc-coop 的自定义画布系统
+ */
+import React, { useState, useEffect, useCallback } from 'react';
+import { Play, Pause, AlertCircle, CheckCircle, Loader2, X, ChevronDown, Sparkles } from 'lucide-react';
+import { runningHubApi, runningHubConfig, DEFAULT_FUNCTIONS, type RHNodeField, type RunningHubFunction } from '../../api/runningHub';
 
-type RunningHubNodeComponentProps = NodeProps<Node<RunningHubNodeData, 'runninghub'>>;
+interface RunningHubNodeProps {
+  nodeId: string;
+  data: {
+    function?: RunningHubFunction;
+    inputs?: Record<string, any>;
+    status?: 'idle' | 'configuring' | 'pending' | 'processing' | 'completed' | 'failed';
+    result?: { success?: boolean; images?: string[]; files?: any[] };
+    error?: string;
+    taskId?: string;
+    progress?: number;
+    nodeInfoList?: RHNodeField[];
+    covers?: any[];
+    label?: string;
+    onDelete?: (id: string) => void;
+    onEdit?: (id: string, data: any) => void;
+    onExecute?: (id: string) => void;
+    onGenerateImage?: (url: string) => void;
+  };
+  updateData: (key: string, value: unknown) => void;
+}
 
-const RunningHubNode: React.FC<RunningHubNodeComponentProps> = ({ data, id, selected }) => {
+export default function RunningHubNode({ nodeId, data, updateData }: RunningHubNodeProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFunctionSelector, setShowFunctionSelector] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,7 +50,8 @@ const RunningHubNode: React.FC<RunningHubNodeComponentProps> = ({ data, id, sele
   const isConfigured = currentFunction && (Object.keys(data.inputs || {}).length > 0 || nodeFields.length > 0);
 
   const handleFunctionSelect = useCallback(async (func: RunningHubFunction) => {
-    data.onEdit?.(id, { function: func, inputs: {} });
+    updateData('function', func);
+    updateData('inputs', {});
     setShowFunctionSelector(false);
     setIsExpanded(true);
     setProgress(0);
@@ -44,18 +64,21 @@ const RunningHubNode: React.FC<RunningHubNodeComponentProps> = ({ data, id, sele
         const { nodeInfoList, coverList } = await runningHubApi.getNodeInfo(func.webappId);
         setNodeFields(nodeInfoList);
         setCovers(coverList);
+        updateData('nodeInfoList', nodeInfoList);
+        updateData('covers', coverList);
       } catch (err) {
         console.error('[RunningHub] 获取节点信息失败:', err);
       } finally {
         setIsLoadingNodeInfo(false);
       }
     }
-  }, [id, data]);
+  }, [updateData]);
 
-  const handleInputChange = useCallback((nodeId: string, fieldName: string, value: any) => {
+  const handleInputChange = useCallback((fieldName: string, value: any) => {
     const inputKey = `${nodeId}-${fieldName}`;
-    data.onEdit?.(id, { inputs: { ...data.inputs, [inputKey]: value } });
-  }, [id, data]);
+    const currentInputs = (data.inputs as Record<string, any>) || {};
+    updateData('inputs', { ...currentInputs, [inputKey]: value });
+  }, [nodeId, data.inputs, updateData]);
 
   const handleExecute = useCallback(async () => {
     if (!currentFunction || isProcessing) return;
@@ -63,107 +86,150 @@ const RunningHubNode: React.FC<RunningHubNodeComponentProps> = ({ data, id, sele
     setIsProcessing(true);
     setProgress(0);
     setError(null);
+    updateData('status', 'processing');
 
     try {
       const result = await runningHubApi.submitAndPoll(
         currentFunction,
-        data.inputs,
+        data.inputs || {},
         nodeFields,
         (status) => {
           setProgress(status.progress || 0);
+          updateData('progress', status.progress);
+          
           if (status.status === 'completed') {
             const fileUrl = status.result?.images?.[0];
             if (fileUrl && data.onGenerateImage) {
               data.onGenerateImage(fileUrl);
             }
-            data.onEdit?.(id, { status: 'completed', result: { success: true, images: status.result?.images, files: status.result?.files } });
+            updateData('status', 'completed');
+            updateData('result', { success: true, images: status.result?.images, files: status.result?.files });
           } else if (status.status === 'failed') {
             setError(status.error || '处理失败');
-            data.onEdit?.(id, { status: 'failed', error: status.error });
+            updateData('status', 'failed');
+            updateData('error', status.error);
           } else {
-            data.onEdit?.(id, { status: 'processing', progress: status.progress });
+            updateData('status', 'processing');
           }
         }
       );
 
       if (!result.success) {
         setError(result.error || '生成失败');
-        data.onEdit?.(id, { status: 'failed', error: result.error });
+        updateData('status', 'failed');
+        updateData('error', result.error);
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : '处理异常';
       setError(errMsg);
-      data.onEdit?.(id, { status: 'failed', error: errMsg });
+      updateData('status', 'failed');
+      updateData('error', errMsg);
     } finally {
       setIsProcessing(false);
     }
-  }, [currentFunction, data.inputs, nodeFields, id, data, isProcessing]);
+  }, [currentFunction, data.inputs, nodeFields, data, updateData, isProcessing]);
 
   const handleCancel = useCallback(() => {
     runningHubApi.cancelTask(data.taskId || '');
     setIsProcessing(false);
     setProgress(0);
-    data.onEdit?.(id, { status: 'idle', taskId: undefined, progress: undefined });
-  }, [data.taskId, id, data]);
+    updateData('status', 'idle');
+    updateData('taskId', undefined);
+    updateData('progress', undefined);
+  }, [data.taskId, updateData]);
 
-  const getCategoryColor = (category: string): string => {
-    const colors: Record<string, string> = { '图片处理': '#3B82F6', '视频处理': '#10B981' };
-    return colors[category] || '#6B7280';
-  };
+  const handleDelete = useCallback(() => {
+    if (data.onDelete) {
+      data.onDelete(nodeId);
+    }
+  }, [nodeId, data]);
 
   return (
-    <div className={`min-w-[320px] max-w-[480px] bg-white rounded-2xl shadow-lg border-2 transition-all ${selected ? 'border-primary shadow-primary/20' : 'border-slate-200'} ${data.status === 'completed' ? 'ring-2 ring-green-500/30' : ''} ${data.status === 'failed' ? 'ring-2 ring-red-500/30' : ''}`}>
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-primary" />
-
+    <div className="min-w-[280px] max-w-[400px] bg-white rounded-xl shadow-md border border-slate-200">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-xl">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: currentFunction?.color || '#6366f1' }}>
+          <div className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: currentFunction?.color || '#6366f1' }}>
             🤖
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">RunningHub</span>
-            <p className="text-[10px] text-slate-400">{currentFunction?.name || '选择功能'}</p>
+            <span className="text-xs font-bold text-slate-700">RunningHub</span>
+            <p className="text-[9px] text-slate-400">{currentFunction?.name || '选择功能'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {data.status === 'completed' && <span className="flex items-center gap-1 text-xs text-green-500"><CheckCircle className="w-3 h-3" /> 完成</span>}
-          {data.status === 'failed' && <span className="flex items-center gap-1 text-xs text-red-500"><AlertCircle className="w-3 h-3" /> 失败</span>}
-          <Button isIconOnly size="sm" variant="light" className="p-1" onPress={() => data.onDelete?.(id)}>
-            <X className="w-4 h-4" />
-          </Button>
-          <Button isIconOnly size="sm" variant="light" className="p-1" onPress={() => setIsExpanded(!isExpanded)}>
-            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-          </Button>
+        <div className="flex items-center gap-1">
+          {data.status === 'completed' && <span className="flex items-center gap-1 text-[10px] text-green-500"><CheckCircle className="w-3 h-3" />完成</span>}
+          {data.status === 'failed' && <span className="flex items-center gap-1 text-[10px] text-red-500"><AlertCircle className="w-3 h-3" />失败</span>}
+          <button onClick={handleDelete} className="p-1 rounded hover:bg-slate-200">
+            <X className="w-3 h-3 text-slate-400" />
+          </button>
+          <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 rounded hover:bg-slate-200">
+            <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          </button>
         </div>
       </div>
 
       {/* Function Selector */}
-      <FunctionSelector
-        currentFunction={currentFunction}
-        showFunctionSelector={showFunctionSelector}
-        onToggle={() => setShowFunctionSelector(!showFunctionSelector)}
-        categories={categories}
-        activeCategory={activeCategory}
-        onCategoryChange={setActiveCategory}
-        functions={functions}
-        onFunctionSelect={handleFunctionSelect}
-      />
+      <div className="relative">
+        <button
+          onClick={() => setShowFunctionSelector(!showFunctionSelector)}
+          className="w-full px-3 py-2 flex items-center justify-between bg-slate-50 hover:bg-slate-100 border-b border-slate-100 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">{currentFunction?.icon || '🎨'}</span>
+            <span className="text-xs text-slate-700">{currentFunction?.name || '选择功能'}</span>
+          </div>
+          <ChevronDown className={`w-3 h-3 text-slate-400 ${showFunctionSelector ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showFunctionSelector && (
+          <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+            <div className="flex flex-wrap gap-1 p-2 border-b border-slate-100">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => { setActiveCategory(cat); }}
+                  className={`px-2 py-1 text-[10px] rounded ${activeCategory === cat ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            {(activeCategory === '全部' ? functions : functions.filter(f => f.category === activeCategory)).map(func => (
+              <button
+                key={func.id}
+                onClick={() => handleFunctionSelect(func)}
+                className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 text-left"
+              >
+                <span className="text-sm">{func.icon}</span>
+                <div className="flex-1">
+                  <div className="text-xs text-slate-700">{func.name}</div>
+                  <div className="text-[9px] text-slate-400">{func.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="p-4 space-y-3">
-          {isLoadingNodeInfo && <div className="flex items-center gap-2 text-xs text-slate-500"><Loader2 className="w-4 h-4 animate-spin" />加载节点配置...</div>}
+        <div className="p-3 space-y-2">
+          {isLoadingNodeInfo && (
+            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+              <Loader2 className="w-3 h-3 animate-spin" />加载节点配置...
+            </div>
+          )}
 
-          <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2">{currentFunction?.description}</p>
+          <p className="text-[10px] text-slate-500 bg-slate-50 rounded p-2">{currentFunction?.description}</p>
 
           {/* Cover Images */}
           {covers.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-slate-600">预览图</label>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium text-slate-600">预览图</label>
+              <div className="grid grid-cols-2 gap-1">
                 {covers.slice(0, 4).map((cover, idx) => (
-                  <div key={cover.id || idx} className="relative aspect-video rounded-lg overflow-hidden bg-slate-100">
+                  <div key={cover.id || idx} className="relative aspect-video rounded overflow-hidden bg-slate-100">
                     <img src={cover.thumbnailUri || cover.url} alt={cover.name || `Cover ${idx + 1}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
@@ -172,69 +238,105 @@ const RunningHubNode: React.FC<RunningHubNodeComponentProps> = ({ data, id, sele
           )}
 
           {/* Input Fields */}
-          <div className="space-y-2 nodrag">
-            <label className="text-xs font-medium text-slate-600">输入参数</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-medium text-slate-600">输入参数</label>
             {nodeFields.length > 0 ? (
               nodeFields.map((field, idx) => (
                 <div key={`${field.nodeId}-${field.fieldName}-${idx}`} className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">
+                  <label className="text-[10px] font-medium text-slate-600">
                     {field.fieldName}
                     {field.description && <span className="text-slate-400 font-normal ml-1">- {field.description}</span>}
                   </label>
-                  <DynamicFieldRenderer
-                    field={field}
-                    nodeId={id}
-                    data={data}
-                    onInputChange={handleInputChange}
-                    localPreviews={localPreviews}
-                    setLocalPreviews={setLocalPreviews}
-                    currentFunction={currentFunction}
-                  />
+                  {/* 简化版 - 只支持文本输入 */}
+                  {field.fieldType === 'STRING' || field.fieldType === 'TEXT' ? (
+                    <textarea
+                      placeholder={field.description || `请输入${field.fieldName}`}
+                      value={data.inputs?.[`${nodeId}-${field.fieldName}`] || field.fieldValue || ''}
+                      onChange={(e) => handleInputChange(field.fieldName, e.target.value)}
+                      rows={2}
+                      className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded resize-none"
+                    />
+                  ) : field.fieldType === 'LIST' ? (
+                    <select
+                      value={data.inputs?.[`${nodeId}-${field.fieldName}`] || field.fieldValue || ''}
+                      onChange={(e) => handleInputChange(field.fieldName, e.target.value)}
+                      className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded"
+                    >
+                      <option value="">请选择{field.fieldName}</option>
+                      {field.fieldData && (() => {
+                        try {
+                          const parsed = JSON.parse(field.fieldData);
+                          const opts = Array.isArray(parsed) ? parsed : [];
+                          return opts.map((opt: any, i: number) => (
+                            <option key={i} value={typeof opt === 'string' ? opt : opt.value}>{typeof opt === 'string' ? opt : opt.label}</option>
+                          ));
+                        } catch { return null; }
+                      })()}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder={`请输入${field.fieldName}`}
+                      value={data.inputs?.[`${nodeId}-${field.fieldName}`] || field.fieldValue || ''}
+                      onChange={(e) => handleInputChange(field.fieldName, e.target.value)}
+                      className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded"
+                    />
+                  )}
                 </div>
               ))
             ) : (
-              <>
-                <div className="nodrag">
-                  <input type="text" placeholder="输入提示词..." value={data.inputs.prompt || ''} onChange={(e) => handleInputChange('prompt', 'prompt', e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg" />
-                </div>
-              </>
+              <input
+                type="text"
+                placeholder="输入提示词..."
+                value={data.inputs?.prompt || ''}
+                onChange={(e) => handleInputChange('prompt', e.target.value)}
+                className="w-full px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded"
+              />
             )}
           </div>
 
           {/* Progress Bar */}
           {isProcessing && (
             <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between text-[10px]">
                 <span className="text-slate-500">处理中...</span>
                 <span className="text-primary font-medium">{progress}%</span>
               </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
               </div>
             </div>
           )}
 
           {/* Error Message */}
-          {error && <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg"><AlertCircle className="w-4 h-4 text-red-500" /><span className="text-xs text-red-600">{error}</span></div>}
+          {error && (
+            <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded">
+              <AlertCircle className="w-3 h-3 text-red-500" />
+              <span className="text-[10px] text-red-600">{error}</span>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-2">
             {isProcessing ? (
-              <Button color="danger" onPress={handleCancel} className="flex-1 flex items-center justify-center gap-2 px-4 py-2">
-                <Pause className="w-4 h-4" />取消
-              </Button>
+              <button
+                onClick={handleCancel}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+              >
+                <Pause className="w-3 h-3" />取消
+              </button>
             ) : (
-              <Button color="primary" onPress={handleExecute} isDisabled={!isConfigured} className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 ${!isConfigured ? 'bg-slate-100 text-slate-400' : ''}`}>
-                <Play className="w-4 h-4" />生成
-              </Button>
+              <button
+                onClick={handleExecute}
+                disabled={!isConfigured}
+                className={`flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs rounded ${isConfigured ? 'bg-primary text-white hover:bg-primary/90' : 'bg-slate-200 text-slate-400'}`}
+              >
+                <Play className="w-3 h-3" />生成
+              </button>
             )}
           </div>
         </div>
       )}
-
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-primary" />
     </div>
   );
-};
-
-export default memo(RunningHubNode);
+}

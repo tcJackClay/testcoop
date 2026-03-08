@@ -7,6 +7,7 @@ import ImageNode from './ImageNode';
 import VideoNode from './VideoNode';
 import CreateAssetNode from './CreateAssetNode';
 import PromptNode from './PromptNode';
+import RunningHubNode from './RunningHubNode';
 
 interface NodeRendererProps {
   node: CanvasNode;
@@ -106,13 +107,7 @@ function renderNodeBody(node: CanvasNode) {
       return <PromptNode nodeId={node.id} data={node.data} updateData={updateData} />;
 
     case 'runninghub':
-      // RunningHub 节点需要特殊处理，使用占位符
-      return (
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <Sparkles className="w-3 h-3" />
-          <span>RunningHub 节点</span>
-        </div>
-      );
+      return <RunningHubNode nodeId={node.id} data={node.data} updateData={updateData} />;
     case 'saveLocal':
       return (
         <div className="flex items-center gap-2 text-xs text-gray-400">

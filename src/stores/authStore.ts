@@ -52,6 +52,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false, 
           isLoginModalOpen: false 
         });
+        // 登录成功，触发事件通知
+        window.dispatchEvent(new CustomEvent('auth:login-success'));
         return true;
       } else {
         set({ error: response.message || '登录失败', isLoading: false });
@@ -78,6 +80,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoading: false, 
           isLoginModalOpen: false 
         });
+        // 注册成功，用户信息已从注册响应获取
+        return true;
         return true;
       } else {
         set({ error: response.message || '注册失败', isLoading: false });
@@ -119,7 +123,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         localStorage.removeItem('auth_token');
         set({ token: null, user: null, isLoading: false, isDevMode: false });
       }
-    } catch {
+    } catch (error: any) {
+      // 如果是 404（后端没有 /auth/me 接口），不清除 token
+      // 因为登录响应已经包含了用户信息
+      if (error.response?.status === 404) {
+        set({ isLoading: false });
+        return;
+      }
+      // 其他错误（401 等）清除 token
       localStorage.removeItem('auth_token');
       set({ token: null, user: null, isLoading: false, isDevMode: false });
     }

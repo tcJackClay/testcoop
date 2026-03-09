@@ -75,10 +75,11 @@ apiClient.interceptors.response.use(
       console.groupEnd()
     }
     
+    // 401 处理：清除 token 并触发 React 层面的跳转
     if (error.response?.status === 401) {
-      // Handle unauthorized - redirect to login
-      localStorage.removeItem('auth_token')
-      window.location.href = '/login'
+      localStorage.removeItem('auth_token');
+      // 使用自定义事件通知 React 应用处理 401，避免页面刷新
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
     return Promise.reject(error)
   }

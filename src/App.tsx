@@ -18,7 +18,7 @@ import { useProjectStore } from './stores/projectStore';
 export type ViewMode = 'login' | 'canvas' | 'storyboard' | 'history' | 'models' | 'projects';
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<ViewMode>('projects');
+  const [viewMode, setViewMode] = useState<ViewMode>('login');
   const [showSettings, setShowSettings] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
@@ -26,13 +26,41 @@ export default function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   
   const { addNode } = useCanvasStore();
-  const { token } = useAuthStore();
+  const { token, fetchCurrentUser } = useAuthStore();
   const { currentProject } = useProjectStore();
   const prevTokenRef = useRef(token);
+  const isInitializedRef = useRef(false);
 
-  // 初始化后监听登录状态和项目选择状态，自动切换视图
+  // 初始化：验证 token 并获取用户信息
   useEffect(() => {
+    if (isInitializedRef.current) return;
+    isInitializedRef.current = true;
+    
+    // 如果有 token，验证并获取用户信息
+    if (token) {
+      fetchCurrentUser();
+    }
     setIsInitialized(true);
+  }, []);
+
+  // 监听 401 错误事件，清除登录状态
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      useAuthStore.getState().logout();
+      setViewMode('login');
+    };
+    
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
+  // 监听登录成功事件，跳转到项目列表
+  useEffect(() => {
+    const handleLoginSuccess = () => {
+      setViewMode('projects');
+    };
+    
+    window.addEventListener('auth:login-success', handleLoginSuccess);
+    return () => window.removeEventListener('auth:login-success', handleLoginSuccess);
   }, []);
 
   useEffect(() => {
@@ -48,13 +76,14 @@ export default function App() {
     // 已登录且已选择项目，可以进入其他视图
   }, [token, currentProject, isInitialized]);
 
-  // 登录成功后跳转到项目列表
+  // 登录成功后跳转到项目列表 - 简化逻辑
   useEffect(() => {
-    if (!isInitialized && !prevTokenRef.current && token && viewMode === 'login') {
+    // 当 token 从无变为有时，说明刚刚登录成功
+    if (token && prevTokenRef.current === null && isInitialized) {
       setViewMode('projects');
     }
     prevTokenRef.current = token;
-  }, [token, viewMode, isInitialized]);
+  }, [token, isInitialized]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
     // 未登录只能访问登录页面

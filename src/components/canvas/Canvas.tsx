@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Grid3X3 } from 'lucide-react';
+import { Grid3X3, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCanvasStore, type NodeType } from '../../stores/canvasStore';
 import NodeRenderer from '../nodes/NodeRenderer';
@@ -19,7 +19,6 @@ export default function Canvas() {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // State
   const [isPanning, setIsPanning] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionBox, setSelectionBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -27,14 +26,12 @@ export default function Canvas() {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, worldX: 0, worldY: 0 });
   
-  // Store
   const { 
     nodes, connections, viewPort, addNode, updateViewPort,
     deleteSelectedNodes, selectedNodeIds, undo, redo, undoStack, redoStack,
     selectNodesInBox, clearSelection, copyNodes, pasteNodes
   } = useCanvasStore();
 
-  // Handle wheel zoom with passive: false to allow preventDefault
   const handleWheelNative = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -42,28 +39,23 @@ export default function Canvas() {
     updateViewPort({ zoom: newZoom });
   }, [viewPort.zoom, updateViewPort]);
 
-  // Attach wheel event listener with passive: false
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
-    
     element.addEventListener('wheel', handleWheelNative, { passive: false });
     return () => element.removeEventListener('wheel', handleWheelNative);
   }, [handleWheelNative]);
   
-  // Zoom handlers
   const handleZoomIn = useCallback(() => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) }), [viewPort.zoom, updateViewPort]);
   const handleZoomOut = useCallback(() => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) }), [viewPort.zoom, updateViewPort]);
   const handleFitView = useCallback(() => updateViewPort({ x: 0, y: 0, zoom: 1 }), [updateViewPort]);
 
-  // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     updateViewPort({ zoom: newZoom });
   }, [viewPort.zoom, updateViewPort]);
 
-  // Context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (containerRef.current) {
@@ -91,8 +83,7 @@ export default function Canvas() {
     addNode(type, { x: contextMenu.worldX, y: contextMenu.worldY });
     closeContextMenu();
   }, [addNode, contextMenu.worldX, contextMenu.worldY, closeContextMenu]);
-
-  // Mouse handlers
+  
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     const x = e.clientX - (rect?.left || 0);
@@ -140,12 +131,10 @@ export default function Canvas() {
     setIsSelecting(false);
     setSelectionBox(null);
   }, [isSelecting, selectionBox, selectNodesInBox]);
-
-  // Drag and drop
+  
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     
-    // 检查是否是资产库拖拽
     const assetData = e.dataTransfer.getData('application/json');
     if (assetData && containerRef.current) {
       try {
@@ -154,7 +143,6 @@ export default function Canvas() {
         const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
         const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
         
-        // 创建图片节点
         addNode('imageNode', { 
           x, 
           y,
@@ -167,7 +155,6 @@ export default function Canvas() {
       }
     }
     
-    // 原有的节点拖拽
     const nodeType = e.dataTransfer.getData('application/reactflow');
     if (nodeType && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -182,7 +169,6 @@ export default function Canvas() {
     e.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -200,7 +186,6 @@ export default function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection, copyNodes, pasteNodes]);
 
-  // Close context menu on click outside
   useEffect(() => {
     if (contextMenu.visible) {
       const handleClick = () => closeContextMenu();
@@ -211,12 +196,7 @@ export default function Canvas() {
 
   return (
     <div className="h-full flex flex-col">
-      <CanvasToolbar 
-        viewPort={viewPort}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onFitView={handleFitView}
-      />
+      <CanvasToolbar viewPort={viewPort} />
 
       <div
         ref={containerRef}
@@ -272,6 +252,34 @@ export default function Canvas() {
           onAddNode={handleAddNodeFromContextMenu}
           onClose={closeContextMenu}
         />
+
+        {/* Zoom Controls - Bottom Right */}
+        <div className="absolute bottom-3 right-3 flex items-center gap-1">
+          <button
+            onClick={handleZoomOut}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            title="缩小"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="px-2 py-1 bg-gray-800/80 rounded text-xs text-gray-400 min-w-[50px] text-center">
+            {Math.round(viewPort.zoom * 100)}%
+          </span>
+          <button
+            onClick={handleZoomIn}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            title="放大"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleFitView}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded ml-1"
+            title="适应视图"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

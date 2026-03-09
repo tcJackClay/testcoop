@@ -7,7 +7,6 @@ import {
   Image as ImageIcon,
   Grid,
   List,
-  Upload,
   Folder,
   Star,
   User,
@@ -24,7 +23,9 @@ import { useCanvasStore } from '../../stores/canvasStore';
 import AssetCard from './AssetCard';
 import AssetSidebar from './AssetSidebar';
 import VariantDetailView from './VariantDetailView';
+import ContextMenu from './ContextMenu';
 import { mapCategoryToType, type AssetLibraryPanelProps, type AssetStats, type AssetCategory } from './AssetLibraryPanel.types';
+import { imageApi } from '../../api/image';
 
 const categories = [
   { key: 'all', label: '所有资产', icon: <Folder size={12} />, color: 'text-gray-400' },
@@ -35,6 +36,7 @@ const categories = [
   { key: '主要道具', label: '主要道具', icon: <Gem size={12} />, color: 'text-orange-400' },
   { key: '次要道具', label: '次要道具', icon: <Package size={12} />, color: 'text-orange-400' },
 ];
+
 export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   const {
     assets,
@@ -81,7 +83,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   // Handle right-click on asset
   const handleContextMenu = (e: React.MouseEvent, asset: Image) => {
     e.preventDefault();
-    // Adjust position to be relative to viewport
     setContextMenu({
       asset,
       position: { x: e.clientX, y: e.clientY },
@@ -96,7 +97,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   // Add asset to canvas
   const handleAddToCanvas = (asset: Image) => {
     const position = getCanvasCenterPosition();
-    // Create a new node with the asset data pre-filled
     addNode('createAsset', position, {
       name: asset.name || asset.resourceName,
       imageUrl: asset.url || asset.resourceContent,
@@ -112,7 +112,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     setDeletingId(asset.id);
     try {
       await imageApi.delete(asset.id);
-      // Refresh the asset list
       useAssetStore.getState().fetchAssets();
       console.log('Asset deleted:', asset.name);
     } catch (error) {
@@ -122,30 +121,29 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
       setDeletingId(null);
     }
   };
-
+  
   // 组件挂载时获取资产数据
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
-
+  
   // 计算画布中心位置
   const getCanvasCenterPosition = () => {
     if (nodes.length === 0) {
       return { x: 100, y: 100 };
     }
-    // 找到最右下的节点位置，在其旁边添加新节点
     const maxX = Math.max(...nodes.map(n => n.position.x + (n.width || 200)));
     const maxY = Math.max(...nodes.map(n => n.position.y + (n.height || 100)));
     return { x: maxX + 50, y: maxY };
   };
-
+  
   // 添加资产节点到画布
   const handleAddAssetNode = () => {
     const position = getCanvasCenterPosition();
     addNode('createAsset', position);
     console.log('Added createAsset node to canvas at position:', position);
   };
-
+  
   // Calculate stats
   const stats: AssetStats = useMemo(() => {
     const result: AssetStats = {
@@ -166,16 +164,16 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     
     return result;
   }, [assets]);
-
+  
   // Filter to show only primary assets (exclude secondary assets with parentId)
   const filteredAssets = getFilteredAssets().filter((asset) => isPrimaryAsset(asset));
   const totalAssets = filteredAssets.length;
-
+  
   const getCount = (key: string): number => {
     if (key === 'all') return totalAssets;
     return stats[key as AssetCategory] || 0;
   };
-
+  
   const handleDragStart = (asset: Image) => {
     console.log('Drag start:', asset.name);
   };
@@ -276,6 +274,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
               ))}
             </div>
           )}
+          
           {/* Variant Detail View */}
           {selectedPrimaryAsset && (
             <VariantDetailView
@@ -284,18 +283,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
               onBack={() => setSelectedPrimaryAsset(null)}
             />
           )}
-        </div>
-
-        {/* Bottom Actions */}
-        <div className="p-2 border-t border-gray-700 flex gap-2 shrink-0">
-          <button className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-[10px] transition-colors">
-            <Upload size={12} />
-            <span>上传资产</span>
-          </button>
-          <button className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-[10px] transition-colors">
-            <ImageIcon size={12} />
-            <span>导入</span>
-          </button>
         </div>
       </div>
 

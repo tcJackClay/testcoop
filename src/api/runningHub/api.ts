@@ -279,30 +279,33 @@ class RunningHubApiService {
 
   // 上传文件
   async uploadFile(
-    file: File,
-    _function: RunningHubFunction,
-    fileType: 'image' | 'audio' | 'video' | 'input' = 'image'
+    file: File
   ): Promise<{ success: boolean; fileId?: string; url?: string; error?: string }> {
     const baseUrl = runningHubConfig.getBaseUrl();
+    console.log('[RunningHub] 上传文件, baseUrl:', baseUrl);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('fileType', fileType);
 
+      const authHeader = this.getHeaders();
       const response = await fetch(`${baseUrl}/upload-file`, {
         method: 'POST',
         headers: {
-          'Authorization': this.getHeaders()['Authorization'] || '',
+          'Authorization': (authHeader as Record<string, string>)['Authorization'] || '',
         },
         body: formData,
       });
+
+      console.log('[RunningHub] 上传响应状态:', response.status);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: 文件上传失败`);
       }
 
       const data = await response.json();
+      console.log('[RunningHub] 上传响应数据:', data);
+
       const filePath = data.data?.data?.fileName || data.thirdPartyResponse?.filePath || data.thirdPartyResponse?.url || data.url || '';
       
       return {

@@ -82,6 +82,24 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
     updateData('inputs', { ...currentInputs, [inputKey]: value });
   }, [nodeId, data.inputs, updateData]);
 
+  // 处理文件上传
+  const handleFileUpload = useCallback(async (file: File): Promise<string | null> => {
+    console.log('[RunningHub] handleFileUpload 开始, file:', file.name);
+    try {
+      const result = await runningHubApi.uploadFile(file);
+      console.log('[RunningHub] handleFileUpload result:', JSON.stringify(result));
+      if (result.success && result.url) {
+        return result.url;
+      }
+      console.error('[RunningHub] 文件上传失败, result:', result);
+      return null;
+    } catch (err) {
+      console.error('[RunningHub] 文件上传异常:', err);
+      return null;
+      return null;
+    }
+  }, []);
+
   const handleExecute = useCallback(async () => {
     if (!currentFunction || isProcessing) return;
 
@@ -260,6 +278,7 @@ export default function RunningHubNode({ nodeId, data, updateData }: RunningHubN
                     nodeId={nodeId}
                     data={{ inputs: data.inputs || {} }}
                     onInputChange={handleFieldInputChange}
+                    onUpload={handleFileUpload}
                     localPreviews={localPreviews}
                     setLocalPreviews={setLocalPreviews}
                     currentFunction={currentFunction}

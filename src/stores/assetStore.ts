@@ -129,14 +129,12 @@ export const useAssetStore = create<AssetStore>()(
               } catch (e) {}
             }
             
-            // 获取图片 base64
-            // 参考 huanu-workbench-frontend 的实现
+            // 获取图片 base64 - 调用单独的 getImage API
             if (image.id) {
               try {
                 const imageResource: any = await imageApi.getImage(image.id);
                 console.log(`[资产${image.id}] getImage返回:`, imageResource);
                 
-                // 优先从 resourceContent 获取
                 let base64 = imageResource?.resourceContent;
                 
                 // 如果 resourceContent 不存在，尝试直接使用 imageResource（可能是 base64 字符串本身）
@@ -148,7 +146,6 @@ export const useAssetStore = create<AssetStore>()(
                 if (base64 && base64.startsWith('{')) {
                   try {
                     const jsonContent = JSON.parse(base64);
-                    // 优先使用 image 字段，其次使用 data 字段
                     base64 = jsonContent.image || jsonContent.data || '';
                     console.log(`[资产${image.id}] 解析JSON后 base64长度:`, base64?.length);
                   } catch (e) {
@@ -161,7 +158,6 @@ export const useAssetStore = create<AssetStore>()(
                   if (base64.startsWith('data:')) {
                     imageUrl = base64;
                   } else {
-                    // 检测图片类型
                     let mimeType = 'image/png';
                     if (base64.startsWith('/9j/')) mimeType = 'image/jpeg';
                     else if (base64.startsWith('iVBOR')) mimeType = 'image/png';
@@ -177,9 +173,11 @@ export const useAssetStore = create<AssetStore>()(
               }
             }
             
-            // 备用：也从列表API的 resourceContent 解析（huanu-workbench-frontend 也有此逻辑）
+            // 备用：也从列表API的 resourceContent 解析（如果 getImage 返回空）
             if (!imageUrl && image.resourceContent) {
               let listBase64 = image.resourceContent;
+              
+              // 情况1: JSON 格式 {image: '...'} 或 {data: '...'}
               if (listBase64.startsWith('{')) {
                 try {
                   const jsonContent = JSON.parse(listBase64);
@@ -192,6 +190,24 @@ export const useAssetStore = create<AssetStore>()(
                     imageUrl = `data:${mimeType};base64,${listBase64}`;
                   }
                 } catch (e) {}
+              }
+              // 情况2: 文件路径 images/xxx.jpg -> 需要转换为 URL
+              else if (listBase64.startsWith('images/') || listBase64.startsWith('/images/')) {
+                // 假设后端提供图片访问服务，拼接完整 URL
+                // 需要根据实际情况修改图片服务的基础 URL
+                imageUrl = listBase64; // 或者拼接后端图片服务地址
+              }
+              // 情况3: base64 原始数据
+              else if (listBase64.startsWith('/9j/') || listBase64.startsWith('iVBOR') || listBase64.startsWith('UklGR')) {
+                let mimeType = 'image/png';
+                if (listBase64.startsWith('/9j/')) mimeType = 'image/jpeg';
+                else if (listBase64.startsWith('iVBOR')) mimeType = 'image/png';
+                else if (listBase64.startsWith('UklGR')) mimeType = 'image/webp';
+                imageUrl = `data:${mimeType};base64,${listBase64}`;
+              }
+              // 情况4: 已经是完整 URL
+              else if (listBase64.startsWith('http') || listBase64.startsWith('/')) {
+                imageUrl = listBase64;
               }
             }
             
@@ -303,6 +319,30 @@ export const useAssetStore = create<AssetStore>()(
           return true;
         });
       },
+      
+      // 调试方法：手动获取单个图片
+      debugFetchImage: async (id: number) => {
+        console.log(`[DEBUG] 开始获取图片 id=${id}`);
+        try {
+          const result = await imageApi.getImage(id);
+          console.log(`[DEBUG] imageApi.getImage(${id}) 返回:`, result);
+          return result;
+        } catch (e) {
+          console.error(`[DEBUG] 获取失败:`, e);
+          return null;
+        }
+      },
+      
+      // 调试方法：查看列表中第一个图片的 resourceContent
+      debugListContent: () => {
+        const { assets } = get();
+        if (assets.length > 0) {
+          console.log('[DEBUG] 列表中第一个资产的 resourceContent:', assets[0].resourceContent);
+          return assets[0].resourceContent;
+        }
+        console.log('[DEBUG] 资产列表为空');
+        return null;
+      }
     }),
     {
       name: 'asset-storage',
@@ -313,3 +353,30 @@ export const useAssetStore = create<AssetStore>()(
   )
 );
 export default useAssetStore;
+
+// 全局调试方法 - 可在控制台直接调用
+window.debugAssetStore = {
+  // 查看列表中第一个图片的 resourceContent
+  listContent: () => {
+    const store = useAssetStore.getState();
+    const assets = store.assets;
+    if (assets.length > 0) {
+      console.log('=== 列表中第一个资产的原始数据 ===');
+      console.log('resourceContent:', assets[0].resourceContent);
+      console.log('resourceType:', assets[0].resourceType);
+      console.log('resourceName:', assets[0].resourceName);
+      console.log('完整对象:', assets[0]);
+      return assets[0].resourceContent;
+    }
+    console.log('资产列表为空');
+    return null;
+  },
+  // 手动获取单个图片
+  fetchImage: async (id) => {
+    const { imageApi } = await import('../api/image');
+    console.log(`=== 获取图片 id=${id} ===`);
+    const result = await imageApi.getImage(id);
+    console.log('返回结果:', result);
+    return result;
+  }
+};

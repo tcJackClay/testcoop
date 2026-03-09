@@ -6,6 +6,7 @@ interface DynamicFieldRendererProps {
   nodeId: string;
   data: { inputs: Record<string, any> };
   onInputChange: (nodeId: string, fieldName: string, value: any) => void;
+  onUpload?: (file: File) => Promise<string | null>;
   localPreviews: Record<string, string>;
   setLocalPreviews: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   currentFunction?: { webappId: string };
@@ -16,14 +17,15 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
   nodeId,
   data,
   onInputChange,
+  onUpload,
   localPreviews,
   setLocalPreviews,
 }) => {
   const inputKey = `${field.nodeId}-${field.fieldName}`;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 文件选择处理（仅本地预览）
-  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  // 文件选择处理
+  const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -36,14 +38,26 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
       [inputKey]: localPreviewUrl
     }));
 
-    // 将本地预览 URL 作为输入值
-    onInputChange(field.nodeId, field.fieldName, localPreviewUrl);
+    // 如果有上传回调，先上传文件
+    if (onUpload) {
+      const uploadedUrl = await onUpload(file);
+      if (uploadedUrl) {
+        // 上传成功，使用服务器返回的 URL
+        onInputChange(field.nodeId, field.fieldName, uploadedUrl);
+      } else {
+        // 上传失败，回退到本地预览
+        onInputChange(field.nodeId, field.fieldName, localPreviewUrl);
+      }
+    } else {
+      // 没有上传回调，使用本地预览
+      onInputChange(field.nodeId, field.fieldName, localPreviewUrl);
+    }
 
     // 清空 input 以允许再次选择相同文件
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [inputKey, onInputChange, setLocalPreviews, field]);
+  }, [inputKey, onInputChange, setLocalPreviews, field, onUpload]);
 
   // STRING type - multiline text
   if (field.fieldType === 'STRING') {

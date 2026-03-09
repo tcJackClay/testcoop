@@ -38,13 +38,6 @@ export type {
   RHNodeField,
   RHCover,
 } from './runningHub'
-export { 
-  runningHubApi, 
-  type RHApp, 
-  type RHTaskRequest, 
-  type RHTaskResponse, 
-  type RHTaskResult 
-} from './runningHub'
 
 // Image
 export { imageApi, type Image, type CreateImageRequest, type UpdateImageRequest } from './image'

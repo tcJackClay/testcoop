@@ -142,6 +142,7 @@ export const imageApi = {
         return convertToImage(res.data)
       }
       return null
+      return null
     } catch (error) {
       console.error('[imageApi.getImage] 获取图片失败:', error)
       return null

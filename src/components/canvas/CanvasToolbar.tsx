@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Undo2, Redo2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -11,7 +11,12 @@ interface CanvasToolbarProps {
 export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
   const { t } = useTranslation();
   const { undo, redo, undoStack, redoStack, selectedNodeIds, deleteSelectedNodes, nodes, updateNode } = useCanvasStore();
-  const assets = useAssetStore((state) => state.assets);
+  const { assets, fetchAssets } = useAssetStore((state) => ({ assets: state.assets, fetchAssets: state.fetchAssets }));
+
+  // Ensure assets are loaded when toolbar mounts
+  useEffect(() => {
+    fetchAssets();
+  }, [fetchAssets]);
 
   // Get selected node info
   const selectedNode = useMemo(() => {

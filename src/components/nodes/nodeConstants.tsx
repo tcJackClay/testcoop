@@ -26,7 +26,6 @@ export const generationNodeTypes: NodeType[] = [
 
 // 节点图标映射
 export const nodeIcons: Record<NodeType, React.ReactNode> = {
-  videoInput: <Video className="w-4 h-4" />,
   textNode: <FileText className="w-4 h-4" />,
   novelInput: <BookOpen className="w-4 h-4" />,
   characterDescription: <Users className="w-4 h-4" />,
@@ -43,17 +42,15 @@ export const nodeIcons: Record<NodeType, React.ReactNode> = {
   imageNode: <Image className="w-4 h-4" />,
   videoNode: <Film className="w-4 h-4" />,
   aiImage: <Wand2 className="w-4 h-4" />,
-  preview: <Eye className="w-4 h-4" />,
-  imageInput: <Image className="w-4 h-4" />,
   createAsset: <Image className="w-4 h-4" />,
   generateCharacterImage: <Wand2 className="w-4 h-4" />,
   generateSceneImage: <Wand2 className="w-4 h-4" />,
   promptNode: <Wand2 className="w-4 h-4" />,
-  };
+  runninghub: <Sparkles className="w-4 h-4" />,
+};
 
 // 节点颜色映射
 export const nodeColors: Record<string, string> = {
-  videoInput: 'border-purple-500 bg-purple-500/10',
   textNode: 'border-gray-500 bg-gray-500/10',
   novelInput: 'border-amber-500 bg-amber-500/10',
   characterDescription: 'border-green-500 bg-green-500/10',
@@ -70,8 +67,6 @@ export const nodeColors: Record<string, string> = {
   imageNode: 'border-pink-400 bg-pink-400/10',
   videoNode: 'border-red-400 bg-red-400/10',
   aiImage: 'border-blue-500 bg-blue-500/10',
-  preview: 'border-indigo-500 bg-indigo-500/10',
-  imageInput: 'border-pink-500 bg-pink-500/10',
   createAsset: 'border-teal-500 bg-teal-500/10',
   generateCharacterImage: 'border-pink-300 bg-pink-300/10',
   generateSceneImage: 'border-pink-300 bg-pink-300/10',

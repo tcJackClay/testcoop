@@ -2,7 +2,6 @@
 import type { NodeType, CanvasNode } from './canvasTypes';
 
 export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
-  videoInput: { type: 'videoInput', data: { label: 'Video Input', videoUrl: '' } },
   textNode: { type: 'textNode', data: { label: 'Text', content: '' } },
   novelInput: { type: 'novelInput', data: { label: 'Novel Input', content: '' } },
   characterDescription: { type: 'characterDescription', data: { label: 'Character Description' } },
@@ -12,10 +11,9 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
   createCharacter: { type: 'createCharacter', data: { label: 'Create Character' } },
   createScene: { type: 'createScene', data: { label: 'Create Scene' } },
   videoAnalyze: { type: 'videoAnalyze', data: { label: 'Video Analyze' } },
-  storyboardNode: { type: 'storyboardNode', data: { label: 'Storyboard' } },
+  storyboardNode: { type: 'storyboardNode', data: { label: 'Storyboard', shots: [] } },
   aiVideo: { type: 'aiVideo', data: { label: 'AI Video', prompt: '', modelId: '' } },
   imageCompare: { type: 'imageCompare', data: { label: 'Image Compare', imageA: '', imageB: '' } },
-  preview: { type: 'preview', data: { label: 'Preview' } },
   imageNode: { 
     type: 'imageNode', 
     data: { 
@@ -49,6 +47,12 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
       status: 'idle'
     }
   },
+  aiImage: { type: 'aiImage', data: { label: 'AI Image', prompt: '', modelId: '' } },
+  generateCharacterImage: { type: 'generateCharacterImage', data: { label: 'Generate Character Image', prompt: '' } },
+  generateSceneImage: { type: 'generateSceneImage', data: { label: 'Generate Scene Image', prompt: '' } },
+  saveLocal: { type: 'saveLocal', data: { label: 'Save Local' } },
+  promptNode: { type: 'promptNode', data: { label: 'Prompt' } },
+  runninghub: { type: 'runninghub', data: { label: 'RunningHub' } },
 };
 
 let nodeIdCounter = 0;

@@ -8,6 +8,7 @@ import VideoNode from './VideoNode';
 import CreateAssetNode from './CreateAssetNode';
 import PromptNode from './PromptNode';
 import RunningHubNode from './RunningHubNode';
+import StoryboardNode from './StoryboardNode';
 
 interface NodeRendererProps {
   node: CanvasNode;
@@ -75,12 +76,7 @@ function renderNodeBody(node: CanvasNode) {
       );
 
     case 'storyboardNode':
-      return (
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <Sparkles className="w-3 h-3" />
-          <span>{((node.data.shots as string[]) || []).length || 0} shots</span>
-        </div>
-      );
+      return <StoryboardNode nodeId={node.id} data={node.data} updateData={updateData} />;
 
     case 'imageCompare':
       return (

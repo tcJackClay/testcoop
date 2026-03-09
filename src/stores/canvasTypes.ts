@@ -10,7 +10,6 @@ export interface CanvasNode {
 }
 
 export type NodeType = 
-  | 'videoInput' 
   | 'textNode' 
   | 'novelInput'
   | 'characterDescription'
@@ -22,7 +21,6 @@ export type NodeType =
   | 'videoAnalyze'
   | 'storyboardNode'
   | 'imageCompare'
-  | 'preview'
   | 'imageNode'
   | 'videoNode'
   | 'createAsset'
@@ -30,7 +28,6 @@ export type NodeType =
   | 'aiImage'
   | 'generateCharacterImage'
   | 'generateSceneImage'
-  | 'imageInput'
   | 'saveLocal'
   | 'promptNode';
 

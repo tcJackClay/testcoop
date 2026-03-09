@@ -12,7 +12,6 @@ interface ContextMenuProps {
 }
 
 const nodeTypeItems: Array<{ type: NodeType; label: string; icon: React.ReactNode }> = [
-  { type: 'videoInput', label: '视频输入', icon: <Video className="w-4 h-4" /> },
   { type: 'novelInput', label: '小说输入', icon: <BookOpen className="w-4 h-4" /> },
   { type: 'promptNode', label: '文字节点', icon: <Wand2 className="w-4 h-4" /> },
   { type: 'imageNode', label: '图片节点', icon: <Image className="w-4 h-4" /> },
@@ -24,8 +23,6 @@ const nodeTypeItems: Array<{ type: NodeType; label: string; icon: React.ReactNod
   { type: 'characterDescription', label: '角色描述', icon: <Users className="w-4 h-4" /> },
   { type: 'sceneDescription', label: '场景描述', icon: <Mountain className="w-4 h-4" /> },
   { type: 'imageCompare', label: '图像对比', icon: <GitCompare className="w-4 h-4" /> },
-  { type: 'preview', label: '预览窗口', icon: <Eye className="w-4 h-4" /> },
-  { type: 'saveLocal', label: '保存到本地', icon: <HardDrive className="w-4 h-4" /> },
 ];
 
 export default function CanvasContextMenu({ visible, x, y, onAddNode, onClose }: ContextMenuProps) {

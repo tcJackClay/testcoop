@@ -68,7 +68,7 @@ export default function Sidebar({
 
 
   // Dynamic position: move right when leftPanel is open (after 200px leftPanel)
-  const sidebarLeft = leftPanel ? 'left-[204px]' : 'left-4';
+  const sidebarLeft = leftPanel ? 'left-[324px]' : 'left-4';
 
   return (
     <aside className={`fixed ${sidebarLeft} top-1/2 -translate-y-1/2 bg-gray-800/95 backdrop-blur rounded-2xl shadow-2xl border border-gray-700 flex flex-col items-center py-2 gap-1 z-50 w-10 transition-all duration-200`}>
@@ -116,10 +116,11 @@ export default function Sidebar({
         <MessageSquare size={16} />
       </button>
 
+      {/* Left Panel Buttons */}
       <button
-        onClick={() => onRightPanelChange('characters')}
+        onClick={() => onLeftPanelChange('assets')}
         className={`p-2 rounded-lg transition-all ${
-          rightPanel === 'characters'
+          leftPanel === 'assets'
             ? 'bg-zinc-800 text-white' 
             : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
         }`}

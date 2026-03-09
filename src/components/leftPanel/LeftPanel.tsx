@@ -1,8 +1,9 @@
 import HistoryPanel from '../../features/history/HistoryPanel';
 import CharactersPanel from '../../features/characters/CharactersPanel';
-import ScriptPanel from '../../features/script/ScriptPanel';
+import ScriptPanel from './script/ScriptPanel';
+import AssetLibraryPanel from '../../features/assets/AssetLibraryPanel';
 
-export type LeftPanelType = 'history' | 'characters' | 'script' | null;
+export type LeftPanelType = 'history' | 'characters' | 'script' | 'assets' | null;
 
 interface LeftPanelProps {
   type: LeftPanelType;
@@ -12,7 +13,7 @@ interface LeftPanelProps {
 export default function LeftPanel({ type, onClose }: LeftPanelProps) {
   if (!type) return null;
 
-  const panelStyle = { width: '200px' }; // w-50 = 200px
+  const panelStyle = { width: '320px' };
 
   switch (type) {
     case 'history':
@@ -31,6 +32,12 @@ export default function LeftPanel({ type, onClose }: LeftPanelProps) {
       return (
         <div style={panelStyle} className="bg-gray-800 border-r border-gray-700 flex flex-col animate-in slide-in-from-left">
           <ScriptPanel onClose={onClose} />
+        </div>
+      );
+    case 'assets':
+      return (
+        <div style={panelStyle} className="bg-gray-800 border-r border-gray-700 flex flex-col animate-in slide-in-from-left">
+          <AssetLibraryPanel onClose={onClose} />
         </div>
       );
     default:

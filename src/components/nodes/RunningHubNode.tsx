@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Play, Pause, AlertCircle, CheckCircle, Loader2, X, ChevronDown } from 'lucide-react';
-import { runningHubApi, runningHubConfig, DEFAULT_FUNCTIONS, type RHNodeField, type RunningHubFunction } from '../../api/runningHub';
+import { runningHubApi, runningHubConfig, DEFAULT_FUNCTIONS, type RHNodeField, type RunningHubFunction } from '../../api/runningHub/index';
 import { DynamicFieldRenderer } from './DynamicFieldRenderer';
 
 interface RunningHubNodeProps {

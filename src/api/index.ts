@@ -27,6 +27,17 @@ export {
 } from './vector'
 
 // RunningHub
+export { runningHubApi, runningHubConfig, DEFAULT_FUNCTIONS } from './runningHub'
+export type {
+  RunningHubConfig,
+  RunningHubFunction,
+  RunningHubInputField,
+  RunningHubNodeData,
+  RunningHubResult,
+  TaskStatus,
+  RHNodeField,
+  RHCover,
+} from './runningHub'
 export { 
   runningHubApi, 
   type RHApp, 

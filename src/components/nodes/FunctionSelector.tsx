@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
-import type { RunningHubFunction } from '../../api/runningHub';
+import type { RunningHubFunction } from '../../api/runningHub/index';
 
 interface FunctionSelectorProps {
   currentFunction: RunningHubFunction | undefined;

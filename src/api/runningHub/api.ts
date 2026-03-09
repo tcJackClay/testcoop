@@ -1,268 +1,27 @@
 /**
  * RunningHub API Service
- * 参考 huanu-workbench-frontend 实现
- * webAppID 相关参数已备份占位
+ * 核心 API 服务
  */
 
-import { apiClient, ApiResponse } from './client';
+import { runningHubConfig } from './config';
+import {
+  RunningHubFunction,
+  RunningHubResult,
+  TaskStatus,
+  RHNodeField,
+  RHCover,
+} from './types';
 
 // ============================================
-// Types
+// Cache Config
 // ============================================
 
-export interface RunningHubConfig {
-  enabled: boolean;
-  apiKey: string;
-  baseUrl: string;
-  functions: RunningHubFunction[];
-}
-
-export interface RunningHubFunction {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  webappId: string;  // TODO: 填写实际 webAppID
-  category: string;
-  description: string;
-  inputFields?: RunningHubInputField[];
-  parameters?: Record<string, any>;
-}
-
-export interface RunningHubInputField {
-  name: string;
-  label: string;
-  type: 'text' | 'textarea' | 'image' | 'select' | 'number' | 'checkbox';
-  required: boolean;
-  defaultValue?: any;
-  options?: { label: string; value: string }[];
-  placeholder?: string;
-  description?: string;
-}
-
-export interface RunningHubNodeData {
-  label: string;
-  type: 'runninghub';
-  function?: RunningHubFunction;
-  inputs: Record<string, any>;
-  status: 'idle' | 'configuring' | 'pending' | 'processing' | 'completed' | 'failed';
-  result?: RunningHubResult;
-  error?: string;
-  taskId?: string;
-  progress?: number;
-  nodeInfoList?: RHNodeField[];
-  covers?: RHCover[];
-  // 回调
-  onDelete?: (id: string) => void;
-  onEdit?: (id: string, data: Partial<RunningHubNodeData>) => void;
-  onExecute?: (id: string) => void;
-  onCancel?: (id: string) => void;
-  onGenerateImage?: (url: string) => void;
-}
-
-export interface RunningHubResult {
-  success: boolean;
-  images?: string[];
-  video?: string;
-  files?: { name: string; url: string }[];
-  metadata?: Record<string, any>;
-  error?: string;
-}
-
-export interface TaskStatus {
-  taskId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  progress: number;
-  result?: RunningHubResult;
-  estimatedTime?: number;
-  error?: string;
-}
-
-export interface RHNodeField {
-  nodeId: string;
-  nodeName: string;
-  description: string;
-  descriptionEn?: string;
-  fieldName: string;
-  fieldType: 'STRING' | 'TEXT' | 'LIST' | 'IMAGE' | 'AUDIO' | 'VIDEO';
-  fieldValue?: any;
-  fieldData?: string;  // LIST 类型的选项 JSON
-}
-
-export interface RHCover {
-  coverId: string;
-  coverUrl: string;
-  thumbnailUri?: string;
-  name?: string;
-}
-
-// ============================================
-// Default Functions - webAppID 备用
-// ============================================
-
-export const DEFAULT_FUNCTIONS: RunningHubFunction[] = [
-  {
-    id: 'ai_image_upscale',
-    name: '图片放大',
-    icon: '⬆️',
-    color: '#3B82F6',
-    webappId: '2007596875607707650', // 图片放大
-    category: '图片处理',
-    description: '限制：4080最长边',
-  },
-  {
-    id: 'image_enhance',
-    name: '人物多角度',
-    icon: '🖼️',
-    color: '#10B981',
-    webappId: '1997953926043459586', // 人物多角度
-    category: '图片处理',
-    description: '1：上传主角图片；2：提示词输入；3：点击运行',
-  },
-  {
-    id: 'style_transfer',
-    name: '图片融合',
-    icon: '🎭',
-    color: '#8B5CF6',
-    webappId: '1954402676572340225', // 图片融合
-    category: '图片处理',
-    description: '拼好的图片融入到场景中',
-  },
-  {
-    id: 'video_editing',
-    name: '镜头分镜',
-    icon: '🎬',
-    color: '#EC4899',
-    webappId: '2004018172321800193', // 镜头分镜
-    category: '图片处理',
-    description: '上传图片即可出分镜',
-  },
-  {
-    id: 'text_analysis',
-    name: '道具迁移',
-    icon: '📝',
-    color: '#6B7280',
-    webappId: '1973744628144975874', // 道具迁移
-    category: '图片处理',
-    description: '图片1目标图，图片2放入的道具',
-  },
-  {
-    id: 'data_visualization',
-    name: '动作迁移',
-    icon: '📊',
-    color: '#059669',
-    webappId: '1996522834732130305', // 动作迁移
-    category: '视频处理',
-    description: '图片与视频比例一致，5-60s',
-  },
-  {
-    id: 'video_upscale',
-    name: '视频高清',
-    icon: '📈',
-    color: '#059669',
-    webappId: '1933689617772404738', // 视频高清
-    category: '视频处理',
-    description: '视频高清放大+补帧',
-  },
-];
-
-// ============================================
-// Config Service
-// ============================================
-
-const STORAGE_KEY = 'aigc-coop-runninghub-config';
-
-class RunningHubConfigService {
-  private config: RunningHubConfig;
-
-  constructor() {
-    this.config = this.loadConfig();
-  }
-
-  private loadConfig(): RunningHubConfig {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return {
-          ...{
-            enabled: false,
-            apiKey: '',
-            baseUrl: '/api/runninghub',
-            functions: DEFAULT_FUNCTIONS,
-          },
-          ...parsed,
-          functions: parsed.functions || DEFAULT_FUNCTIONS,
-        };
-      }
-    } catch (e) {
-      console.warn('加载 RunningHub 配置失败:', e);
-    }
-    return {
-      enabled: false,
-      apiKey: '',
-      baseUrl: '/api/runninghub',
-      functions: DEFAULT_FUNCTIONS,
-    };
-  }
-
-  private saveConfig(): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
-    } catch (e) {
-      console.warn('保存 RunningHub 配置失败:', e);
-    }
-  }
-
-  getConfig(): RunningHubConfig {
-    return this.config;
-  }
-
-  isEnabled(): boolean {
-    return this.config.enabled && !!this.config.apiKey;
-  }
-
-  getApiKey(): string {
-    return this.config.apiKey;
-  }
-
-  setApiKey(apiKey: string): void {
-    this.config.apiKey = apiKey;
-    this.saveConfig();
-  }
-
-  getBaseUrl(): string {
-    return this.config.baseUrl;
-  }
-
-  getFunctions(): RunningHubFunction[] {
-    return this.config.functions;
-  }
-
-  getFunctionById(id: string): RunningHubFunction | undefined {
-    return this.config.functions.find(f => f.id === id);
-  }
-
-  getCategories(): string[] {
-    const categories = new Set(this.config.functions.map(f => f.category));
-    return Array.from(categories);
-  }
-
-  setEnabled(enabled: boolean): void {
-    this.config.enabled = enabled;
-    this.saveConfig();
-  }
-}
-
-export const runningHubConfig = new RunningHubConfigService();
-
-// ============================================
-// API Service
-// ============================================
-
-// 24小时缓存
-const CACHE_DURATION = 24 * 60 * 60 * 1000;
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24小时
 const CACHE_STORAGE_KEY = 'aigc-coop-runninghub-nodeinfo-cache';
+
+// ============================================
+// API Service Class
+// ============================================
 
 class RunningHubApiService {
   private nodeInfoCache: Map<string, { data: RHNodeField[]; covers: RHCover[]; timestamp: number }> = new Map();
@@ -270,6 +29,10 @@ class RunningHubApiService {
   constructor() {
     this.loadCacheFromStorage();
   }
+
+  // ============================================
+  // Cache Methods
+  // ============================================
 
   private loadCacheFromStorage(): void {
     try {
@@ -299,6 +62,10 @@ class RunningHubApiService {
     }
   }
 
+  // ============================================
+  // Auth Methods
+  // ============================================
+
   private getHeaders(): HeadersInit {
     let authToken = runningHubConfig.getApiKey();
     
@@ -326,6 +93,10 @@ class RunningHubApiService {
       'Authorization': `Bearer ${authToken}`,
     };
   }
+
+  // ============================================
+  // API Methods
+  // ============================================
 
   // 获取节点信息（带缓存）
   async getNodeInfo(webappId: string): Promise<{ nodeInfoList: RHNodeField[], coverList: RHCover[] }> {
@@ -601,60 +372,8 @@ class RunningHubApiService {
   }
 }
 
+// ============================================
+// Export Singleton
+// ============================================
+
 export const runningHubApi = new RunningHubApiService();
-
-// ============================================
-// Legacy API (保持向后兼容)
-// ============================================
-
-export interface RHApp {
-  id: string;
-  name: string;
-  description?: string;
-  icon?: string;
-}
-
-export interface RHTaskRequest {
-  appId: string;
-  inputs: Record<string, unknown>;
-  webhookUrl?: string;
-}
-
-export interface RHTaskResponse {
-  taskId: string;
-  status: string;
-}
-
-export interface RHTaskResult {
-  taskId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  output?: Record<string, unknown>;
-  error?: string;
-}
-
-export const legacyRunningHubApi = {
-  getApps: async (): Promise<ApiResponse<RHApp[]>> => {
-    const response = await apiClient.get('/api/runninghub/apps')
-    return response.data
-  },
-
-  submitTask: async (data: RHTaskRequest): Promise<ApiResponse<RHTaskResponse>> => {
-    const response = await apiClient.post('/api/runninghub/tasks', data)
-    return response.data
-  },
-
-  getTaskStatus: async (taskId: string): Promise<ApiResponse<RHTaskResult>> => {
-    const response = await apiClient.get(`/api/runninghub/tasks/${taskId}`)
-    return response.data
-  },
-
-  cancelTask: async (taskId: string): Promise<ApiResponse<void>> => {
-    const response = await apiClient.delete(`/api/runninghub/tasks/${taskId}`)
-    return response.data
-  },
-
-  getTaskResult: async (taskId: string): Promise<ApiResponse<RHTaskResult>> => {
-    const response = await apiClient.get(`/api/runninghub/tasks/${taskId}/result`)
-    return response.data
-  },
-};

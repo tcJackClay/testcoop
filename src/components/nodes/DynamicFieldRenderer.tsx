@@ -1,5 +1,5 @@
 import React, { useRef, useCallback } from 'react';
-import type { RHNodeField } from '../../api/runningHub';
+import type { RHNodeField } from '../../api/runningHub/index';
 
 interface DynamicFieldRendererProps {
   field: RHNodeField;

@@ -86,9 +86,9 @@ export {
 // Episode Script
 export { 
   episodeScriptApi, 
-  type EpisodeScript, 
-  type CreateEpisodeScriptRequest, 
-  type UpdateEpisodeScriptRequest 
+  type Resource, 
+  type Episode,
+  type EpisodeScriptResponse
 } from './episodeScript'
 
 // Approval

@@ -23,32 +23,38 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [leftPanel, setLeftPanel] = useState<LeftPanelType>(null);
   const [rightPanel, setRightPanel] = useState<RightPanelType>(null);
-  const [isInitialMount, setIsInitialMount] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   const { addNode } = useCanvasStore();
   const { token } = useAuthStore();
   const { currentProject } = useProjectStore();
   const prevTokenRef = useRef(token);
 
-  // 初始跳转：只在首次挂载时检查
+  // 初始化后监听登录状态和项目选择状态，自动切换视图
   useEffect(() => {
-    if (isInitialMount) {
-      if (!token) {
-        setViewMode('login');
-      } else if (!currentProject) {
-        setViewMode('projects');
-      }
-      setIsInitialMount(false);
+    setIsInitialized(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    if (!token) {
+      // 未登录，跳转到登录页面
+      setViewMode('login');
+    } else if (!currentProject) {
+      // 已登录但未选择项目，停留在项目列表
+      setViewMode('projects');
     }
-  }, [isInitialMount, token, currentProject]);
+    // 已登录且已选择项目，可以进入其他视图
+  }, [token, currentProject, isInitialized]);
 
   // 登录成功后跳转到项目列表
   useEffect(() => {
-    if (!isInitialMount && !prevTokenRef.current && token && viewMode === 'login') {
+    if (!isInitialized && !prevTokenRef.current && token && viewMode === 'login') {
       setViewMode('projects');
     }
     prevTokenRef.current = token;
-  }, [token, viewMode, isInitialMount]);
+  }, [token, viewMode, isInitialized]);
 
   const handleViewChange = useCallback((mode: ViewMode) => {
     // 未登录只能访问登录页面

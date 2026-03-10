@@ -25,7 +25,7 @@ const getVariantDisplayName = (variantName: string, parentName: string): string 
 
 export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
   const { t } = useTranslation();
-  const { undo, redo, undoStack, redoStack, selectedNodeIds, deleteSelectedNodes } = useCanvasStore();
+  const { undo, redo, undoStack, redoStack, selectedNodeIds, deleteSelectedNodes, addNode, nodes } = useCanvasStore();
   const { assets, fetchAssets, selectedAssetId } = useAssetStore((state) => ({ 
     assets: state.assets, 
     fetchAssets: state.fetchAssets,
@@ -63,6 +63,33 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
     });
   }, [assetName, assets]);
 
+  // Calculate canvas center position for new node
+  const getCanvasCenterPosition = () => {
+    if (nodes.length === 0) {
+      return { x: 100, y: 100 };
+    }
+    const maxX = Math.max(...nodes.map(n => n.position.x + (n.width || 200)));
+    const maxY = Math.max(...nodes.map(n => n.position.y + (n.height || 100)));
+    return { x: maxX + 50, y: maxY };
+  };
+
+  // Handle variant button click - create asset node with variant info
+  const handleVariantClick = (variant: typeof assets[0]) => {
+    const position = getCanvasCenterPosition();
+    const variantImageUrl = variant.url || variant.resourceContent || '';
+    
+    addNode('createAsset', position, {
+      data: {
+        name: variant.name || variant.resourceName || assetName,
+        imageUrl: variantImageUrl,
+        assetType: variant.resourceType || selectedAsset?.resourceType || 'character_primary',
+        isVariant: true,
+        parentAssetId: selectedAssetId,
+      },
+    });
+    console.log('Created asset node from variant:', variant.name);
+  };
+
   return (
     <div className="h-10 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-2">
@@ -76,8 +103,9 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
                 {variants.map((variant) => (
                   <button
                     key={variant.id}
+                    onClick={() => handleVariantClick(variant)}
                     className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/40 transition-colors"
-                    title={`变体: ${variant.name}`}
+                    title={`点击创建资产节点: ${variant.name}`}
                   >
                     {getVariantDisplayName(variant.name || variant.resourceName || '', assetName)}
                   </button>

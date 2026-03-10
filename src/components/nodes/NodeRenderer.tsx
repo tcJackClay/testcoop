@@ -354,6 +354,8 @@ export default function NodeRenderer({
           </span>
         )}
       </div>
+
+      {/* Delete Button */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
         <GripVertical className="w-3 h-3 text-gray-500" />
         <span className="text-gray-400">{icon}</span>

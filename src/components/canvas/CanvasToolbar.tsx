@@ -8,6 +8,21 @@ interface CanvasToolbarProps {
   viewPort: { x: number; y: number; zoom: number };
 }
 
+// Extract variant display name by removing the parent asset name prefix
+// e.g., "九转印行 - 夜晚闭店状态" -> "夜晚闭店状态"
+const getVariantDisplayName = (variantName: string, parentName: string): string => {
+  if (!variantName || !parentName) return variantName || '';
+  
+  const separators = [' - ', ' — ', ' - ', ' _ ', '：', ':'];
+  for (const sep of separators) {
+    const fullPattern = `${parentName}${sep}`;
+    if (variantName.startsWith(fullPattern)) {
+      return variantName.slice(fullPattern.length);
+    }
+  }
+  return variantName;
+};
+
 export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
   const { t } = useTranslation();
   const { undo, redo, undoStack, redoStack, selectedNodeIds, deleteSelectedNodes } = useCanvasStore();
@@ -64,7 +79,7 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
                     className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/40 transition-colors"
                     title={`变体: ${variant.name}`}
                   >
-                    {variant.name}
+                    {getVariantDisplayName(variant.name || variant.resourceName || '', assetName)}
                   </button>
                 ))}
                 <span className="text-xs text-gray-500">)</span>

@@ -35,6 +35,7 @@ export default function Canvas() {
     selectNodesInBox, clearSelection, copyNodes, pasteNodes, addConnection, deleteConnection
   } = useCanvasStore();
 
+  // 滚轮缩放
   const handleWheelNative = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -48,7 +49,8 @@ export default function Canvas() {
     element.addEventListener('wheel', handleWheelNative, { passive: false });
     return () => element.removeEventListener('wheel', handleWheelNative);
   }, [handleWheelNative]);
-  
+
+  // 缩放控制
   const handleZoomIn = useCallback(() => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) }), [viewPort.zoom, updateViewPort]);
   const handleZoomOut = useCallback(() => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) }), [viewPort.zoom, updateViewPort]);
   const handleFitView = useCallback(() => updateViewPort({ x: 0, y: 0, zoom: 1 }), [updateViewPort]);
@@ -59,6 +61,7 @@ export default function Canvas() {
     updateViewPort({ zoom: newZoom });
   }, [viewPort.zoom, updateViewPort]);
 
+  // 右键菜单
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (containerRef.current) {
@@ -87,21 +90,26 @@ export default function Canvas() {
     closeContextMenu();
   }, [addNode, contextMenu.worldX, contextMenu.worldY, closeContextMenu]);
 
-  // 处理连线
+  // 处理连线 - 点击连接点开始/结束连接
   const handleStartConnect = useCallback((nodeId: string, handle: 'source' | 'target') => {
     if (handle === 'source') {
-      setConnectingSource(nodeId);
+      if (nodeId === '') {
+        // 空字符串表示取消连接
+        setConnectingSource(null);
+      } else {
+        setConnectingSource(nodeId);
+      }
     }
   }, []);
 
   const handleEndConnect = useCallback((nodeId: string, handle: 'source' | 'target') => {
-    // 如果是从目标节点结束连接，建立从源到目标的连接
     if (handle === 'target' && connectingSource) {
       // 不能自己连接自己
       if (connectingSource !== nodeId) {
         addConnection(connectingSource, nodeId);
       }
     }
+    // 无论连接成功与否，都清除连线状态
     setConnectingSource(null);
   }, [connectingSource, addConnection]);
 
@@ -112,6 +120,7 @@ export default function Canvas() {
     }
   }, [connectingSource]);
 
+  // 鼠标按下
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // 如果正在连线，点击空白处取消
     if (connectingSource) {
@@ -141,6 +150,7 @@ export default function Canvas() {
     }
   }, [viewPort.x, viewPort.y, clearSelection, connectingSource]);
 
+  // 鼠标移动
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     const x = e.clientX - (rect?.left || 0);
@@ -157,6 +167,7 @@ export default function Canvas() {
     }
   }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort]);
 
+  // 鼠标松开
   const handleMouseUp = useCallback(() => {
     if (isSelecting && selectionBox && selectionBox.width > 5 && selectionBox.height > 5) {
       selectNodesInBox(selectionBox);
@@ -166,6 +177,7 @@ export default function Canvas() {
     setSelectionBox(null);
   }, [isSelecting, selectionBox, selectNodesInBox]);
   
+  // 拖放
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     
@@ -203,6 +215,7 @@ export default function Canvas() {
     e.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // 键盘事件
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }

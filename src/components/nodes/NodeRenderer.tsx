@@ -12,13 +12,12 @@ import StoryboardNode from './StoryboardNode';
 
 interface NodeRendererProps {
   node: CanvasNode;
-  // 连线相关 props
   connectingSource?: string | null;
-  connectingTarget?: string | null;
   onStartConnect?: (nodeId: string, handle: 'source' | 'target') => void;
   onEndConnect?: (nodeId: string, handle: 'source' | 'target') => void;
 }
 
+// 更新节点数据的辅助函数
 function updateNodeData(id: string, key: string, value: unknown) {
   const node = useCanvasStore.getState().nodes.find((n) => n.id === id);
   if (node) {
@@ -28,6 +27,7 @@ function updateNodeData(id: string, key: string, value: unknown) {
   }
 }
 
+// 根据节点类型渲染不同的内容
 function renderNodeBody(node: CanvasNode) {
   const updateData = (key: string, value: unknown) => updateNodeData(node.id, key, value);
 
@@ -125,8 +125,7 @@ function renderNodeBody(node: CanvasNode) {
 
 export default function NodeRenderer({ 
   node, 
-  connectingSource, 
-  connectingTarget,
+  connectingSource,
   onStartConnect,
   onEndConnect 
 }: NodeRendererProps) {
@@ -136,16 +135,16 @@ export default function NodeRenderer({
   const containerRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedNodeIds.includes(node.id);
 
-  // Check if this node is connected
+  // 检查节点连接状态
   const connections = useCanvasStore((state) => state.connections);
   const hasInputConnection = connections.some((c) => c.targetId === node.id);
   const hasOutputConnection = connections.some((c) => c.sourceId === node.id);
+  const isConnectingSource = connectingSource === node.id;
 
+  // 节点拖拽处理
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      // 如果正在连线，不处理节点的拖拽
-      if (connectingSource || connectingTarget) return;
-      
+      if (connectingSource) return;
       if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') {
         return;
       }
@@ -166,7 +165,7 @@ export default function NodeRenderer({
 
       selectNode(node.id, e.shiftKey);
     },
-    [node.position, node.id, selectNode, viewPort, connectingSource, connectingTarget]
+    [node.position, node.id, selectNode, viewPort, connectingSource]
   );
 
   const handleMouseMove = useCallback(
@@ -201,29 +200,48 @@ export default function NodeRenderer({
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // Handle connect point mouse events
-  const handleSourceMouseDown = useCallback((e: React.MouseEvent) => {
+  // 连接点点击处理
+  const handleSourceClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    onStartConnect?.(node.id, 'source');
-  }, [node.id, onStartConnect]);
+    if (isConnectingSource) {
+      onStartConnect?.('', 'source');
+    } else {
+      onStartConnect?.(node.id, 'source');
+    }
+  }, [node.id, isConnectingSource, onStartConnect]);
 
-  const handleTargetMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleTargetClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    onEndConnect?.(node.id, 'target');
-  }, [node.id, onEndConnect]);
+    if (connectingSource && connectingSource !== node.id) {
+      onEndConnect?.(node.id, 'target');
+    }
+  }, [node.id, connectingSource, onEndConnect]);
 
   const icon = nodeIcons[node.type];
   const label = (node.data.label as string) || node.type;
   const colorClass = nodeColors[node.type] || 'border-gray-500 bg-gray-500/10';
+
+  // 连接点样式
+  const sourceHandleClass = isConnectingSource
+    ? 'bg-green-400 border-green-300 scale-125 animate-pulse'
+    : hasOutputConnection
+    ? 'bg-green-500 border-green-400'
+    : 'bg-gray-600 border-gray-400 hover:bg-green-500 hover:border-green-400';
+    
+  const targetHandleClass = connectingSource && connectingSource !== node.id
+    ? 'bg-blue-400 border-blue-300 scale-125 animate-pulse'
+    : hasInputConnection
+    ? 'bg-blue-500 border-blue-400'
+    : 'bg-gray-600 border-gray-400 hover:bg-blue-500 hover:border-blue-400';
 
   return (
     <div
       ref={containerRef}
       className={`node absolute min-w-[180px] cursor-move select-none rounded-lg border-2 group ${colorClass} ${
         isSelected ? 'ring-2 ring-white/50' : ''
-      }`}
+      } ${isConnectingSource ? 'ring-2 ring-green-400/50' : ''}`}
       style={{
         left: node.position.x,
         top: node.position.y,
@@ -272,28 +290,24 @@ export default function NodeRenderer({
 
       {/* Source Handle (Left) - Output */}
       <div
-        className={`absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 cursor-crosshair transition-all ${
-          connectingSource === node.id
-            ? 'bg-blue-400 border-blue-300 scale-125'
-            : hasOutputConnection
-            ? 'bg-green-500 border-green-400'
-            : 'bg-gray-600 border-gray-400 hover:bg-blue-500 hover:border-blue-400'
-        }`}
-        onMouseDown={handleSourceMouseDown}
-        title="拖拽连接输出"
+        className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-12 cursor-pointer"
+        onClick={handleSourceClick}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+      <div
+        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${sourceHandleClass}`}
+        title={isConnectingSource ? "点击取消连接" : "点击选择输出节点"}
       />
 
       {/* Target Handle (Right) - Input */}
       <div
-        className={`absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 cursor-crosshair transition-all ${
-          connectingTarget === node.id
-            ? 'bg-blue-400 border-blue-300 scale-125'
-            : hasInputConnection
-            ? 'bg-blue-500 border-blue-400'
-            : 'bg-gray-600 border-gray-400 hover:bg-blue-500 hover:border-blue-400'
-        }`}
-        onMouseDown={handleTargetMouseDown}
-        title="拖拽连接输入"
+        className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-12 cursor-pointer"
+        onClick={handleTargetClick}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+      <div
+        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${targetHandleClass}`}
+        title={connectingSource && connectingSource !== node.id ? "点击连接" : (hasInputConnection ? "已连接" : "点击选择输入节点")}
       />
     </div>
   );

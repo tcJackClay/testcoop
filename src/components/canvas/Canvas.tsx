@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Grid3X3, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Grid3X3, ZoomIn, ZoomOut, Maximize2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCanvasStore, type NodeType } from '../../stores/canvasStore';
 import NodeRenderer from '../nodes/NodeRenderer';
@@ -28,6 +28,8 @@ export default function Canvas() {
   
   // 连线状态
   const [connectingSource, setConnectingSource] = useState<string | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
   
   const { 
     nodes, connections, viewPort, addNode, updateViewPort,
@@ -113,6 +115,11 @@ export default function Canvas() {
     setConnectingSource(null);
   }, [connectingSource, addConnection]);
 
+  // 删除连接
+  const handleDeleteConnection = useCallback((connectionId: string) => {
+    deleteConnection(connectionId);
+  }, [deleteConnection]);
+
   // 点击空白处取消连线
   const handleCanvasClick = useCallback(() => {
     if (connectingSource) {
@@ -156,6 +163,13 @@ export default function Canvas() {
     const x = e.clientX - (rect?.left || 0);
     const y = e.clientY - (rect?.top || 0);
 
+    // 连线时更新鼠标位置用于预览
+    if (connectingSource) {
+      const worldX = (x - viewPort.x) / viewPort.zoom;
+      const worldY = (y - viewPort.y) / viewPort.zoom;
+      setMousePos({ x: worldX, y: worldY });
+    }
+
     if (isPanning) {
       updateViewPort({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
     } else if (isSelecting) {
@@ -165,7 +179,9 @@ export default function Canvas() {
       const height = Math.abs(y - selectionStart.y);
       setSelectionBox({ x: selX, y: selY, width, height });
     }
-  }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort]);
+  }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort, connectingSource, viewPort]);
+
+
 
   // 鼠标松开
   const handleMouseUp = useCallback(() => {
@@ -269,19 +285,38 @@ export default function Canvas() {
         >
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             {connections.map((conn) => (
-              <ConnectionLine key={conn.id} connection={conn} nodes={nodes} />
+              <ConnectionLine 
+                key={conn.id} 
+                connection={conn} 
+                nodes={nodes}
+                selectedNodeId={selectedNodeIds[0]}
+                onDeleteConnection={handleDeleteConnection}
+              />
             ))}
+            {/* 连线预览 - 拖拽时的虚线 */}
+            {connectingSource && (() => {
+              const sourceNode = nodes.find(n => n.id === connectingSource);
+              if (!sourceNode) return null;
+              const startX = sourceNode.position.x + 180;
+              const startY = sourceNode.position.y + 40;
+              const path = `M ${startX} ${startY} C ${startX + 100} ${startY}, ${mousePos.x - 100} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`;
+              return <path d={path} stroke="#60a5fa" strokeWidth="2" fill="none" strokeDasharray="4,4" />;
+            })()}
           </svg>
+
           {nodes.map((node) => (
             <NodeRenderer 
               key={node.id} 
               node={node} 
               connectingSource={connectingSource}
+              mousePos={mousePos}
               onStartConnect={handleStartConnect}
               onEndConnect={handleEndConnect}
+              onDeleteConnection={handleDeleteConnection}
             />
           ))}
         </div>
+
 
         {selectionBox && (
           <div

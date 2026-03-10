@@ -13,9 +13,14 @@ import StoryboardNode from './StoryboardNode';
 interface NodeRendererProps {
   node: CanvasNode;
   connectingSource?: string | null;
+  connectingTarget?: string | null;
+  mousePos?: { x: number; y: number };
   onStartConnect?: (nodeId: string, handle: 'source' | 'target') => void;
   onEndConnect?: (nodeId: string, handle: 'source' | 'target') => void;
+  onMouseMove?: (worldPos: { x: number; y: number }) => void;
+  onDeleteConnection?: (connectionId: string) => void;
 }
+
 
 // 更新节点数据的辅助函数
 function updateNodeData(id: string, key: string, value: unknown) {
@@ -219,11 +224,55 @@ export default function NodeRenderer({
     }
   }, [node.id, connectingSource, onEndConnect]);
 
+  // 拖拽式连接 - 输出连接点
+  const handleSourceMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onStartConnect?.(node.id, 'source');
+  }, [node.id, onStartConnect]);
+
+  // 拖拽式连接 - 输入连接点
+  const handleTargetMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (connectingSource && connectingSource !== node.id) {
+      onEndConnect?.(node.id, 'target');
+    }
+  }, [node.id, connectingSource, onEndConnect]);
+
   const icon = nodeIcons[node.type];
   const label = (node.data.label as string) || node.type;
   const colorClass = nodeColors[node.type] || 'border-gray-500 bg-gray-500/10';
 
-  // 连接点样式
+  // 连接点样式 - TapNow-Studio 风格
+  const sourceHandleStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    right: '-0.45rem',
+    width: '0.9rem',
+    height: '0.9rem',
+    backgroundColor: connectingSource === node.id ? '#d4d4d8' : '#27272a',
+    border: '1px solid #71717a',
+    borderRadius: '50%',
+    cursor: 'crosshair',
+    zIndex: 30,
+    opacity: connectingSource === node.id ? 1 : 0.5,
+    pointerEvents: 'auto',
+    transform: 'translateY(-50%)',
+  };
+
+  const targetHandleStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    left: '-0.25rem',
+    width: '0.5rem',
+    height: '0.5rem',
+    backgroundColor: hasInputConnection ? '#60a5fa' : '#52525b',
+    borderRadius: '50%',
+    zIndex: 20,
+    pointerEvents: 'auto',
+    transform: 'translateY(-50%)',
+  };
   const sourceHandleClass = isConnectingSource
     ? 'bg-green-400 border-green-300 scale-125 animate-pulse'
     : hasOutputConnection
@@ -298,8 +347,8 @@ export default function NodeRenderer({
         className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${sourceHandleClass}`}
         title={isConnectingSource ? "点击取消连接" : "点击选择输出节点"}
       />
-
       {/* Target Handle (Right) - Input */}
+
       <div
         className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-12 cursor-pointer"
         onClick={handleTargetClick}

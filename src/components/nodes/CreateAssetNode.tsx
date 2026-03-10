@@ -176,6 +176,7 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
         {/* 左侧：名称 + 类型/变体/父资产 */}
         <div className="flex-1 space-y-1">
           {/* 资产类型选择 - 仅在非变体时显示 */}
+          {/* 资产类型选择 - 仅在非变体时显示 */}
           {/* Name Input */}
           <input
             type="text"

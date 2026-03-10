@@ -57,6 +57,48 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
     
     const loadEpisodes = async () => {
       setLoadingEpisodes(true);
+      setLocalEpisodes([]);
+      try {
+        const response = await episodeScriptApi.getList(currentProjectId);
+        
+        // 处理响应格式
+        let scriptList: any[] = [];
+        if (Array.isArray(response.data)) {
+          scriptList = response.data;
+        } else if (response.data?.code === 0 && Array.isArray(response.data?.data)) {
+          scriptList = response.data.data;
+        }
+        
+        // 从 resourceContent 解析 episodes
+        if (scriptList.length > 0) {
+          const firstScript = scriptList[0];
+          if (firstScript.resourceContent) {
+            try {
+              const content = JSON.parse(firstScript.resourceContent);
+              if (content.episodes && Array.isArray(content.episodes)) {
+                const sorted = [...content.episodes].sort((a, b) => a.episodeNumber - b.episodeNumber);
+                setLocalEpisodes(sorted);
+                updateData('episodes', sorted);
+              }
+            } catch (e) {
+              console.error('解析分集内容失败:', e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('加载分集失败:', error);
+      } finally {
+        setLoadingEpisodes(false);
+      }
+    };
+    
+    loadEpisodes();
+  }, [currentProjectId, updateData]);
+  useEffect(() => {
+    if (!currentProjectId) return;
+    
+    const loadEpisodes = async () => {
+      setLoadingEpisodes(true);
       setLocalEpisodes([]); // 清空旧数据
       try {
         const response = await episodeScriptApi.getAll(undefined, currentProjectId);

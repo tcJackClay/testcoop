@@ -2,20 +2,21 @@
 import type { NodeType, CanvasNode } from './canvasTypes';
 
 export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
-  textNode: { type: 'textNode', data: { label: 'Text', content: '' } },
-  novelInput: { type: 'novelInput', data: { label: 'Novel Input', content: '' } },
-  characterDescription: { type: 'characterDescription', data: { label: 'Character Description' } },
-  sceneDescription: { type: 'sceneDescription', data: { label: 'Scene Description' } },
-  generateCharacterVideo: { type: 'generateCharacterVideo', data: { label: 'Generate Character Video', prompt: '' } },
-  generateSceneVideo: { type: 'generateSceneVideo', data: { label: 'Generate Scene Video', prompt: '' } },
-  createCharacter: { type: 'createCharacter', data: { label: 'Create Character' } },
-  createScene: { type: 'createScene', data: { label: 'Create Scene' } },
-  videoAnalyze: { type: 'videoAnalyze', data: { label: 'Video Analyze' } },
-  storyboardNode: { type: 'storyboardNode', data: { label: 'Storyboard', shots: [] } },
-  aiVideo: { type: 'aiVideo', data: { label: 'AI Video', prompt: '', modelId: '' } },
-  imageCompare: { type: 'imageCompare', data: { label: 'Image Compare', imageA: '', imageB: '' } },
+  textNode: { type: 'textNode', width: 200, height: 80, data: { label: 'Text', content: '' } },
+  novelInput: { type: 'novelInput', width: 200, height: 120, data: { label: 'Novel Input', content: '' } },
+  characterDescription: { type: 'characterDescription', width: 200, height: 100, data: { label: 'Character Description' } },
+  sceneDescription: { type: 'sceneDescription', width: 200, height: 100, data: { label: 'Scene Description' } },
+  generateCharacterVideo: { type: 'generateCharacterVideo', width: 200, height: 120, data: { label: 'Generate Character Video', prompt: '' } },
+  generateSceneVideo: { type: 'generateSceneVideo', width: 200, height: 120, data: { label: 'Generate Scene Video', prompt: '' } },
+  createCharacter: { type: 'createCharacter', width: 200, height: 100, data: { label: 'Create Character' } },
+  createScene: { type: 'createScene', width: 200, height: 100, data: { label: 'Create Scene' } },
+  videoAnalyze: { type: 'videoAnalyze', width: 200, height: 100, data: { label: 'Video Analyze' } },
+  storyboardNode: { type: 'storyboardNode', width: 300, height: 200, data: { label: 'Storyboard', shots: [] } },
+  aiVideo: { type: 'aiVideo', width: 200, height: 120, data: { label: 'AI Video', prompt: '', modelId: '' } },
+  imageCompare: { type: 'imageCompare', width: 200, height: 120, data: { label: 'Image Compare', imageA: '', imageB: '' } },
   imageNode: { 
     type: 'imageNode', 
+    width: 200, height: 120,
     data: { 
       label: 'Image', 
       imageUrl: '',
@@ -27,6 +28,7 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
   },
   videoNode: { 
     type: 'videoNode', 
+    width: 200, height: 140,
     data: { 
       label: 'Video', 
       videoUrl: '',
@@ -36,6 +38,7 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
   },
   createAsset: {
     type: 'createAsset',
+    width: 200, height: 160,
     data: {
       label: 'Create Asset',
       name: '',
@@ -47,12 +50,12 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
       status: 'idle'
     }
   },
-  aiImage: { type: 'aiImage', data: { label: 'AI Image', prompt: '', modelId: '' } },
-  generateCharacterImage: { type: 'generateCharacterImage', data: { label: 'Generate Character Image', prompt: '' } },
-  generateSceneImage: { type: 'generateSceneImage', data: { label: 'Generate Scene Image', prompt: '' } },
-  saveLocal: { type: 'saveLocal', data: { label: 'Save Local' } },
-  promptNode: { type: 'promptNode', data: { label: 'Prompt' } },
-  runninghub: { type: 'runninghub', data: { label: 'RunningHub' } },
+  aiImage: { type: 'aiImage', width: 200, height: 120, data: { label: 'AI Image', prompt: '', modelId: '' } },
+  generateCharacterImage: { type: 'generateCharacterImage', width: 200, height: 120, data: { label: 'Generate Character Image', prompt: '' } },
+  generateSceneImage: { type: 'generateSceneImage', width: 200, height: 120, data: { label: 'Generate Scene Image', prompt: '' } },
+  saveLocal: { type: 'saveLocal', width: 180, height: 80, data: { label: 'Save Local' } },
+  promptNode: { type: 'promptNode', width: 200, height: 100, data: { label: 'Prompt' } },
+  runninghub: { type: 'runninghub', width: 200, height: 120, data: { label: 'RunningHub' } },
 };
 
 let nodeIdCounter = 0;

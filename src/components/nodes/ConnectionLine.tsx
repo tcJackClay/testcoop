@@ -28,13 +28,13 @@ export default function ConnectionLine({
   // 设置透明度：选中节点相关为100%，其他为35%
   const opacity = isRelatedToSelected ? 1 : 0.35;
 
-  // Calculate positions - 考虑连接点偏移
-  // Source 在右侧 (position.x + 180 - 6)，Target 在左侧 (position.x + 6)
-  const sourceX = sourceNode.position.x + 180 - 6;
-  const sourceY = sourceNode.position.y + 40;
+  // Calculate positions 
+  const sourceX = sourceNode.position.x + (sourceNode.width || 200) - 6;
+  const sourceY = sourceNode.position.y + (sourceNode.height || 80) / 2;
   const targetX = targetNode.position.x + 6;
-  const targetY = targetNode.position.y + 40;
-  
+  const targetY = targetNode.position.y + (targetNode.height || 80) / 2;
+
+
   // Bezier curve control points
   const dist = Math.abs(targetX - sourceX);
   const cp1X = sourceX + dist * 0.5;

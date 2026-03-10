@@ -288,7 +288,10 @@ export default function NodeRenderer({
       style={{
         left: node.position.x,
         top: node.position.y,
+        width: node.width || 200,
+        height: node.height || 80,
       }}
+
       onMouseDown={handleMouseDown}
     >
       {/* Header */}

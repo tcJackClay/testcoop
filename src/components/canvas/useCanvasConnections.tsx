@@ -160,8 +160,8 @@ export function useCanvasConnections({
           if (!sourceNode) return null;
           
           // Source 在节点右侧 - 考虑连接点偏移 (-6px)
-          const startX = sourceNode.position.x + 180 - 6;
-          const startY = sourceNode.position.y + 40;
+          const startX = sourceNode.position.x + (sourceNode.width || 200) - 6;
+          const startY = sourceNode.position.y + (sourceNode.height || 80) / 2;
           
           const path = `M ${startX} ${startY} C ${startX + 100} ${startY}, ${mousePos.x - 100} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`;
           
@@ -183,7 +183,7 @@ export function useCanvasConnections({
           
           // Target 在节点左侧 - 考虑连接点偏移 (+6px)
           const startX = targetNode.position.x + 6;
-          const startY = targetNode.position.y + 40;
+          const startY = targetNode.position.y + (targetNode.height || 80) / 2;
           
           // 反向曲线
           const path = `M ${startX} ${startY} C ${startX - 100} ${startY}, ${mousePos.x + 100} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`;

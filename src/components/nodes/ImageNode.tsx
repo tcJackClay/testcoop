@@ -51,9 +51,9 @@ export default function ImageNode({ nodeId, data, updateData }: ImageNodeProps) 
   };
 
   return (
-    <div className="space-y-2 min-w-[240px]">
+    <div className="space-y-2 min-w-[240px] max-w-full overflow-hidden">
       {/* Image Upload/Preview */}
-      <div className="px-2">
+      <div className="px-2 max-w-full">
         <input
           type="file"
           accept="image/*"
@@ -65,9 +65,13 @@ export default function ImageNode({ nodeId, data, updateData }: ImageNodeProps) 
           <label
             htmlFor={`image-upload-${nodeId}`}
             className="relative rounded-lg overflow-hidden bg-gray-700 cursor-pointer hover:opacity-90"
-            style={{ aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '16/9' }}
+            style={{ 
+              aspectRatio: imageDimensions ? `${imageDimensions.width}/${imageDimensions.height}` : '16/9',
+              maxHeight: '140px',
+              maxWidth: '100%',
+            }}
           >
-            <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" onLoad={handleImageLoad} />
+            <img src={imageUrl} alt="Preview" className="w-full h-full max-w-full max-h-full object-contain" onLoad={handleImageLoad} />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
               <Upload className="w-6 h-6 text-white" />
             </div>

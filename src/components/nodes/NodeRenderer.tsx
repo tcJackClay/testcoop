@@ -166,14 +166,13 @@ export default function NodeRenderer({
       const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
       if (canvasContainer) {
         const rect = canvasContainer.getBoundingClientRect();
-        const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-        const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+        const mouseX = (e.clientX - rect.left) / viewPort.zoom;
+        const mouseY = (e.clientY - rect.top) / viewPort.zoom;
         dragOffset.current = {
           x: mouseX - node.position.x,
           y: mouseY - node.position.y,
         };
       }
-
       selectNode(node.id, e.shiftKey);
     },
     [node.position, node.id, selectNode, viewPort, connectingSource]
@@ -182,12 +181,11 @@ export default function NodeRenderer({
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!isDragging) return;
-
       const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
       if (canvasContainer) {
         const rect = canvasContainer.getBoundingClientRect();
-        const mouseX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-        const mouseY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+        const mouseX = (e.clientX - rect.left) / viewPort.zoom;
+        const mouseY = (e.clientY - rect.top) / viewPort.zoom;
         const newX = mouseX - dragOffset.current.x;
         const newY = mouseY - dragOffset.current.y;
         moveNode(node.id, { x: newX, y: newY });
@@ -282,14 +280,12 @@ export default function NodeRenderer({
   return (
     <div
       ref={containerRef}
-      className={`node absolute min-w-[180px] cursor-move select-none rounded-lg border-2 group ${colorClass} ${
+      className={`node absolute min-w-[180px] max-w-[300px] cursor-move select-none rounded-lg border-2 group overflow-hidden ${colorClass} ${
         isSelected ? 'ring-2 ring-white/50' : ''
       } ${isConnectingSource ? 'ring-2 ring-green-400/50' : ''}`}
       style={{
         left: node.position.x,
         top: node.position.y,
-        width: node.width || 200,
-        height: node.height || 80,
       }}
 
       onMouseDown={handleMouseDown}

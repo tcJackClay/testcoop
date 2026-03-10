@@ -1,10 +1,12 @@
 // CreateAssetNode - 创建资产节点组件
-import { Upload, Sparkles } from 'lucide-react';
+import { Sparkles, ArrowDown } from 'lucide-react';
 import { useAssetStore } from '../../stores/assetStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { useCanvasStore } from '../../stores/canvasStore';
 import { imageApi } from '../../api/image';
 import { vectorApi } from '../../api/vector';
 import { assetTypeOptions } from './nodeConstants';
+import { useMemo } from 'react';
 
 interface CreateAssetNodeProps {
   nodeId: string;
@@ -15,8 +17,6 @@ interface CreateAssetNodeProps {
     parentAssetId?: number | null;
     description?: string;
     status?: string;
-    imageUrl?: string;
-    uploadedFile?: File | null;
   };
   updateData: (key: string, value: unknown) => void;
 }
@@ -28,45 +28,55 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
   const parentAssetId = data.parentAssetId as number | null;
   const description = data.description as string || '';
   const status = data.status as string || 'idle';
-  const uploadedFile = data.uploadedFile as File | null;
-  const imageUrl = data.imageUrl as string || '';
 
   // 从资产库获取主要资产作为父资产选项
   const allAssets = useAssetStore.getState().assets;
-  const primaryAssets = allAssets
-    .filter((a) => {
-      const ext1 = a.ext1
-        ? a.ext1.startsWith('{')
-          ? (() => {
-              try {
-                return JSON.parse(a.ext1);
-              } catch {
-                return {};
-              }
-            })()
-          : {}
-        : {};
-      return (
-        !ext1.parent &&
-        (a.resourceType?.includes('primary') || !a.resourceType?.includes('secondary'))
-      );
-    })
-    .map((a) => ({ id: a.id!, name: a.name || a.resourceName }));
+  const primaryAssets = useMemo(() => {
+    return allAssets
+      .filter((a) => {
+        const ext1 = a.ext1
+          ? a.ext1.startsWith('{')
+            ? (() => {
+                try {
+                  return JSON.parse(a.ext1);
+                } catch {
+                  return {};
+                }
+              })()
+            : {}
+          : {};
+        return (
+          !ext1.parent &&
+          (a.resourceType?.includes('primary') || !a.resourceType?.includes('secondary'))
+        );
+      })
+      .map((a) => ({ id: a.id!, name: a.name || a.resourceName }));
+  }, [allAssets]);
+
+  // 获取输入的图片节点
+  const { connections, nodes } = useCanvasStore();
+  const inputImageNode = useMemo(() => {
+    // 查找所有连接到当前节点的连线
+    const inputConnections = connections.filter((conn) => conn.targetId === nodeId);
+    if (inputConnections.length === 0) return null;
+    
+    // 获取第一个输入节点的ID
+    const sourceId = inputConnections[0].sourceId;
+    const sourceNode = nodes.find((n) => n.id === sourceId);
+    
+    // 只接受 imageNode 类型的输入
+    if (!sourceNode || sourceNode.type !== 'imageNode') return null;
+    
+    return sourceNode;
+  }, [connections, nodes, nodeId]);
+
+  // 获取输入节点的图片URL
+  const inputImageUrl = inputImageNode?.data?.imageUrl as string || '';
 
   const handleVariantChange = (checked: boolean) => {
     updateData('isVariant', checked);
     if (!checked) {
       updateData('parentAssetId', null);
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
-    const file = e.target.files?.[0];
-    if (file) {
-      const objectUrl = URL.createObjectURL(file);
-      updateData('imageUrl', objectUrl);
-      updateData('uploadedFile', file);
     }
   };
 
@@ -78,8 +88,8 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
       alert('请输入资产名称');
       return;
     }
-    if (!imageUrl) {
-      alert('请先上传或生成图片');
+    if (!inputImageUrl) {
+      alert('请先从图片节点输入图片');
       return;
     }
 
@@ -107,31 +117,13 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
         parent: parentAssetName,
       };
 
-      // Upload image to vector image bed
-      let uploadedUrl = imageUrl;
+      // Get image URL from input node
+      let uploadedUrl = inputImageUrl;
 
-      // If we have a directly uploaded file, upload it
-      if (uploadedFile) {
+      // If the image is a local blob/base64, upload it
+      if (inputImageUrl.startsWith('data:') || inputImageUrl.startsWith('blob:')) {
         try {
-          const uploadResult = await vectorApi.uploadImageFile(uploadedFile);
-          if (uploadResult.code === 0 && uploadResult.data) {
-            uploadedUrl = uploadResult.data.imageUrl;
-          } else {
-            console.error('图片上传失败:', uploadResult);
-            alert('图片上传失败');
-            updateData('status', 'idle');
-            return;
-          }
-        } catch (uploadError) {
-          console.error('图片上传错误:', uploadError);
-          alert('图片上传失败');
-          updateData('status', 'idle');
-          return;
-        }
-      } else if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
-        // Convert base64/blob to file and upload
-        try {
-          const response = await fetch(imageUrl);
+          const response = await fetch(inputImageUrl);
           const blob = await response.blob();
           const file = new File([blob], `${name}.png`, { type: 'image/png' });
           const uploadResult = await vectorApi.uploadImageFile(file);
@@ -240,28 +232,21 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
         </select>
       )}
 
-      {/* Image Upload / Preview Area */}
+      {/* Image Input Preview - 从图片节点输入 */}
       <div
         className="w-full h-24 bg-gray-700 border border-gray-600 rounded flex items-center justify-center overflow-hidden cursor-pointer hover:bg-gray-600"
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          id={`asset-upload-${nodeId}`}
-          onChange={handleImageUpload}
-        />
-        {imageUrl ? (
-          <label htmlFor={`asset-upload-${nodeId}`} className="w-full h-full cursor-pointer">
-            <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
-          </label>
+        {inputImageUrl ? (
+          <div className="w-full h-full">
+            <img src={inputImageUrl} alt="Preview" className="w-full h-full object-contain" />
+          </div>
         ) : (
-          <label htmlFor={`asset-upload-${nodeId}`} className="text-center cursor-pointer">
-            <Upload className="w-6 h-6 text-gray-500 mx-auto" />
-            <span className="text-[10px] text-gray-500">点击上传图片</span>
-          </label>
+          <div className="text-center text-gray-500">
+            <ArrowDown className="w-6 h-6 mx-auto mb-1" />
+            <span className="text-[10px]">从图片节点输入</span>
+          </div>
         )}
       </div>
 

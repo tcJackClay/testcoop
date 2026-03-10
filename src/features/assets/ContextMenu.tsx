@@ -1,11 +1,11 @@
-import { Trash2, Download, Plus, Eye } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Download, Eye } from 'lucide-react';
 import type { Image as AssetImage } from '../../api/image';
 
 interface ContextMenuProps {
   asset: AssetImage;
   position: { x: number; y: number };
   onClose: () => void;
-  onAddToCanvas: (asset: AssetImage) => void;
   onDelete: (asset: AssetImage) => void;
   onViewDetails?: (asset: AssetImage) => void;
 }
@@ -14,12 +14,10 @@ export default function ContextMenu({
   asset, 
   position, 
   onClose, 
-  onAddToCanvas, 
   onDelete,
   onViewDetails 
 }: ContextMenuProps) {
   const [showConfirm, setShowConfirm] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handle click outside to close menu
   const handleOverlayClick = () => {
@@ -38,11 +36,6 @@ export default function ContextMenu({
 
   const handleCancelDelete = () => {
     setShowConfirm(false);
-  };
-
-  const handleAddToCanvas = () => {
-    onAddToCanvas(asset);
-    onClose();
   };
 
   const handleViewDetails = () => {
@@ -85,14 +78,6 @@ export default function ContextMenu({
         style={menuStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={handleAddToCanvas}
-          className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center gap-2"
-        >
-          <Plus size={14} />
-          添加到画布
-        </button>
-        
         <button
           onClick={handleViewDetails}
           className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center gap-2"

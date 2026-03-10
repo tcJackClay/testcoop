@@ -10,27 +10,28 @@ interface CanvasToolbarProps {
 
 export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
   const { t } = useTranslation();
-  const { undo, redo, undoStack, redoStack, selectedNodeIds, deleteSelectedNodes, nodes, updateNode } = useCanvasStore();
-  const { assets, fetchAssets } = useAssetStore((state) => ({ assets: state.assets, fetchAssets: state.fetchAssets }));
+  const { undo, redo, undoStack, redoStack, selectedNodeIds, deleteSelectedNodes } = useCanvasStore();
+  const { assets, fetchAssets, selectedAssetId } = useAssetStore((state) => ({ 
+    assets: state.assets, 
+    fetchAssets: state.fetchAssets,
+    selectedAssetId: state.selectedAssetId 
+  }));
 
   // Ensure assets are loaded when toolbar mounts
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
 
-  // Get selected node info
-  const selectedNode = useMemo(() => {
-    if (selectedNodeIds.length !== 1) return null;
-    return nodes.find((node) => node.id === selectedNodeIds[0]) || null;
-  }, [selectedNodeIds, nodes]);
+  // Get selected asset from assetStore
+  const selectedAsset = useMemo(() => {
+    if (!selectedAssetId) return null;
+    return assets.find((asset) => asset.id === selectedAssetId) || null;
+  }, [selectedAssetId, assets]);
 
-  // Check if selected node is a CreateAssetNode
-  const isAssetNode = selectedNode?.type === 'createAsset';
-  
-  // Get asset name from selected node
-  const assetName = isAssetNode ? (selectedNode.data.name as string || '') : '';
-  
-  // Get variants for this asset
+  // Get asset name
+  const assetName = selectedAsset?.name || selectedAsset?.resourceName || '';
+
+  // Get variants for this asset (assets with same parent)
   const variants = useMemo(() => {
     if (!assetName) return [];
     return assets.filter((asset) => {
@@ -47,23 +48,11 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
     });
   }, [assetName, assets]);
 
-  // Handle variant button click - update the node's image to show the variant
-  const handleVariantClick = (variant: typeof assets[0]) => {
-    if (!selectedNode) return;
-    
-    const variantImageUrl = variant.resourceContent || variant.url;
-    if (variantImageUrl) {
-      // Update the selected node with the variant's image
-      updateNode(selectedNode.id, { data: { ...selectedNode.data, imageUrl: variantImageUrl } });
-      console.log('切换到变体:', variant.name);
-    }
-  };
-
   return (
     <div className="h-10 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-2">
         {/* Selected Asset Info */}
-        {isAssetNode && assetName ? (
+        {selectedAsset ? (
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-300 font-medium">{assetName}</span>
             {variants.length > 0 && (
@@ -72,9 +61,8 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
                 {variants.map((variant) => (
                   <button
                     key={variant.id}
-                    onClick={() => handleVariantClick(variant)}
                     className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/40 transition-colors"
-                    title={`点击切换到变体: ${variant.name}`}
+                    title={`变体: ${variant.name}`}
                   >
                     {variant.name}
                   </button>

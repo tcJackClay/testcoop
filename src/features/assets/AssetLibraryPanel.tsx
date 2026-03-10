@@ -5,8 +5,6 @@ import {
   Search, 
   Filter,
   Image as ImageIcon,
-  Grid,
-  List,
   Folder,
   Star,
   User,
@@ -14,9 +12,7 @@ import {
   MapPin,
   Gem,
   Package,
-  HardDrive,
   Loader2,
-  ChevronLeft
 } from 'lucide-react';
 import { useAssetStore } from '../../stores/assetStore';
 import { useCanvasStore } from '../../stores/canvasStore';
@@ -48,10 +44,10 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     setFilterType,
     setSearchTerm,
     getFilteredAssets,
+    selectAsset,
   } = useAssetStore();
   
   const { addNode, nodes } = useCanvasStore();
-  const [viewMode] = useState<'grid' | 'list'>('grid');
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -65,7 +61,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   // Variant detail view state
   const [selectedPrimaryAsset, setSelectedPrimaryAsset] = useState<Image | null>(null);
   
-  // Helper functions for asset filtering
+  // Helper functions
   const isSecondaryAsset = (asset: Image): boolean => {
     return !!asset.parentId && asset.parentId.length > 0;
   };
@@ -74,7 +70,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return !isSecondaryAsset(asset);
   };
   
-  // Get variants (secondary assets) for a primary asset
   const getVariantsForPrimary = (primaryAsset: Image): Image[] => {
     const primaryName = primaryAsset.name || primaryAsset.resourceName;
     return assets.filter((asset) => asset.parentId === primaryName);
@@ -89,20 +84,8 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     });
   };
   
-  // Close context menu
   const handleCloseContextMenu = () => {
     setContextMenu(null);
-  };
-  
-  // Add asset to canvas
-  const handleAddToCanvas = (asset: Image) => {
-    const position = getCanvasCenterPosition();
-    addNode('createAsset', position, {
-      name: asset.name || asset.resourceName,
-      imageUrl: asset.url || asset.resourceContent,
-      assetType: asset.resourceType || 'character_primary',
-    });
-    console.log('Added asset to canvas:', asset.name);
   };
   
   // Delete asset
@@ -122,12 +105,12 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     }
   };
   
-  // 组件挂载时获取资产数据
+  // Component mount: fetch assets
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
   
-  // 计算画布中心位置
+  // Calculate canvas center position
   const getCanvasCenterPosition = () => {
     if (nodes.length === 0) {
       return { x: 100, y: 100 };
@@ -137,7 +120,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return { x: maxX + 50, y: maxY };
   };
   
-  // 添加资产节点到画布
+  // Add new asset node to canvas
   const handleAddAssetNode = () => {
     const position = getCanvasCenterPosition();
     addNode('createAsset', position);
@@ -165,7 +148,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return result;
   }, [assets]);
   
-  // Filter to show only primary assets (exclude secondary assets with parentId)
+  // Filter to show only primary assets
   const filteredAssets = getFilteredAssets().filter((asset) => isPrimaryAsset(asset));
   const totalAssets = filteredAssets.length;
   
@@ -174,13 +157,17 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return stats[key as AssetCategory] || 0;
   };
   
-  const handleDragStart = (asset: Image) => {
-    console.log('Drag start:', asset.name);
+  // Handle asset card click
+  const handleAssetClick = (asset: Image) => {
+    selectAsset(asset.id!);
+    if (getVariantsForPrimary(asset).length > 0) {
+      setSelectedPrimaryAsset(asset);
+    }
   };
-
+  
   return (
     <div className="flex h-full">
-      {/* Main Content - Left */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="h-10 border-b border-gray-700 flex items-center justify-between px-3 shrink-0">
@@ -224,6 +211,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
 
         {/* Content Grid */}
         <div className="flex-1 overflow-y-auto p-3">
+          {/* Error state */}
           {error && (
             <div className="text-center text-red-400 py-4">
               <p className="text-xs">{error}</p>
@@ -236,6 +224,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
             </div>
           )}
           
+          {/* Empty state */}
           {!error && totalAssets === 0 && !isLoading && (
             <div className="text-center text-gray-500 py-8">
               <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
@@ -244,10 +233,9 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
             </div>
           )}
           
+          {/* Asset grid */}
           {!error && totalAssets > 0 && (
-            <div className={`grid gap-3 ${
-              viewMode === 'grid' ? 'grid-cols-2' : 'grid-cols-1'
-            }`}>
+            <div className="grid grid-cols-2 gap-3">
               {/* Add New Card */}
               <div 
                 onClick={handleAddAssetNode}
@@ -262,14 +250,15 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
                   <span className="text-[10px] text-gray-500">新建资产</span>
                 </div>
               </div>
+              
               {filteredAssets.map((asset) => (
                 <AssetCard
                   key={asset.id}
                   asset={asset as any}
-                  onDragStart={handleDragStart}
+                  onDragStart={(asset) => console.log('Drag start:', asset.name)}
                   onDragEnd={() => {}}
                   onContextMenu={(e) => handleContextMenu(e, asset)}
-                  onClick={getVariantsForPrimary(asset).length > 0 ? () => setSelectedPrimaryAsset(asset) : undefined}
+                  onClick={() => handleAssetClick(asset)}
                 />
               ))}
             </div>
@@ -286,6 +275,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
         </div>
       </div>
 
+      {/* Sidebar */}
       <AssetSidebar
         categories={categories}
         filterType={filterType}
@@ -298,7 +288,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
           asset={contextMenu.asset}
           position={contextMenu.position}
           onClose={handleCloseContextMenu}
-          onAddToCanvas={handleAddToCanvas}
           onDelete={handleDeleteAsset}
         />
       )}

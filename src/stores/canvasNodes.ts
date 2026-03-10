@@ -4,7 +4,7 @@ import type { CanvasState, CanvasNode, NodeType } from './canvasTypes';
 import { nodeDefaults, generateNodeId } from './canvasNodeDefaults';
 
 export interface CanvasNodesSlice {
-  addNode: (type: NodeType, position: { x: number; y: number }) => void;
+  addNode: (type: NodeType, position: { x: number; y: number }, initialData?: Partial<CanvasNode>) => void;
   updateNode: (id: string, data: Partial<CanvasNode>) => void;
   deleteNode: (id: string) => void;
   deleteSelectedNodes: () => void;
@@ -18,24 +18,27 @@ export interface CanvasNodesSlice {
 }
 
 export const createCanvasNodesSlice: StateCreator<CanvasState, [], [], CanvasNodesSlice> = (set, get) => ({
-  addNode: (type, position) => {
+  // Add new node
+  addNode: (type, position, initialData) => {
     const defaults = nodeDefaults[type] || { type, data: { label: type } };
     const newNode: CanvasNode = {
       id: generateNodeId(),
       ...defaults,
       position,
-      data: { ...defaults.data },
+      data: { ...defaults.data, ...(initialData?.data || {}) },
     } as CanvasNode;
     get().saveToUndoStack();
     set((state) => ({ nodes: [...state.nodes, newNode] }));
   },
 
+  // Update node data
   updateNode: (id, data) => {
     set((state) => ({
       nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...data } : n)),
     }));
   },
 
+  // Delete single node
   deleteNode: (id) => {
     get().saveToUndoStack();
     set((state) => ({
@@ -45,6 +48,7 @@ export const createCanvasNodesSlice: StateCreator<CanvasState, [], [], CanvasNod
     }));
   },
 
+  // Delete all selected nodes
   deleteSelectedNodes: () => {
     const { selectedNodeIds } = get();
     if (selectedNodeIds.length === 0) return;
@@ -58,12 +62,14 @@ export const createCanvasNodesSlice: StateCreator<CanvasState, [], [], CanvasNod
     }));
   },
 
+  // Move node to new position
   moveNode: (id, position) => {
     set((state) => ({
       nodes: state.nodes.map((n) => (n.id === id ? { ...n, position } : n)),
     }));
   },
 
+  // Select a node (single or multi-select with Ctrl/Cmd)
   selectNode: (id, multi = false) => {
     set((state) => {
       if (multi) {
@@ -78,10 +84,12 @@ export const createCanvasNodesSlice: StateCreator<CanvasState, [], [], CanvasNod
     });
   },
 
+  // Clear all selections
   clearSelection: () => {
     set({ selectedNodeIds: [] });
   },
 
+  // Select nodes within a rectangular box
   selectNodesInBox: (box) => {
     const { nodes, viewPort } = get();
     const selectedIds = nodes
@@ -101,17 +109,20 @@ export const createCanvasNodesSlice: StateCreator<CanvasState, [], [], CanvasNod
     set({ selectedNodeIds: selectedIds });
   },
 
+  // Select all nodes
   selectAll: () => {
     const { nodes } = get();
     set({ selectedNodeIds: nodes.map((node) => node.id) });
   },
 
+  // Copy selected nodes to clipboard
   copyNodes: () => {
     const { nodes, selectedNodeIds } = get();
     const nodesToCopy = nodes.filter((n) => selectedNodeIds.includes(n.id));
     set({ clipboardNodes: JSON.parse(JSON.stringify(nodesToCopy)) });
   },
 
+  // Paste nodes from clipboard
   pasteNodes: (offset = { x: 50, y: 50 }) => {
     const { clipboardNodes, nodes, addNode } = get();
     if (clipboardNodes.length === 0) return;

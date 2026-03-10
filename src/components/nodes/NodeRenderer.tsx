@@ -234,7 +234,6 @@ export default function NodeRenderer({
     onNodeMouseUp?.(node.id, inputType);
   }, [node.id, onNodeMouseUp]);
 
-
   const icon = nodeIcons[node.type];
   const label = (node.data.label as string) || node.type;
   const colorClass = nodeColors[node.type] || 'border-gray-500 bg-gray-500/10';
@@ -332,14 +331,11 @@ export default function NodeRenderer({
       {/* Body */}
       <div className="p-3">{renderNodeBody(node)}</div>
 
-      {/* Target Handle (Left) - Input */}
-      {/* 点击区域 */}
       <div
-        className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-12 cursor-pointer"
+        className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-6 cursor-pointer"
         onMouseDown={(e) => {
           e.stopPropagation();
           e.preventDefault();
-          const rect = e.currentTarget.getBoundingClientRect();
           const canvasContainer = document.querySelector('.canvas-content');
           if (canvasContainer) {
             const canvasRect = canvasContainer.getBoundingClientRect();
@@ -359,10 +355,8 @@ export default function NodeRenderer({
         title={connectingSource && connectingSource !== node.id ? "点击连接" : (hasInputConnection ? "已连接" : "点击选择输入节点")}
       />
 
-      {/* Source Handle (Right) - Output */}
-      {/* 点击区域 */}
       <div
-        className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-12 cursor-pointer"
+        className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-6 cursor-pointer"
         onMouseDown={(e) => {
           e.stopPropagation();
           e.preventDefault();

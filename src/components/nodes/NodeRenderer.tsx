@@ -142,6 +142,8 @@ export default function NodeRenderer({
 
   const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode, executeNode, updateNode } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
+  const [isEditingLabel, setIsEditingLabel] = useState(false);
+  const [labelValue, setLabelValue] = useState(node.data.label as string || '');
   const dragOffset = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedNodeIds.includes(node.id);
@@ -161,6 +163,28 @@ export default function NodeRenderer({
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, [node.id, node.width, node.height, updateNode]);
+
+  // 处理标签编辑
+  const handleLabelDoubleClick = () => {
+    setLabelValue(node.data.label as string || '');
+    setIsEditingLabel(true);
+  };
+
+  const handleLabelBlur = () => {
+    setIsEditingLabel(false);
+    if (labelValue !== node.data.label) {
+      updateNodeData(node.id, 'label', labelValue);
+    }
+  };
+
+  const handleLabelKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleLabelBlur();
+    } else if (e.key === 'Escape') {
+      setIsEditingLabel(false);
+      setLabelValue(node.data.label as string || '');
+    }
+  };
 
   // 检查节点连接状态
   const connections = useCanvasStore((state) => state.connections);
@@ -307,6 +331,29 @@ export default function NodeRenderer({
       onMouseDown={handleMouseDown}
     >
       {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
+        <GripVertical className="w-3 h-3 text-gray-500" />
+        <span className="text-gray-400">{icon}</span>
+        {isEditingLabel ? (
+          <input
+            type="text"
+            value={labelValue}
+            onChange={(e) => setLabelValue(e.target.value)}
+            onBlur={handleLabelBlur}
+            onKeyDown={handleLabelKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 bg-transparent border-b border-gray-500 text-sm font-medium text-white focus:outline-none focus:border-blue-400 px-0"
+            autoFocus
+          />
+        ) : (
+          <span
+            className="text-sm font-medium truncate cursor-text"
+            onDoubleClick={handleLabelDoubleClick}
+          >
+            {label}
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
         <GripVertical className="w-3 h-3 text-gray-500" />
         <span className="text-gray-400">{icon}</span>

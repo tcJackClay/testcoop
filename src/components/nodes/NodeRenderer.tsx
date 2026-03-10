@@ -140,11 +140,27 @@ export default function NodeRenderer({
   onDeleteConnection
 }: NodeRendererProps) {
 
-  const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode, executeNode } = useCanvasStore();
+  const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode, executeNode, updateNode } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedNodeIds.includes(node.id);
+
+  // 监听节点尺寸变化，更新到 store 供连线使用
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // 只在尺寸变化时更新（忽略微小的变化）
+        if (Math.abs(width - (node.width || 0)) > 1 || Math.abs(height - (node.height || 0)) > 1) {
+          updateNode(node.id, { width: Math.round(width), height: Math.round(height) });
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [node.id, node.width, node.height, updateNode]);
 
   // 检查节点连接状态
   const connections = useCanvasStore((state) => state.connections);

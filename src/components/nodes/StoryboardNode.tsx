@@ -53,6 +53,28 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
 
   // 加载分集列表
   useEffect(() => {
+    if (!currentProjectId) return;
+    
+    const loadEpisodes = async () => {
+      setLoadingEpisodes(true);
+      setLocalEpisodes([]); // 清空旧数据
+      try {
+        const response = await episodeScriptApi.getAll(undefined, currentProjectId);
+        if (response.code === 0 && response.data) {
+          const sorted = [...response.data].sort((a, b) => a.episodeNumber - b.episodeNumber);
+          setLocalEpisodes(sorted);
+          updateData('episodes', sorted);
+        }
+      } catch (error) {
+        console.error('加载分集失败:', error);
+      } finally {
+        setLoadingEpisodes(false);
+      }
+    };
+    
+    loadEpisodes();
+  }, [currentProjectId, updateData]);
+  useEffect(() => {
     if (!currentProjectId || localEpisodes.length > 0) return;
     
     const loadEpisodes = async () => {

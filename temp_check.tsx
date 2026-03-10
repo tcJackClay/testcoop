@@ -170,11 +170,11 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
   };
 
   return (
-    <div className="space-y-2 min-w-[200px]">
+    <div className="space-y-2 min-w-[240px]">
       {/* 顶部两列布局 */}
       <div className="flex gap-2">
         {/* 左侧：名称 + 类型/变体/父资产 */}
-        <div className="flex-1 space-y-1">
+        <div className="flex-1 space-y-1.5">
           {/* Name Input */}
           <input
             type="text"
@@ -237,7 +237,7 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
 
         {/* 右侧：图片预览 */}
         <div
-          className="w-20 h-20 bg-gray-700 border border-gray-600 rounded flex-shrink-0 flex items-center justify-center overflow-hidden cursor-pointer hover:bg-gray-600"
+          className="w-24 h-24 bg-gray-700 border border-gray-600 rounded flex-shrink-0 flex items-center justify-center overflow-hidden cursor-pointer hover:bg-gray-600"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -245,15 +245,15 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
             <img src={inputImageUrl} alt="Preview" className="w-full h-full object-contain" />
           ) : (
             <div className="text-center text-gray-500">
-              <ArrowDown className="w-4 h-4 mx-auto mb-1" />
-              <span className="text-[8px]">输入图片</span>
+              <ArrowDown className="w-5 h-5 mx-auto mb-1" />
+              <span className="text-[9px]">输入图片</span>
             </div>
           )}
         </div>
       </div>
 
       {/* 底部：描述 + 保存按钮 */}
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {/* Description Input */}
         <textarea
           className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white resize-none"
@@ -287,4 +287,4 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
       </div>
     </div>
   );
-}
+

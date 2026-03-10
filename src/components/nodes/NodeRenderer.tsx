@@ -319,7 +319,7 @@ export default function NodeRenderer({
           e.stopPropagation();
           deleteNode(node.id);
         }}
-        className="absolute -top-2.5 -right-2.5 z-50 p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-gray-400 hover:text-red-500 border-gray-700 hover:bg-gray-700"
+        className="absolute -top-2.5 -right-2.5 z-[60] p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-gray-400 hover:text-red-500 border-gray-700 hover:bg-gray-700"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <X size={12} />
@@ -328,7 +328,7 @@ export default function NodeRenderer({
       {/* Execute Button - Only for generation nodes */}
       {generationNodeTypes.includes(node.type) && (
         <button
-          className="absolute -top-2.5 -right-8 z-50 p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-green-400 hover:text-green-300 border-gray-700 hover:bg-gray-700"
+          className="absolute -top-2.5 -right-8 z-[60] p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-green-400 hover:text-green-300 border-gray-700 hover:bg-gray-700"
           onClick={(e) => {
             e.stopPropagation();
             executeNode?.(node.id);
@@ -366,7 +366,7 @@ export default function NodeRenderer({
       />
       {/* 可视圆点 */}
       <div
-        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${targetHandleClass}`}
+        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none z-[60] ${targetHandleClass}`}
         title={connectingSource && connectingSource !== node.id ? "点击连接" : (hasInputConnection ? "已连接" : "点击选择输入节点")}
       />
 
@@ -393,7 +393,7 @@ export default function NodeRenderer({
       />
       {/* 可视圆点 */}
       <div
-        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${sourceHandleClass}`}
+        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none z-[60] ${sourceHandleClass}`}
         title={isConnectingSource ? "点击取消连接" : "点击选择输出节点"}
       />
     </div>

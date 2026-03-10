@@ -296,7 +296,7 @@ export default function NodeRenderer({
   return (
     <div
       ref={containerRef}
-      className={`node absolute min-w-[180px] max-w-[300px] cursor-move select-none rounded-lg border-2 group overflow-hidden ${colorClass} ${
+      className={`node absolute min-w-[180px] max-w-[300px] cursor-move select-none rounded-lg border-2 group ${colorClass} ${
         isSelected ? 'ring-2 ring-white/50' : ''
       } ${isConnectingSource ? 'ring-2 ring-green-400/50' : ''}`}
       style={{

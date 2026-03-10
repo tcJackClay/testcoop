@@ -26,10 +26,13 @@ export default function Canvas() {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, worldX: 0, worldY: 0 });
   
+  // 连线状态
+  const [connectingSource, setConnectingSource] = useState<string | null>(null);
+  
   const { 
     nodes, connections, viewPort, addNode, updateViewPort,
     deleteSelectedNodes, selectedNodeIds, undo, redo, undoStack, redoStack,
-    selectNodesInBox, clearSelection, copyNodes, pasteNodes
+    selectNodesInBox, clearSelection, copyNodes, pasteNodes, addConnection, deleteConnection
   } = useCanvasStore();
 
   const handleWheelNative = useCallback((e: WheelEvent) => {
@@ -83,8 +86,39 @@ export default function Canvas() {
     addNode(type, { x: contextMenu.worldX, y: contextMenu.worldY });
     closeContextMenu();
   }, [addNode, contextMenu.worldX, contextMenu.worldY, closeContextMenu]);
-  
+
+  // 处理连线
+  const handleStartConnect = useCallback((nodeId: string, handle: 'source' | 'target') => {
+    if (handle === 'source') {
+      setConnectingSource(nodeId);
+    }
+  }, []);
+
+  const handleEndConnect = useCallback((nodeId: string, handle: 'source' | 'target') => {
+    // 如果是从目标节点结束连接，建立从源到目标的连接
+    if (handle === 'target' && connectingSource) {
+      // 不能自己连接自己
+      if (connectingSource !== nodeId) {
+        addConnection(connectingSource, nodeId);
+      }
+    }
+    setConnectingSource(null);
+  }, [connectingSource, addConnection]);
+
+  // 点击空白处取消连线
+  const handleCanvasClick = useCallback(() => {
+    if (connectingSource) {
+      setConnectingSource(null);
+    }
+  }, [connectingSource]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // 如果正在连线，点击空白处取消
+    if (connectingSource) {
+      setConnectingSource(null);
+      return;
+    }
+    
     const rect = containerRef.current?.getBoundingClientRect();
     const x = e.clientX - (rect?.left || 0);
     const y = e.clientY - (rect?.top || 0);
@@ -105,7 +139,7 @@ export default function Canvas() {
     } else if (e.button === 0 && e.target === containerRef.current) {
       clearSelection();
     }
-  }, [viewPort.x, viewPort.y, clearSelection]);
+  }, [viewPort.x, viewPort.y, clearSelection, connectingSource]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -180,7 +214,10 @@ export default function Canvas() {
           deleteSelectedNodes();
         }
       }
-      if (e.key === 'Escape') clearSelection();
+      if (e.key === 'Escape') {
+        clearSelection();
+        setConnectingSource(null);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -201,7 +238,7 @@ export default function Canvas() {
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden canvas-grid"
-        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : 'default' }}
+        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : connectingSource ? 'crosshair' : 'default' }}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -211,6 +248,7 @@ export default function Canvas() {
         onDragOver={handleDragOver}
         onContextMenu={handleContextMenu}
         onDoubleClick={handleDoubleClick}
+        onClick={handleCanvasClick}
       >
         <div
           className="absolute inset-0 origin-top-left canvas-content"
@@ -222,7 +260,13 @@ export default function Canvas() {
             ))}
           </svg>
           {nodes.map((node) => (
-            <NodeRenderer key={node.id} node={node} />
+            <NodeRenderer 
+              key={node.id} 
+              node={node} 
+              connectingSource={connectingSource}
+              onStartConnect={handleStartConnect}
+              onEndConnect={handleEndConnect}
+            />
           ))}
         </div>
 
@@ -239,6 +283,7 @@ export default function Canvas() {
               <Grid3X3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{t('canvas.addNode')}</p>
               <p className="text-xs mt-1">双击或右键点击添加节点</p>
+              <p className="text-xs mt-1">拖拽节点连接点进行连线</p>
             </div>
           </div>
         )}
@@ -274,7 +319,7 @@ export default function Canvas() {
           </button>
           <button
             onClick={handleFitView}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded ml-1"
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 ml-1"
             title="适应视图"
           >
             <Maximize2 className="w-4 h-4" />

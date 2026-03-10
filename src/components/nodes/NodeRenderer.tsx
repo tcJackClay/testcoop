@@ -12,6 +12,11 @@ import StoryboardNode from './StoryboardNode';
 
 interface NodeRendererProps {
   node: CanvasNode;
+  // 连线相关 props
+  connectingSource?: string | null;
+  connectingTarget?: string | null;
+  onStartConnect?: (nodeId: string, handle: 'source' | 'target') => void;
+  onEndConnect?: (nodeId: string, handle: 'source' | 'target') => void;
 }
 
 function updateNodeData(id: string, key: string, value: unknown) {
@@ -104,6 +109,7 @@ function renderNodeBody(node: CanvasNode) {
 
     case 'runninghub':
       return <RunningHubNode nodeId={node.id} data={node.data} updateData={updateData} />;
+
     case 'saveLocal':
       return (
         <div className="flex items-center gap-2 text-xs text-gray-400">
@@ -117,15 +123,29 @@ function renderNodeBody(node: CanvasNode) {
   }
 }
 
-export default function NodeRenderer({ node }: NodeRendererProps) {
+export default function NodeRenderer({ 
+  node, 
+  connectingSource, 
+  connectingTarget,
+  onStartConnect,
+  onEndConnect 
+}: NodeRendererProps) {
   const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode, executeNode } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedNodeIds.includes(node.id);
 
+  // Check if this node is connected
+  const connections = useCanvasStore((state) => state.connections);
+  const hasInputConnection = connections.some((c) => c.targetId === node.id);
+  const hasOutputConnection = connections.some((c) => c.sourceId === node.id);
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // 如果正在连线，不处理节点的拖拽
+      if (connectingSource || connectingTarget) return;
+      
       if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') {
         return;
       }
@@ -146,7 +166,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
       selectNode(node.id, e.shiftKey);
     },
-    [node.position, node.id, selectNode, viewPort]
+    [node.position, node.id, selectNode, viewPort, connectingSource, connectingTarget]
   );
 
   const handleMouseMove = useCallback(
@@ -168,7 +188,7 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  }, []);
+  }, {});
 
   useEffect(() => {
     if (isDragging) {
@@ -180,6 +200,19 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       };
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // Handle connect point mouse events
+  const handleSourceMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onStartConnect?.(node.id, 'source');
+  }, [node.id, onStartConnect]);
+
+  const handleTargetMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onEndConnect?.(node.id, 'target');
+  }, [node.id, onEndConnect]);
 
   const icon = nodeIcons[node.type];
   const label = (node.data.label as string) || node.type;
@@ -237,14 +270,30 @@ export default function NodeRenderer({ node }: NodeRendererProps) {
       {/* Body */}
       <div className="p-3">{renderNodeBody(node)}</div>
 
-      {/* Handles */}
+      {/* Source Handle (Left) - Output */}
       <div
-        className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-gray-600 rounded-full border-2 border-gray-400 hover:bg-blue-500 hover:border-blue-400 cursor-crosshair"
-        data-handle="source"
+        className={`absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 cursor-crosshair transition-all ${
+          connectingSource === node.id
+            ? 'bg-blue-400 border-blue-300 scale-125'
+            : hasOutputConnection
+            ? 'bg-green-500 border-green-400'
+            : 'bg-gray-600 border-gray-400 hover:bg-blue-500 hover:border-blue-400'
+        }`}
+        onMouseDown={handleSourceMouseDown}
+        title="拖拽连接输出"
       />
+
+      {/* Target Handle (Right) - Input */}
       <div
-        className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-gray-600 rounded-full border-2 border-gray-400 hover:bg-blue-500 hover:border-blue-400 cursor-crosshair"
-        data-handle="target"
+        className={`absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 cursor-crosshair transition-all ${
+          connectingTarget === node.id
+            ? 'bg-blue-400 border-blue-300 scale-125'
+            : hasInputConnection
+            ? 'bg-blue-500 border-blue-400'
+            : 'bg-gray-600 border-gray-400 hover:bg-blue-500 hover:border-blue-400'
+        }`}
+        onMouseDown={handleTargetMouseDown}
+        title="拖拽连接输入"
       />
     </div>
   );

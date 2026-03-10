@@ -1,11 +1,11 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Grid3X3, ZoomIn, ZoomOut, Maximize2, X } from 'lucide-react';
+import { Grid3X3, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCanvasStore, type NodeType } from '../../stores/canvasStore';
 import NodeRenderer from '../nodes/NodeRenderer';
-import ConnectionLine from '../nodes/ConnectionLine';
 import CanvasToolbar from './CanvasToolbar';
 import CanvasContextMenu from './CanvasContextMenu';
+import { useCanvasConnections } from './useCanvasConnections';
 
 interface ContextMenuState {
   visible: boolean;
@@ -26,16 +26,31 @@ export default function Canvas() {
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, worldX: 0, worldY: 0 });
   
-  // 连线状态
-  const [connectingSource, setConnectingSource] = useState<string | null>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
-  
   const { 
-    nodes, connections, viewPort, addNode, updateViewPort,
-    deleteSelectedNodes, selectedNodeIds, undo, redo, undoStack, redoStack,
-    selectNodesInBox, clearSelection, copyNodes, pasteNodes, addConnection, deleteConnection
+    nodes, viewPort, addNode, updateViewPort,
+    deleteSelectedNodes, selectedNodeIds, undo, redo,
+    selectNodesInBox, clearSelection, copyNodes, pasteNodes
   } = useCanvasStore();
+
+  // 使用连线 hook (Tapnow 风格)
+  const {
+    connectingSource,
+    connectingTarget,
+    connectingInputType,
+    mousePos,
+    onSourceMouseDown,
+    onTargetMouseDown,
+    onNodeMouseUp,
+    onDeleteConnection,
+    onCanvasMouseMove,
+    onCanvasClick,
+    onCanvasMouseDown,
+    ConnectionRenderer,
+  } = useCanvasConnections({
+    containerRef,
+    viewPort,
+  });
+
 
   // 滚轮缩放
   const handleWheelNative = useCallback((e: WheelEvent) => {
@@ -92,48 +107,10 @@ export default function Canvas() {
     closeContextMenu();
   }, [addNode, contextMenu.worldX, contextMenu.worldY, closeContextMenu]);
 
-  // 处理连线 - 点击连接点开始/结束连接
-  const handleStartConnect = useCallback((nodeId: string, handle: 'source' | 'target') => {
-    if (handle === 'source') {
-      if (nodeId === '') {
-        // 空字符串表示取消连接
-        setConnectingSource(null);
-      } else {
-        setConnectingSource(nodeId);
-      }
-    }
-  }, []);
-
-  const handleEndConnect = useCallback((nodeId: string, handle: 'source' | 'target') => {
-    if (handle === 'target' && connectingSource) {
-      // 不能自己连接自己
-      if (connectingSource !== nodeId) {
-        addConnection(connectingSource, nodeId);
-      }
-    }
-    // 无论连接成功与否，都清除连线状态
-    setConnectingSource(null);
-  }, [connectingSource, addConnection]);
-
-  // 删除连接
-  const handleDeleteConnection = useCallback((connectionId: string) => {
-    deleteConnection(connectionId);
-  }, [deleteConnection]);
-
-  // 点击空白处取消连线
-  const handleCanvasClick = useCallback(() => {
-    if (connectingSource) {
-      setConnectingSource(null);
-    }
-  }, [connectingSource]);
-
   // 鼠标按下
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // 如果正在连线，点击空白处取消
-    if (connectingSource) {
-      setConnectingSource(null);
-      return;
-    }
+    // 使用连线 hook 的处理
+    onCanvasMouseDown(e);
     
     const rect = containerRef.current?.getBoundingClientRect();
     const x = e.clientX - (rect?.left || 0);
@@ -155,20 +132,16 @@ export default function Canvas() {
     } else if (e.button === 0 && e.target === containerRef.current) {
       clearSelection();
     }
-  }, [viewPort.x, viewPort.y, clearSelection, connectingSource]);
+  }, [viewPort.x, viewPort.y, clearSelection, onCanvasMouseDown]);
 
   // 鼠标移动
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // 使用连线 hook 的处理（更新预览位置）
+    onCanvasMouseMove(e);
+    
     const rect = containerRef.current?.getBoundingClientRect();
     const x = e.clientX - (rect?.left || 0);
     const y = e.clientY - (rect?.top || 0);
-
-    // 连线时更新鼠标位置用于预览
-    if (connectingSource) {
-      const worldX = (x - viewPort.x) / viewPort.zoom;
-      const worldY = (y - viewPort.y) / viewPort.zoom;
-      setMousePos({ x: worldX, y: worldY });
-    }
 
     if (isPanning) {
       updateViewPort({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
@@ -179,9 +152,7 @@ export default function Canvas() {
       const height = Math.abs(y - selectionStart.y);
       setSelectionBox({ x: selX, y: selY, width, height });
     }
-  }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort, connectingSource, viewPort]);
-
-
+  }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort, onCanvasMouseMove]);
 
   // 鼠标松开
   const handleMouseUp = useCallback(() => {
@@ -245,12 +216,12 @@ export default function Canvas() {
       }
       if (e.key === 'Escape') {
         clearSelection();
-        setConnectingSource(null);
+        onCanvasClick(); // 取消连线
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection, copyNodes, pasteNodes]);
+  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection, copyNodes, pasteNodes, onCanvasClick]);
 
   useEffect(() => {
     if (contextMenu.visible) {
@@ -277,46 +248,31 @@ export default function Canvas() {
         onDragOver={handleDragOver}
         onContextMenu={handleContextMenu}
         onDoubleClick={handleDoubleClick}
-        onClick={handleCanvasClick}
+        onClick={onCanvasClick}
       >
         <div
           className="absolute inset-0 origin-top-left canvas-content"
           style={{ transform: `translate(${viewPort.x}px, ${viewPort.y}px) scale(${viewPort.zoom})` }}
         >
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-            {connections.map((conn) => (
-              <ConnectionLine 
-                key={conn.id} 
-                connection={conn} 
-                nodes={nodes}
-                selectedNodeId={selectedNodeIds[0]}
-                onDeleteConnection={handleDeleteConnection}
-              />
-            ))}
-            {/* 连线预览 - 拖拽时的虚线 */}
-            {connectingSource && (() => {
-              const sourceNode = nodes.find(n => n.id === connectingSource);
-              if (!sourceNode) return null;
-              const startX = sourceNode.position.x + 180;
-              const startY = sourceNode.position.y + 40;
-              const path = `M ${startX} ${startY} C ${startX + 100} ${startY}, ${mousePos.x - 100} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`;
-              return <path d={path} stroke="#60a5fa" strokeWidth="2" fill="none" strokeDasharray="4,4" />;
-            })()}
-          </svg>
+          {/* 连线渲染器 */}
+          <ConnectionRenderer />
 
           {nodes.map((node) => (
             <NodeRenderer 
               key={node.id} 
               node={node} 
               connectingSource={connectingSource}
+              connectingTarget={connectingTarget}
+              connectingInputType={connectingInputType}
               mousePos={mousePos}
-              onStartConnect={handleStartConnect}
-              onEndConnect={handleEndConnect}
-              onDeleteConnection={handleDeleteConnection}
+              onSourceMouseDown={onSourceMouseDown}
+              onTargetMouseDown={onTargetMouseDown}
+              onNodeMouseUp={onNodeMouseUp}
+              onDeleteConnection={onDeleteConnection}
             />
           ))}
-        </div>
 
+        </div>
 
         {selectionBox && (
           <div

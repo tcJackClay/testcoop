@@ -14,13 +14,13 @@ interface NodeRendererProps {
   node: CanvasNode;
   connectingSource?: string | null;
   connectingTarget?: string | null;
+  connectingInputType?: string | null;
   mousePos?: { x: number; y: number };
-  onStartConnect?: (nodeId: string, handle: 'source' | 'target') => void;
-  onEndConnect?: (nodeId: string, handle: 'source' | 'target') => void;
-  onMouseMove?: (worldPos: { x: number; y: number }) => void;
+  onSourceMouseDown?: (nodeId: string, worldPos: { x: number; y: number }) => void;
+  onTargetMouseDown?: (nodeId: string, inputType: string, worldPos: { x: number; y: number }) => void;
+  onNodeMouseUp?: (nodeId: string, inputType?: string) => void;
   onDeleteConnection?: (connectionId: string) => void;
 }
-
 
 // 更新节点数据的辅助函数
 function updateNodeData(id: string, key: string, value: unknown) {
@@ -131,9 +131,15 @@ function renderNodeBody(node: CanvasNode) {
 export default function NodeRenderer({ 
   node, 
   connectingSource,
-  onStartConnect,
-  onEndConnect 
+  connectingTarget,
+  connectingInputType,
+  mousePos,
+  onSourceMouseDown,
+  onTargetMouseDown,
+  onNodeMouseUp,
+  onDeleteConnection
 }: NodeRendererProps) {
+
   const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode, executeNode } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
@@ -205,40 +211,29 @@ export default function NodeRenderer({
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // 连接点点击处理
-  const handleSourceClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (isConnectingSource) {
-      onStartConnect?.('', 'source');
-    } else {
-      onStartConnect?.(node.id, 'source');
-    }
-  }, [node.id, isConnectingSource, onStartConnect]);
-
-  const handleTargetClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (connectingSource && connectingSource !== node.id) {
-      onEndConnect?.(node.id, 'target');
-    }
-  }, [node.id, connectingSource, onEndConnect]);
-
-  // 拖拽式连接 - 输出连接点
+  // 连接点事件处理 - Tapnow 风格
+  // Source Handle - 从右侧输出端口开始连接
   const handleSourceMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    onStartConnect?.(node.id, 'source');
-  }, [node.id, onStartConnect]);
+    const worldPos = { x: 0, y: 0 }; // 将在渲染层传递正确位置
+    onSourceMouseDown?.(node.id, worldPos);
+  }, [node.id, onSourceMouseDown]);
 
-  // 拖拽式连接 - 输入连接点
-  const handleTargetMouseDown = useCallback((e: React.MouseEvent) => {
+  // Target Handle - 从左侧输入端口开始连接
+  const handleTargetMouseDown = useCallback((e: React.MouseEvent, inputType: string = 'default') => {
     e.stopPropagation();
     e.preventDefault();
-    if (connectingSource && connectingSource !== node.id) {
-      onEndConnect?.(node.id, 'target');
-    }
-  }, [node.id, connectingSource, onEndConnect]);
+    const worldPos = { x: 0, y: 0 }; // 将在渲染层传递正确位置
+    onTargetMouseDown?.(node.id, inputType, worldPos);
+  }, [node.id, onTargetMouseDown]);
+
+  // Target Handle - 鼠标松开时建立连接
+  const handleTargetMouseUp = useCallback((e: React.MouseEvent, inputType: string = 'default') => {
+    e.stopPropagation();
+    onNodeMouseUp?.(node.id, inputType);
+  }, [node.id, onNodeMouseUp]);
+
 
   const icon = nodeIcons[node.type];
   const label = (node.data.label as string) || node.type;
@@ -337,26 +332,60 @@ export default function NodeRenderer({
       {/* Body */}
       <div className="p-3">{renderNodeBody(node)}</div>
 
-      {/* Source Handle (Left) - Output */}
+      {/* Target Handle (Left) - Input */}
+      {/* 点击区域 */}
       <div
         className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-12 cursor-pointer"
-        onClick={handleSourceClick}
-        onMouseDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const canvasContainer = document.querySelector('.canvas-content');
+          if (canvasContainer) {
+            const canvasRect = canvasContainer.getBoundingClientRect();
+            const worldX = (e.clientX - canvasRect.left - viewPort.x) / viewPort.zoom;
+            const worldY = (e.clientY - canvasRect.top - viewPort.y) / viewPort.zoom;
+            onTargetMouseDown?.(node.id, 'default', { x: worldX, y: worldY });
+          }
+        }}
+        onMouseUp={(e) => {
+          e.stopPropagation();
+          onNodeMouseUp?.(node.id, 'default');
+        }}
       />
+      {/* 可视圆点 */}
       <div
-        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${sourceHandleClass}`}
-        title={isConnectingSource ? "点击取消连接" : "点击选择输出节点"}
+        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${targetHandleClass}`}
+        title={connectingSource && connectingSource !== node.id ? "点击连接" : (hasInputConnection ? "已连接" : "点击选择输入节点")}
       />
-      {/* Target Handle (Right) - Input */}
 
+      {/* Source Handle (Right) - Output */}
+      {/* 点击区域 */}
       <div
         className="absolute -right-4 top-1/2 -translate-y-1/2 w-8 h-12 cursor-pointer"
-        onClick={handleTargetClick}
-        onMouseDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const canvasContainer = document.querySelector('.canvas-content');
+          if (canvasContainer) {
+            const canvasRect = canvasContainer.getBoundingClientRect();
+            const worldX = (e.clientX - canvasRect.left - viewPort.x) / viewPort.zoom;
+            const worldY = (e.clientY - canvasRect.top - viewPort.y) / viewPort.zoom;
+            onSourceMouseDown?.(node.id, { x: worldX, y: worldY });
+          }
+        }}
+        onMouseUp={(e) => {
+          e.stopPropagation();
+          // 如果已选中该source，松开取消
+          if (isConnectingSource) {
+            // 取消连接
+          }
+        }}
       />
+      {/* 可视圆点 */}
       <div
-        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${targetHandleClass}`}
-        title={connectingSource && connectingSource !== node.id ? "点击连接" : (hasInputConnection ? "已连接" : "点击选择输入节点")}
+        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none ${sourceHandleClass}`}
+        title={isConnectingSource ? "点击取消连接" : "点击选择输出节点"}
       />
     </div>
   );

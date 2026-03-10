@@ -347,7 +347,7 @@ export default function NodeRenderer({
       <div className="p-3">{renderNodeBody(node)}</div>
 
       <div
-        className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-6 cursor-pointer"
+        className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 cursor-pointer"
         onMouseDown={(e) => {
           e.stopPropagation();
           e.preventDefault();
@@ -366,12 +366,12 @@ export default function NodeRenderer({
       />
       {/* 可视圆点 */}
       <div
-        className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none z-[60] ${targetHandleClass}`}
+        className={`absolute -left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all pointer-events-none z-[60] ${targetHandleClass}`}
         title={connectingSource && connectingSource !== node.id ? "点击连接" : (hasInputConnection ? "已连接" : "点击选择输入节点")}
       />
 
       <div
-        className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-6 cursor-pointer"
+        className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 cursor-pointer"
         onMouseDown={(e) => {
           e.stopPropagation();
           e.preventDefault();
@@ -393,7 +393,7 @@ export default function NodeRenderer({
       />
       {/* 可视圆点 */}
       <div
-        className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 transition-all pointer-events-none z-[60] ${sourceHandleClass}`}
+        className={`absolute -right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all pointer-events-none z-[60] ${sourceHandleClass}`}
         title={isConnectingSource ? "点击取消连接" : "点击选择输出节点"}
       />
     </div>

@@ -39,7 +39,11 @@ interface SplitResult {
 
 export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const { currentProjectId } = useProjectStore();
-  const { episodes, selectedEpisodeId, setSelectedEpisodeId, loadEpisodes } = useEpisodeStore();
+  // 从 store 读取 episodes 列表和 store 中的选中状态
+  const { episodes, selectedEpisodeId, loadEpisodes } = useEpisodeStore();
+  
+  // ScriptPanel 自己的选中状态（局部状态，不会影响 StoryboardNode）
+  const [localSelectedEpisodeId, setLocalSelectedEpisodeId] = useState<string>('');
   
   const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [scriptContent, setScriptContent] = useState<string>('');
@@ -48,14 +52,26 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>('script');
   const [showActionDropdown, setShowActionDropdown] = useState(false);
   
-  // 使用 store 中的 episodes 和 selectedEpisodeId
-  const currentEpisode = episodes.find(ep => String(ep.id) === selectedEpisodeId) || episodes[0];
+  // 使用局部状态 + store 中的 episodes
+  const currentEpisode = episodes.find(ep => String(ep.id) === localSelectedEpisodeId) || episodes[0];
   const selectedOption = actionOptions.find(o => o.key === selectedAction);
+
+  // 监听 store 中 selectedEpisodeId 变化（StoryboardNode 改变时同步到 ScriptPanel）
+  useEffect(() => {
+    if (selectedEpisodeId) {
+      setLocalSelectedEpisodeId(selectedEpisodeId);
+    }
+  }, [selectedEpisodeId]);
 
   // 加载分集剧本 - 使用 store
   useEffect(() => {
     if (currentProjectId) {
-      loadEpisodes(currentProjectId);
+      loadEpisodes(currentProjectId).then(() => {
+        // 加载完成后，选中第一个分集
+        if (episodes.length > 0) {
+          setLocalSelectedEpisodeId(String(episodes[0].id));
+        }
+      });
     }
   }, [currentProjectId, loadEpisodes]);
 
@@ -97,7 +113,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
       // 重新加载分集
       await loadEpisodes(currentProjectId);
       if (splitEpisodes.length > 0) {
-        setSelectedEpisodeId(String(splitEpisodes[0].id));
+        setLocalSelectedEpisodeId(String(splitEpisodes[0].id));
       }
       
       alert(`分集完成！共分割为 ${splitEpisodes.length} 集`);
@@ -148,8 +164,8 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
         return (
           <div className="space-y-2">
             <select
-              value={selectedEpisodeId || ''}
-              onChange={(e) => setSelectedEpisodeId(e.target.value)}
+              value={localSelectedEpisodeId || ''}
+              onChange={(e) => setLocalSelectedEpisodeId(e.target.value)}
               className="w-full px-2 py-1.5 text-[10px] bg-gray-800 border border-gray-600 rounded text-gray-300 focus:outline-none focus:border-blue-500"
             >
               {episodes.map((ep) => (

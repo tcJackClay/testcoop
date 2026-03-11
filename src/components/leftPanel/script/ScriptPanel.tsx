@@ -130,7 +130,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
               ext1Info = { type: asset.ext1 };
             }
             
-            console.log('[ScriptPanel] 资产:', asset.resourceName, 'ext1:', ext1Info);
+            console.log('[ScriptPanel] 资产:', asset.resourceName, 'ext1:', JSON.stringify(ext1Info));
             
             const resourceName = asset.resourceName || '';
             const type = (ext1Info.type || '').toLowerCase();
@@ -146,20 +146,28 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
             // 判断是主要还是次要
             const isSecondary = type.includes('secondary');
             
+            // 获取描述信息 - 优先使用 background 或 role
+            const description = ext1Info.background || ext1Info.description || '';
+            const role = ext1Info.role || '';
+            
             // 根据 ext1 的 type 分类
             if (type.includes('character') || type.includes('role')) {
               if (isSecondary) {
                 secondaryCharacters.push({
                   id: asset.id,
                   name: resourceName,
-                  description: ext1Info.description || ext1Info.background || '',
+                  description: description,
+                  background: ext1Info.background || '',
+                  role: role,
                   type: type
                 });
               } else {
                 primaryCharacters.push({
                   id: asset.id,
                   name: resourceName,
-                  description: ext1Info.description || ext1Info.background || '',
+                  description: description,
+                  background: ext1Info.background || '',
+                  role: role,
                   type: type
                 });
               }
@@ -168,14 +176,16 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
                 secondaryScenes.push({
                   id: asset.id,
                   name: resourceName,
-                  description: ext1Info.description || ext1Info.background || '',
+                  description: description,
+                  background: ext1Info.background || '',
                   type: type
                 });
               } else {
                 primaryScenes.push({
                   id: asset.id,
                   name: resourceName,
-                  description: ext1Info.description || ext1Info.background || '',
+                  description: description,
+                  background: ext1Info.background || '',
                   type: type
                 });
               }
@@ -184,22 +194,30 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
                 secondaryProps.push({
                   id: asset.id,
                   name: resourceName,
-                  description: ext1Info.description || ext1Info.background || '',
+                  description: description,
+                  background: ext1Info.background || '',
                   type: type
                 });
               } else {
                 primaryProps.push({
                   id: asset.id,
                   name: resourceName,
-                  description: ext1Info.description || ext1Info.background || '',
+                  description: description,
+                  background: ext1Info.background || '',
                   type: type
                 });
               }
             }
           }
           
-          // 合并主要和次要
-          const characters = [...primaryCharacters, ...secondaryCharacters];
+          // 合并主要和次要 - 主角优先排序
+          const sortByRole = (a: any, b: any) => {
+            const aIsMain = (a.role?.includes('主角') || a.background?.includes('主角') || a.description?.includes('主角')) ? 0 : 1;
+            const bIsMain = (b.role?.includes('主角') || b.background?.includes('主角') || b.description?.includes('主角')) ? 0 : 1;
+            return aIsMain - bIsMain;
+          };
+          
+          const characters = [...primaryCharacters.sort(sortByRole), ...secondaryCharacters];
           const scenes = [...primaryScenes, ...secondaryScenes];
           const props = [...primaryProps, ...secondaryProps];
           
@@ -233,14 +251,21 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     const processAssets = (assets: any[] | undefined, _type: string, ext1Type: string) => {
       if (!assets || !Array.isArray(assets)) return;
       for (const item of assets) {
-        // 主资产记录
+        // 主资产记录 - 保存完整信息到 ext1
         requests.push({
           resourceName: item.name || '未命名',
           resourceType: 'image',
           resourceContent: '',
           projectId,
           userId,
-          ext1: JSON.stringify({ id: item.id, name: item.name, type: ext1Type }),
+          ext1: JSON.stringify({ 
+            id: item.id, 
+            name: item.name, 
+            type: ext1Type,
+            description: item.description || item.background || '',
+            background: item.background || '',
+            role: item.role || ''
+          }),
           createdBy: username,
           updatedBy: username,
         });
@@ -261,30 +286,68 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
       }
     };
     
-    processAssets(result.assets?.characters, 'character', 'character_primary');
-    processAssets(result.assets?.scenes, 'scene', 'scene_primary');
-    processAssets(result.assets?.props, 'prop', 'prop_primary');
-    processAssets(result.assets?.secondaryCharacters, 'character', 'character_secondary');
-    processAssets(result.assets?.secondaryScenes, 'scene', 'scene_secondary');
-    processAssets(result.assets?.secondaryProps, 'prop', 'prop_secondary');
+    // 后端返回的数据结构可能是：
+    // 1. { characters: [...], secondaryCharacters: [...] } - 直接数组
+    // 2. { characters: { primary: [...], secondary: [...] } } - 嵌套对象
+    const assetsData = result.assets as any;
     
-    if (requests.length === 0) return;
+    console.log('[ScriptPanel] syncAssetsToBackend 接收到的数据:', assetsData);
+    
+    // 直接处理数据
+    const chars = Array.isArray(assetsData?.characters) ? assetsData.characters : 
+                  Array.isArray(assetsData?.characters?.primary) ? assetsData.characters.primary : [];
+    console.log('[ScriptPanel] 处理角色:', chars.length);
+    
+    processAssets(chars, 'character', 'character_primary');
+    processAssets(Array.isArray(assetsData?.scenes) ? assetsData.scenes : [], 'scene', 'scene_primary');
+    processAssets(Array.isArray(assetsData?.props) ? assetsData.props : [], 'prop', 'prop_primary');
+    processAssets(Array.isArray(assetsData?.secondaryCharacters) ? assetsData.secondaryCharacters : [], 'character', 'character_secondary');
+    processAssets(Array.isArray(assetsData?.secondaryScenes) ? assetsData.secondaryScenes : [], 'scene', 'scene_secondary');
+    processAssets(Array.isArray(assetsData?.secondaryProps) ? assetsData.secondaryProps : [], 'prop', 'prop_secondary');
+    
+    console.log('[ScriptPanel] 同步结果:', requests.length);
+    
+    if (requests.length === 0) {
+      console.log('[ScriptPanel] 没有资产需要同步');
+      return;
+    }
     
     try {
       const existingAssets = await imageApi.getAll(projectId);
+      console.log('[ScriptPanel] 已有资产数量:', existingAssets.length);
       
       let createdCount = 0;
+      let updatedCount = 0;
       let skippedCount = 0;
       
       for (const request of requests) {
         try {
-          const existing = existingAssets.find(
-            item => item.resourceName === request.resourceName && item.ext1 === request.ext1
+          // 查找已存在的资产（按名称匹配）
+          const existingIndex = existingAssets.findIndex(
+            item => item.resourceName === request.resourceName
           );
           
-          if (existing) {
-            skippedCount++;
+          console.log('[ScriptPanel] 处理资产:', request.resourceName, '存在?', existingIndex >= 0);
+          
+          if (existingIndex >= 0) {
+            // 资产已存在，更新它
+            const existingId = existingAssets[existingIndex].id;
+            console.log('[ScriptPanel] 更新资产:', request.resourceName, 'ID:', existingId, 'ext1:', request.ext1);
+            
+            if (existingId) {
+              await imageApi.update(existingId, {
+                resourceName: request.resourceName,
+                resourceType: request.resourceType,
+                ext1: request.ext1,
+                ext2: request.ext2,
+              });
+              updatedCount++;
+            } else {
+              skippedCount++;
+            }
           } else {
+            // 资产不存在，创建新资产
+            console.log('[ScriptPanel] 创建资产:', request.resourceName, 'ext1:', request.ext1);
             await imageApi.create(request);
             createdCount++;
           }
@@ -292,7 +355,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
           console.error('[ScriptPanel] ❌ 同步资产失败:', request.resourceName, error);
         }
       }
-      console.log('[ScriptPanel] 资产同步完成，创建:', createdCount, '个，跳过:', skippedCount, '个');
+      console.log('[ScriptPanel] 资产同步完成，创建:', createdCount, '个，更新:', updatedCount, '个');
     } catch (error) {
       console.error('[ScriptPanel] 获取已有资产失败:', error);
     }
@@ -515,15 +578,47 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
       setCurrentAnalysisStep('正在保存资产到后端...');
       setAnalysisProgress(80);
       
-      // 同步资产到后端
-      if (parsedResult.assets && (
-        parsedResult.assets.characters?.length > 0 || 
-        parsedResult.assets.scenes?.length > 0 || 
-        parsedResult.assets.props?.length > 0
-      )) {
+      // 同步资产到后端 - 更宽松的检查，兼容 AI 返回的各种格式
+      const assetsData = parsedResult.assets as any;
+      
+      // 提取主要资产（兼容多种格式）
+      const getPrimaryArray = (data: any): any[] => {
+        if (!data) return [];
+        if (Array.isArray(data)) return data;
+        if (data.primary) return Array.isArray(data.primary) ? data.primary : [];
+        if (data.主要) return Array.isArray(data.主要) ? data.主要 : [];
+        return [];
+      };
+      
+      const primaryChars = getPrimaryArray(assetsData?.characters);
+      const primaryScenes = getPrimaryArray(assetsData?.scenes);
+      const primaryProps = getPrimaryArray(assetsData?.props);
+      const secondaryChars = getPrimaryArray(assetsData?.characters?.secondary);
+      const secondaryScenes = getPrimaryArray(assetsData?.scenes?.secondary);
+      const secondaryProps = getPrimaryArray(assetsData?.props?.secondary);
+      
+      const hasAssets = primaryChars.length > 0 || primaryScenes.length > 0 || primaryProps.length > 0 ||
+                        secondaryChars.length > 0 || secondaryScenes.length > 0 || secondaryProps.length > 0;
+      
+      console.log('[ScriptPanel] 检查资产是否存在:', { 
+        primaryChars: primaryChars.length, 
+        primaryScenes: primaryScenes.length,
+        primaryProps: primaryProps.length,
+        secondaryChars: secondaryChars.length,
+        hasAssets 
+      });
+      
+      if (parsedResult.assets && hasAssets) {
+        console.log('[ScriptPanel] 开始同步资产到后端...');
         try {
           await syncAssetsToBackend(parsedResult, currentProjectId);
-          // 同步后重新加载资产列表 - 直接调用 imageApi 获取最新数据
+          console.log('[ScriptPanel] syncAssetsToBackend 完成');
+        } catch (syncErr) {
+          console.error('[ScriptPanel] syncAssetsToBackend 错误:', syncErr);
+        }
+        
+        // 同步后重新加载资产列表 - 直接调用 imageApi 获取最新数据
+        try {
           const newAssets = await imageApi.getAll(currentProjectId);
           // 手动处理返回数据并更新状态
           if (newAssets && newAssets.length > 0) {
@@ -533,6 +628,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
             const addedNames = new Set<string>();
             
             for (const asset of newAssets) {
+              console.log('[ScriptPanel] 资产原始数据:', asset.resourceName, 'ext1:', asset.ext1);
               let ext1Info: any = {};
               try {
                 if (asset.ext1) ext1Info = JSON.parse(asset.ext1);
@@ -544,12 +640,16 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
               if (resourceName.includes(' - ') || addedNames.has(resourceName)) continue;
               addedNames.add(resourceName);
               
+              // 提取 description、background 和 role
+              const description = ext1Info.background || ext1Info.description || '';
+              const role = ext1Info.role || '';
+              
               if (type.includes('character') || type.includes('role')) {
-                characters.push({ id: asset.id, name: resourceName, description: ext1Info.description || '', type });
+                characters.push({ id: asset.id, name: resourceName, description, background: ext1Info.background || '', role, type });
               } else if (type.includes('scene') || type.includes('location')) {
-                scenes.push({ id: asset.id, name: resourceName, description: ext1Info.description || '', type });
+                scenes.push({ id: asset.id, name: resourceName, description, type });
               } else if (type.includes('prop') || type.includes('item')) {
-                props.push({ id: asset.id, name: resourceName, description: ext1Info.description || '', type });
+                props.push({ id: asset.id, name: resourceName, description, type });
               }
             }
             
@@ -600,8 +700,15 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
       if (assetsToShow) {
         const { characters, scenes, props } = assetsToShow;
         
-        // 分离主要和次要
-        const primaryChars = characters?.filter((c: any) => !c.type?.includes('secondary')) || [];
+        // 排序函数：主角优先
+        const sortByMainRole = (a: any, b: any) => {
+          const aIsMain = (a.role?.includes('主角') || a.background?.includes('主角') || a.description?.includes('主角')) ? 0 : 1;
+          const bIsMain = (b.role?.includes('主角') || b.background?.includes('主角') || b.description?.includes('主角')) ? 0 : 1;
+          return aIsMain - bIsMain;
+        };
+        
+        // 分离主要和次要，并排序
+        const primaryChars = (characters?.filter((c: any) => !c.type?.includes('secondary')) || []).sort(sortByMainRole);
         const secondaryChars = characters?.filter((c: any) => c.type?.includes('secondary')) || [];
         const primaryScenes = scenes?.filter((s: any) => !s.type?.includes('secondary')) || [];
         const secondaryScenes = scenes?.filter((s: any) => s.type?.includes('secondary')) || [];

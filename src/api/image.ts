@@ -49,6 +49,8 @@ export interface UpdateImageRequest {
   resourceType?: string
   resourceContent?: string
   resourceStatus?: string
+  ext1?: string
+  ext2?: string
 }
 
 // 将后端响应转换为 Image 对象
@@ -180,6 +182,8 @@ export const imageApi = {
       resourceType: data.resourceType,
       resourceContent: data.resourceContent,
       resourceStatus: data.resourceStatus,
+      ext1: data.ext1,
+      ext2: data.ext2,
     }
     const response = await apiClient.put<ApiResponse<Image>>(`/image/${id}`, payload)
     

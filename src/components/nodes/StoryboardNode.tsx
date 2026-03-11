@@ -346,6 +346,17 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
       </div>
 
       {/* 添加场景按钮 */}
+      <div className="px-2 py-2 border-t border-gray-600">
+        <button
+          onClick={handleAddShot}
+          className="w-full flex items-center justify-center gap-1 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-400"
+        >
+          <Plus className="w-3 h-3" />
+          添加场景
+        </button>
+      </div>
+
+      {/* 统计信息 */}
       {shotGroups.length > 0 && (
         <div className="px-2 py-2 border-t border-gray-600">
           <button

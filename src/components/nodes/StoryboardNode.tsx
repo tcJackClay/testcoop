@@ -357,6 +357,8 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
       </div>
 
       {/* 统计信息 */}
+
+      {/* 统计信息 */}
       {shotGroups.length > 0 && (
         <div className="px-2 py-2 border-t border-gray-600">
           <button

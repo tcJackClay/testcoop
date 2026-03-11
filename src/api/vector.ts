@@ -44,10 +44,11 @@ export interface SoraVideoResponse {
 }
 
 export interface VectorChatCompletionRequest {
-  messages: Array<{
+  messages?: Array<{
     role: 'user' | 'assistant' | 'system'
     content: string
   }>
+  prompt?: string
   type: 1 | 2 | 3 | 4 | 5 // 1-资产提取 2-剧本分析-产出故事大纲 3-转分镜 4-转图提示词 5-转视频提示词
   model?: string
 }
@@ -57,7 +58,7 @@ export const vectorApi = {
    * 图片上传图床
    */
   uploadImage: async (data: ImageUploadRequest): Promise<ApiResponse<string>> => {
-    const response = await apiClient.post('/api/vector/upload-image', data)
+    const response = await apiClient.post('/vector/upload-image', data)
     return response.data
   },
 
@@ -67,7 +68,7 @@ export const vectorApi = {
   uploadImageFile: async (file: File): Promise<ApiResponse<ImageResponse>> => {
     const formData = new FormData()
     formData.append('file', file)
-    const response = await apiClient.post('/api/vector/upload-image-file', formData, {
+    const response = await apiClient.post('/vector/upload-image-file', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return response.data
@@ -77,7 +78,7 @@ export const vectorApi = {
    * 生成图片
    */
   generateImage: async (data: ImageGenRequest): Promise<ApiResponse<ImageResponse>> => {
-    const response = await apiClient.post('/api/vector/generate-image', data)
+    const response = await apiClient.post('/vector/generate-image', data)
     return response.data
   },
 
@@ -85,7 +86,7 @@ export const vectorApi = {
    * 创建视频 (sora-2模型)
    */
   createVideo: async (data: VideoRequest): Promise<ApiResponse<SoraVideoResponse>> => {
-    const response = await apiClient.post('/api/vector/create-video', data)
+    const response = await apiClient.post('/vector/create-video', data)
     return response.data
   },
 
@@ -93,19 +94,20 @@ export const vectorApi = {
    * 文生文聊天
    */
   chatCompletion: async (data: VectorChatCompletionRequest): Promise<ApiResponse<string>> => {
-    const response = await apiClient.post('/api/vector/chat-completion', data)
+    const response = await apiClient.post('/vector/chat-completion', data)
     return response.data
   },
 
   /**
    * 文生文聊天 - 文件上传
    */
-  chatCompletionFile: async (file: File, type: number): Promise<ApiResponse<string>> => {
+  chatCompletionFile: async (file: File, type: number, timeout: number = 120000): Promise<ApiResponse<string>> => {
     const formData = new FormData()
     formData.append('file', file)
-    const response = await apiClient.post(`/api/vector/chat-completion-file?type=${type}`, formData, {
+    const response = await apiClient.post(`/vector/chat-completion-file?type=${type}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-    })
+      timeout: timeout, // 增加超时时间到 120 秒
+    } as any)
     return response.data
   },
 }

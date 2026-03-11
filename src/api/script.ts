@@ -107,4 +107,42 @@ export const scriptApi = {
     const response = await apiClient.post('/api/script/analyze', data)
     return response.data
   },
+
+  /**
+   * 保存故事大纲
+   */
+  saveOutline: async (data: {
+    resourceName: string
+    resourceContent: string
+    projectId: number
+    userId: number
+    createdBy: string
+    updatedBy: string
+  }): Promise<ApiResponse<any>> => {
+    const response = await apiClient.post('/api/story-outline', data)
+    return response.data
+  },
+
+  /**
+   * 更新故事大纲
+   */
+  updateOutline: async (id: number, data: {
+    resourceName: string
+    resourceContent: string
+    projectId: number
+    userId: number
+    createdBy: string
+    updatedBy: string
+  }): Promise<ApiResponse<any>> => {
+    const response = await apiClient.put(`/api/story-outline/${id}`, data)
+    return response.data
+  },
+
+  /**
+   * 获取故事大纲列表
+   */
+  getOutlineList: async (projectId: number): Promise<ApiResponse<any[]>> => {
+    const response = await apiClient.get('/api/story-outline/list', { params: { projectId } })
+    return response.data
+  },
 }

@@ -1,14 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   X, Upload, FileText, Sparkles, Package, Wand2,
   ListOrdered, ChevronDown, Check, File,
   Users, Network, BookOpen, ScrollText, Box
 } from 'lucide-react';
 
-import { scriptApi, episodeScriptApi } from '../../../api';
+import { scriptApi, episodeScriptApi, imageApi, vectorApi } from '../../../api';
 import { useProjectStore } from '../../../stores/projectStore';
+import { useAuthStore } from '../../../stores/authStore';
 import { useEpisodeStore, Episode } from '../../../stores/episodeStore';
 import { splitScriptIntoEpisodes } from './scriptUtils';
+import { 
+  transformAssetResponse, 
+  transformAnalysisResponse, 
+  cleanJsonString, 
+  tryFixIncompleteJson 
+} from './scriptTransformers';
+import { ScriptAnalysisResult } from '../../../types/scriptAnalysis';
 
 interface ScriptPanelProps {
   onClose: () => void;
@@ -39,6 +47,7 @@ interface SplitResult {
 
 export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const { currentProjectId } = useProjectStore();
+  const { user } = useAuthStore();
   // 从 store 读取 episodes 列表和 store 中的选中状态
   const { episodes, selectedEpisodeId, loadEpisodes } = useEpisodeStore();
   
@@ -48,9 +57,23 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [scriptContent, setScriptContent] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [currentAnalysisStep, setCurrentAnalysisStep] = useState('');
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  
   const [selectedAction, setSelectedAction] = useState<ActionType>('extractAssets');
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>('script');
   const [showActionDropdown, setShowActionDropdown] = useState(false);
+  
+  // 分析结果状态
+  const [analysisResult, setAnalysisResult] = useState<ScriptAnalysisResult | null>(null);
+  
+  // 后端资产状态
+  const [backendAssets, setBackendAssets] = useState<{
+    characters: any[];
+    scenes: any[];
+    props: any[];
+  } | null>(null);
   
   // 使用局部状态 + store 中的 episodes
   const currentEpisode = episodes.find(ep => String(ep.id) === localSelectedEpisodeId) || episodes[0];
@@ -75,6 +98,264 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     }
   }, [currentProjectId, loadEpisodes]);
 
+  // 加载后端资产
+  useEffect(() => {
+    const loadBackendAssets = async () => {
+      if (!currentProjectId) return;
+      
+      try {
+        const assets = await imageApi.getAll(currentProjectId);
+        console.log('[ScriptPanel] 原始资产数据:', assets);
+        
+        if (assets && assets.length > 0) {
+          // 按类型分类资产
+          const primaryCharacters: any[] = [];
+          const secondaryCharacters: any[] = [];
+          const primaryScenes: any[] = [];
+          const secondaryScenes: any[] = [];
+          const primaryProps: any[] = [];
+          const secondaryProps: any[] = [];
+          
+          // 用于去重
+          const addedNames = new Set<string>();
+          
+          for (const asset of assets) {
+            // 解析 ext1
+            let ext1Info: any = {};
+            try {
+              if (asset.ext1) {
+                ext1Info = JSON.parse(asset.ext1);
+              }
+            } catch (e) {
+              ext1Info = { type: asset.ext1 };
+            }
+            
+            console.log('[ScriptPanel] 资产:', asset.resourceName, 'ext1:', ext1Info);
+            
+            const resourceName = asset.resourceName || '';
+            const type = (ext1Info.type || '').toLowerCase();
+            
+            // 检查是否是变体（名称中包含 " - "）
+            const isVariant = resourceName.includes(' - ');
+            
+            // 只保留主体资产
+            if (isVariant) continue;
+            if (addedNames.has(resourceName)) continue;
+            addedNames.add(resourceName);
+            
+            // 判断是主要还是次要
+            const isSecondary = type.includes('secondary');
+            
+            // 根据 ext1 的 type 分类
+            if (type.includes('character') || type.includes('role')) {
+              if (isSecondary) {
+                secondaryCharacters.push({
+                  id: asset.id,
+                  name: resourceName,
+                  description: ext1Info.description || ext1Info.background || '',
+                  type: type
+                });
+              } else {
+                primaryCharacters.push({
+                  id: asset.id,
+                  name: resourceName,
+                  description: ext1Info.description || ext1Info.background || '',
+                  type: type
+                });
+              }
+            } else if (type.includes('scene') || type.includes('location')) {
+              if (isSecondary) {
+                secondaryScenes.push({
+                  id: asset.id,
+                  name: resourceName,
+                  description: ext1Info.description || ext1Info.background || '',
+                  type: type
+                });
+              } else {
+                primaryScenes.push({
+                  id: asset.id,
+                  name: resourceName,
+                  description: ext1Info.description || ext1Info.background || '',
+                  type: type
+                });
+              }
+            } else if (type.includes('prop') || type.includes('item')) {
+              if (isSecondary) {
+                secondaryProps.push({
+                  id: asset.id,
+                  name: resourceName,
+                  description: ext1Info.description || ext1Info.background || '',
+                  type: type
+                });
+              } else {
+                primaryProps.push({
+                  id: asset.id,
+                  name: resourceName,
+                  description: ext1Info.description || ext1Info.background || '',
+                  type: type
+                });
+              }
+            }
+          }
+          
+          // 合并主要和次要
+          const characters = [...primaryCharacters, ...secondaryCharacters];
+          const scenes = [...primaryScenes, ...secondaryScenes];
+          const props = [...primaryProps, ...secondaryProps];
+          
+          setBackendAssets({ characters, scenes, props });
+          console.log('[ScriptPanel] 后端资产加载完成:', { 
+            primaryCharacters: primaryCharacters.length, 
+            secondaryCharacters: secondaryCharacters.length,
+            primaryScenes: primaryScenes.length,
+            secondaryScenes: secondaryScenes.length,
+            primaryProps: primaryProps.length,
+            secondaryProps: secondaryProps.length
+          });
+        }
+      } catch (error) {
+        console.error('[ScriptPanel] 加载后端资产失败:', error);
+      }
+    };
+    
+    loadBackendAssets();
+  }, [currentProjectId]);
+
+  // ============================================
+  // 同步资产到后端
+  // ============================================
+  const syncAssetsToBackend = useCallback(async (result: ScriptAnalysisResult, projectId: number) => {
+    const userId = user?.id || 1;
+    const username = user?.username || 'system';
+    
+    const requests: Array<any> = [];
+    
+    const processAssets = (assets: any[] | undefined, _type: string, ext1Type: string) => {
+      if (!assets || !Array.isArray(assets)) return;
+      for (const item of assets) {
+        // 主资产记录
+        requests.push({
+          resourceName: item.name || '未命名',
+          resourceType: 'image',
+          resourceContent: '',
+          projectId,
+          userId,
+          ext1: JSON.stringify({ id: item.id, name: item.name, type: ext1Type }),
+          createdBy: username,
+          updatedBy: username,
+        });
+        
+        // 为每个 variant 创建独立记录
+        for (const variant of item.variants || []) {
+          requests.push({
+            resourceName: `${item.name} - ${variant}`,
+            resourceType: 'image',
+            resourceContent: '',
+            projectId,
+            userId,
+            ext1: JSON.stringify({ name: item.name, variant, type: ext1Type }),
+            createdBy: username,
+            updatedBy: username,
+          });
+        }
+      }
+    };
+    
+    processAssets(result.assets?.characters, 'character', 'character_primary');
+    processAssets(result.assets?.scenes, 'scene', 'scene_primary');
+    processAssets(result.assets?.props, 'prop', 'prop_primary');
+    processAssets(result.assets?.secondaryCharacters, 'character', 'character_secondary');
+    processAssets(result.assets?.secondaryScenes, 'scene', 'scene_secondary');
+    processAssets(result.assets?.secondaryProps, 'prop', 'prop_secondary');
+    
+    if (requests.length === 0) return;
+    
+    try {
+      const existingAssets = await imageApi.getAll(projectId);
+      
+      let createdCount = 0;
+      let skippedCount = 0;
+      
+      for (const request of requests) {
+        try {
+          const existing = existingAssets.find(
+            item => item.resourceName === request.resourceName && item.ext1 === request.ext1
+          );
+          
+          if (existing) {
+            skippedCount++;
+          } else {
+            await imageApi.create(request);
+            createdCount++;
+          }
+        } catch (error) {
+          console.error('[ScriptPanel] ❌ 同步资产失败:', request.resourceName, error);
+        }
+      }
+      console.log('[ScriptPanel] 资产同步完成，创建:', createdCount, '个，跳过:', skippedCount, '个');
+    } catch (error) {
+      console.error('[ScriptPanel] 获取已有资产失败:', error);
+    }
+  }, [user]);
+
+  // ============================================
+  // 同步故事大纲到后端
+  // ============================================
+  const syncStoryOutlineToBackend = useCallback(async (result: ScriptAnalysisResult, projectId: number) => {
+    const userId = user?.id || 1;
+    const username = user?.username || 'system';
+    
+    const promises: Promise<any>[] = [];
+    
+    // 人物小传
+    if (result.characterBios && result.characterBios.length > 0) {
+      promises.push(
+        scriptApi.saveOutline({
+          resourceName: '人物小传',
+          resourceContent: JSON.stringify({ characterBios: result.characterBios }),
+          projectId,
+          userId,
+          createdBy: username,
+          updatedBy: username,
+        })
+      );
+    }
+    
+    // 人物关系
+    if (result.relationships && result.relationships.length > 0) {
+      promises.push(
+        scriptApi.saveOutline({
+          resourceName: '人物关系',
+          resourceContent: JSON.stringify({ relationships: result.relationships }),
+          projectId,
+          userId,
+          createdBy: username,
+          updatedBy: username,
+        })
+      );
+    }
+    
+    // 故事大纲
+    if (result.storyOutline) {
+      promises.push(
+        scriptApi.saveOutline({
+          resourceName: '故事大纲',
+          resourceContent: JSON.stringify({ storyOutline: result.storyOutline }),
+          projectId,
+          userId,
+          createdBy: username,
+          updatedBy: username,
+        })
+      );
+    }
+    
+    await Promise.all(promises);
+    console.log('[ScriptPanel] ✅ 所有分析数据同步完成');
+  }, [user]);
+
+  // ============================================
+  // 处理文件上传
+  // ============================================
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -83,6 +364,9 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     setScriptContent(content);
   };
 
+  // ============================================
+  // 处理剧集分集
+  // ============================================
   const handleSplitEpisodes = async () => {
     if (!scriptContent || !currentProjectId) {
       alert('请先上传剧本文件');
@@ -90,9 +374,12 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     }
 
     setIsAnalyzing(true);
+    setAnalysisProgress(0);
+    setCurrentAnalysisStep('正在分割剧本...');
 
     try {
       const splitEpisodes = splitScriptIntoEpisodes(scriptContent);
+      setAnalysisProgress(50);
       
       const resultData: SplitResult = {
         episodes: splitEpisodes,
@@ -104,11 +391,14 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
         await episodeScriptApi.create(
           `剧本分集_${new Date().toLocaleDateString()}`,
           resultData,
-          currentProjectId
+          currentProjectId,
+          user?.id
         );
       } catch (saveError) {
         console.error('保存分集剧本失败:', saveError);
       }
+      
+      setAnalysisProgress(80);
 
       // 重新加载分集
       await loadEpisodes(currentProjectId);
@@ -116,6 +406,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
         setLocalSelectedEpisodeId(String(splitEpisodes[0].id));
       }
       
+      setAnalysisProgress(100);
       alert(`分集完成！共分割为 ${splitEpisodes.length} 集`);
     } catch (error) {
       console.error('分集失败:', error);
@@ -125,40 +416,385 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     }
   };
 
+  // ============================================
+  // 处理 AI 分析（资产提取/剧本分析）
+  // ============================================
   const handleAnalyze = async () => {
     if (!scriptContent || !currentProjectId) {
       alert('请先上传剧本文件');
       return;
     }
 
+    const isAssetExtraction = selectedAction === 'extractAssets';
+    const isScriptAnalysis = selectedAction === 'analyzeScript';
+    
+    console.log('[ScriptPanel] ════════════════════════════════════════');
+    console.log('[ScriptPanel] 🎬 开始 AI 分析剧本');
+    console.log('[ScriptPanel] 📄 剧本内容长度:', scriptContent.length);
+
     setIsAnalyzing(true);
+    setAnalysisProgress(0);
+    setCurrentAnalysisStep('正在准备分析...');
+    setAnalysisError(null);
 
     try {
-      const response = await scriptApi.analyze({
-        scriptContent,
-        projectId: currentProjectId,
-        options: {
-          extractAssets: true,
-          generateOutline: true,
-          generateCharacterBios: true,
-          analyzeRelationships: true,
+      // 创建临时文件用于 API 调用
+      const blob = new Blob([scriptContent], { type: 'text/plain' });
+      const file = new (window.File || (({}: any) => Blob))( [blob], scriptFile?.name || 'script.txt', { type: 'text/plain' } );
+      
+      let analysisResult = '';
+      
+      if (isAssetExtraction) {
+        setCurrentAnalysisStep('正在提取资产...');
+        setAnalysisProgress(20);
+        
+        // 调用资产提取 API (type=1) - 文件上传方式
+        const response = await vectorApi.chatCompletionFile(file as any, 1) as any;
+        console.log('[ScriptPanel] API 响应:', response);
+        
+        if (response.code === 0 && response.data) {
+          analysisResult = response.data;
+        } else {
+          throw new Error(response.msg || response.data?.msg || '资产提取失败');
         }
-      });
-
-      if (response.data?.code === 0) {
-        // TODO: 处理分析结果
-      } else {
-        alert(response.data?.msg || '分析失败');
+      } else if (isScriptAnalysis) {
+        setCurrentAnalysisStep('正在分析剧本大纲...');
+        setAnalysisProgress(20);
+        
+        // 调用剧本分析 API (type=2) - 文件上传方式
+        const response = await vectorApi.chatCompletionFile(file as any, 2) as any;
+        console.log('[ScriptPanel] API 响应:', response);
+        
+        if (response.code === 0 && response.data) {
+          analysisResult = response.data;
+        } else {
+          throw new Error(response.msg || response.data?.msg || '剧本分析失败');
+        }
       }
+      
+      setAnalysisProgress(40);
+      
+      // 解析 JSON
+      let jsonStr = analysisResult;
+      console.log('[ScriptPanel] 原始响应:', typeof jsonStr, jsonStr?.substring?.(0, 500));
+      
+      if (typeof jsonStr === 'string') {
+        // 去除 markdown 代码块标记
+        jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/```$/, '').trim();
+        jsonStr = cleanJsonString(jsonStr);
+      }
+      
+      console.log('[ScriptPanel] 清理后:', jsonStr?.substring?.(0, 500));
+      
+      setCurrentAnalysisStep('正在解析结果...');
+      setAnalysisProgress(60);
+      
+      let parsedResult: ScriptAnalysisResult;
+      
+      try {
+        const rawData = tryFixIncompleteJson(jsonStr);
+        
+        if (isAssetExtraction) {
+          parsedResult = transformAssetResponse(rawData, currentProjectId);
+        } else {
+          parsedResult = transformAnalysisResponse(rawData);
+        }
+      } catch (parseError: any) {
+        console.error('[ScriptPanel] ❌ JSON 解析失败:', parseError?.message || parseError);
+        parsedResult = {
+          id: `analysis_${Date.now()}`,
+          projectId: `project_${currentProjectId}`,
+          assets: { characters: [], scenes: [], props: [] },
+          characterBios: [],
+          relationships: [],
+          suggestedShotGroups: [],
+          overallStyle: { primaryStyle: '待分析', colorPalette: {}, lighting: {} }
+        };
+      }
+      
+      setCurrentAnalysisStep('正在保存资产到后端...');
+      setAnalysisProgress(80);
+      
+      // 同步资产到后端
+      if (parsedResult.assets && (
+        parsedResult.assets.characters?.length > 0 || 
+        parsedResult.assets.scenes?.length > 0 || 
+        parsedResult.assets.props?.length > 0
+      )) {
+        try {
+          await syncAssetsToBackend(parsedResult, currentProjectId);
+          // 同步后重新加载资产列表 - 直接调用 imageApi 获取最新数据
+          const newAssets = await imageApi.getAll(currentProjectId);
+          // 手动处理返回数据并更新状态
+          if (newAssets && newAssets.length > 0) {
+            const characters: any[] = [];
+            const scenes: any[] = [];
+            const props: any[] = [];
+            const addedNames = new Set<string>();
+            
+            for (const asset of newAssets) {
+              let ext1Info: any = {};
+              try {
+                if (asset.ext1) ext1Info = JSON.parse(asset.ext1);
+              } catch (e) { ext1Info = { type: asset.ext1 }; }
+              
+              const resourceName = asset.resourceName || '';
+              const type = (ext1Info.type || '').toLowerCase();
+              
+              if (resourceName.includes(' - ') || addedNames.has(resourceName)) continue;
+              addedNames.add(resourceName);
+              
+              if (type.includes('character') || type.includes('role')) {
+                characters.push({ id: asset.id, name: resourceName, description: ext1Info.description || '', type });
+              } else if (type.includes('scene') || type.includes('location')) {
+                scenes.push({ id: asset.id, name: resourceName, description: ext1Info.description || '', type });
+              } else if (type.includes('prop') || type.includes('item')) {
+                props.push({ id: asset.id, name: resourceName, description: ext1Info.description || '', type });
+              }
+            }
+            
+            setBackendAssets({ characters, scenes, props });
+          }
+        } catch (syncError) {
+          console.error('[ScriptPanel] ⚠️ 资产同步失败:', syncError);
+        }
+      }
+      
+      // 同步分析结果到后端
+      if (parsedResult.characterBios?.length || parsedResult.relationships?.length || parsedResult.storyOutline) {
+        try {
+          setCurrentAnalysisStep('正在保存分析结果...');
+          await syncStoryOutlineToBackend(parsedResult, currentProjectId);
+        } catch (outlineError) {
+          console.error('[ScriptPanel] ⚠️ 故事大纲同步失败:', outlineError);
+        }
+      }
+      
+      setAnalysisProgress(100);
+      setCurrentAnalysisStep('分析完成');
+      setAnalysisResult(parsedResult);
+      
+      // 切换到资产标签页显示结果
+      if (isAssetExtraction) {
+        setActiveResultTab('assets');
+      } else {
+        setActiveResultTab('script');
+      }
+      
     } catch (error) {
-      console.error('分析失败:', error);
-      alert('分析失败，请稍后重试');
+      console.error('[ScriptPanel] ❌ AI 分析失败:', error);
+      setAnalysisError(error instanceof Error ? error.message : '分析失败');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
+  // ============================================
+  // 渲染标签内容
+  // ============================================
   const renderTabContent = () => {
+    // 优先显示后端资产（如果有）
+    if (activeResultTab === 'assets') {
+      const assetsToShow = backendAssets || analysisResult?.assets;
+      
+      if (assetsToShow) {
+        const { characters, scenes, props } = assetsToShow;
+        
+        // 分离主要和次要
+        const primaryChars = characters?.filter((c: any) => !c.type?.includes('secondary')) || [];
+        const secondaryChars = characters?.filter((c: any) => c.type?.includes('secondary')) || [];
+        const primaryScenes = scenes?.filter((s: any) => !s.type?.includes('secondary')) || [];
+        const secondaryScenes = scenes?.filter((s: any) => s.type?.includes('secondary')) || [];
+        const primaryProps = props?.filter((p: any) => !p.type?.includes('secondary')) || [];
+        const secondaryProps = props?.filter((p: any) => p.type?.includes('secondary')) || [];
+        
+        return (
+          <div className="space-y-3 text-[10px] max-h-96 overflow-y-auto">
+            {/* 主要角色 */}
+            {primaryChars.length > 0 && (
+              <div>
+                <div className="text-blue-400 font-medium mb-1">主要角色 ({primaryChars.length})</div>
+                <div className="space-y-2 pl-2">
+                  {primaryChars.map((char: any, i: number) => (
+                    <div key={`primary-${i}`} className="bg-gray-800 p-2 rounded">
+                      <div className="text-gray-200 font-medium">{char.name}</div>
+                      {char.description && (
+                        <div className="text-gray-500 text-[9px] mt-1">{char.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* 次要角色 */}
+            {secondaryChars.length > 0 && (
+              <div>
+                <div className="text-blue-300 font-medium mb-1">次要角色 ({secondaryChars.length})</div>
+                <div className="space-y-2 pl-2">
+                  {secondaryChars.map((char: any, i: number) => (
+                    <div key={`secondary-${i}`} className="bg-gray-800 p-2 rounded opacity-70">
+                      <div className="text-gray-300 font-medium">{char.name}</div>
+                      {char.description && (
+                        <div className="text-gray-500 text-[9px] mt-1">{char.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* 主要场景 */}
+            {primaryScenes.length > 0 && (
+              <div>
+                <div className="text-green-400 font-medium mb-1">主要场景 ({primaryScenes.length})</div>
+                <div className="space-y-2 pl-2">
+                  {primaryScenes.map((scene: any, i: number) => (
+                    <div key={`primary-${i}`} className="bg-gray-800 p-2 rounded">
+                      <div className="text-gray-200 font-medium">{scene.name}</div>
+                      {scene.description && (
+                        <div className="text-gray-500 text-[9px] mt-1">{scene.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* 次要场景 */}
+            {secondaryScenes.length > 0 && (
+              <div>
+                <div className="text-green-300 font-medium mb-1">次要场景 ({secondaryScenes.length})</div>
+                <div className="space-y-2 pl-2">
+                  {secondaryScenes.map((scene: any, i: number) => (
+                    <div key={`secondary-${i}`} className="bg-gray-800 p-2 rounded opacity-70">
+                      <div className="text-gray-300 font-medium">{scene.name}</div>
+                      {scene.description && (
+                        <div className="text-gray-500 text-[9px] mt-1">{scene.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* 主要道具 */}
+            {primaryProps.length > 0 && (
+              <div>
+                <div className="text-yellow-400 font-medium mb-1">主要道具 ({primaryProps.length})</div>
+                <div className="space-y-2 pl-2">
+                  {primaryProps.map((prop: any, i: number) => (
+                    <div key={`primary-${i}`} className="bg-gray-800 p-2 rounded">
+                      <div className="text-gray-200 font-medium">{prop.name}</div>
+                      {prop.description && (
+                        <div className="text-gray-500 text-[9px] mt-1">{prop.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* 次要道具 */}
+            {secondaryProps.length > 0 && (
+              <div>
+                <div className="text-yellow-300 font-medium mb-1">次要道具 ({secondaryProps.length})</div>
+                <div className="space-y-2 pl-2">
+                  {secondaryProps.map((prop: any, i: number) => (
+                    <div key={`secondary-${i}`} className="bg-gray-800 p-2 rounded opacity-70">
+                      <div className="text-gray-300 font-medium">{prop.name}</div>
+                      {prop.description && (
+                        <div className="text-gray-500 text-[9px] mt-1">{prop.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {(primaryChars.length === 0 && secondaryChars.length === 0 && 
+              primaryScenes.length === 0 && secondaryScenes.length === 0 && 
+              primaryProps.length === 0 && secondaryProps.length === 0) && (
+              <div className="text-gray-500 text-center py-4">
+                {analysisResult ? '未提取到资产' : '上传剧本后提取资产'}
+              </div>
+            )}
+          </div>
+        );
+      }
+      
+      return (
+        <div className="text-gray-500 text-center py-4">
+          {analysisResult ? '未提取到资产' : '上传剧本后提取资产'}
+        </div>
+      );
+    }
+    
+    // 显示分析结果中的其他标签
+    if (analysisResult) {
+      
+      if (activeResultTab === 'bios' && analysisResult.characterBios) {
+        return (
+          <div className="space-y-2 text-[10px] max-h-80 overflow-y-auto">
+            {analysisResult.characterBios.map((bio, i) => (
+              <div key={i} className="bg-gray-800 p-2 rounded">
+                <div className="text-blue-300 font-medium">{bio.name}</div>
+                {bio.age && <div className="text-gray-500">年龄: {bio.age}</div>}
+                {bio.background && <div className="text-gray-400 mt-1">{bio.background}</div>}
+                {bio.role && <div className="text-gray-500">角色: {bio.role}</div>}
+              </div>
+            ))}
+            {analysisResult.characterBios.length === 0 && (
+              <div className="text-gray-500 text-center py-4">未提取到人物小传</div>
+            )}
+          </div>
+        );
+      }
+      
+      if (activeResultTab === 'relationships' && analysisResult.relationships) {
+        return (
+          <div className="space-y-2 text-[10px] max-h-80 overflow-y-auto">
+            {analysisResult.relationships.map((rel, i) => (
+              <div key={i} className="bg-gray-800 p-2 rounded">
+                <div className="text-blue-300">{rel.from}</div>
+                <div className="text-gray-500">— {rel.type} —</div>
+                <div className="text-green-300">{rel.to}</div>
+                {rel.description && <div className="text-gray-400 mt-1">{rel.description}</div>}
+              </div>
+            ))}
+            {analysisResult.relationships.length === 0 && (
+              <div className="text-gray-500 text-center py-4">未提取到人物关系</div>
+            )}
+          </div>
+        );
+      }
+      
+      if (activeResultTab === 'outline' && analysisResult.storyOutline) {
+        return (
+          <div className="space-y-2 text-[10px] max-h-80 overflow-y-auto">
+            {analysisResult.storyOutline.title && (
+              <div className="text-lg text-blue-300 font-medium">{analysisResult.storyOutline.title}</div>
+            )}
+            {analysisResult.storyOutline.genre && (
+              <div className="text-gray-500">类型: {analysisResult.storyOutline.genre}</div>
+            )}
+            {analysisResult.storyOutline.summary && (
+              <div className="text-gray-300 mt-2">{analysisResult.storyOutline.summary}</div>
+            )}
+            {analysisResult.storyOutline.chapters && analysisResult.storyOutline.chapters.length > 0 && (
+              <div className="mt-2">
+                <div className="text-gray-400 font-medium">章节:</div>
+                {analysisResult.storyOutline.chapters.map((ch, i) => (
+                  <div key={i} className="text-gray-300 pl-2">{ch.title || ch.name || ch}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+    }
+    
+    // 默认显示剧本内容
     if (activeResultTab === 'script') {
       if (episodes.length > 0) {
         return (
@@ -203,6 +839,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
 
   return (
     <div className="flex flex-col h-full">
+      {/* 头部 */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 shrink-0">
         <div className="flex items-center gap-2">
           <FileText size={14} className="text-blue-400" />
@@ -213,6 +850,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
         </button>
       </div>
 
+      {/* 标签页 */}
       <div className="border-b border-gray-700 shrink-0">
         <div className="flex">
           {resultTabs.slice(0, 3).map(tab => (
@@ -248,11 +886,34 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
         </div>
       </div>
 
+      {/* 进度条 */}
+      {isAnalyzing && (
+        <div className="px-3 py-1 bg-gray-800 shrink-0">
+          <div className="text-[8px] text-gray-400 mb-1">{currentAnalysisStep}</div>
+          <div className="h-1 bg-gray-700 rounded overflow-hidden">
+            <div 
+              className="h-full bg-blue-500 transition-all duration-300"
+              style={{ width: `${analysisProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 错误提示 */}
+      {analysisError && (
+        <div className="px-3 py-2 bg-red-900/30 border-b border-red-700 shrink-0">
+          <div className="text-[10px] text-red-400">{analysisError}</div>
+        </div>
+      )}
+
+      {/* 内容区域 */}
       <div className="flex-1 overflow-y-auto p-2">
         {renderTabContent()}
       </div>
 
+      {/* 底部操作区 */}
       <div className="p-2 border-t border-gray-700 space-y-2 shrink-0">
+        {/* 操作选择 */}
         <div className="relative">
           <button
             onClick={() => setShowActionDropdown(!showActionDropdown)}
@@ -289,6 +950,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
           )}
         </div>
 
+        {/* 文件上传 */}
         <div className={`border-2 border-dashed rounded-lg p-2 text-center transition-colors ${
           scriptFile ? 'border-green-500/50 bg-green-500/10' : 'border-gray-600 hover:border-blue-500/50'
         }`}>
@@ -314,13 +976,14 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
           </label>
         </div>
 
+        {/* 执行按钮 */}
         <button
           onClick={selectedAction === 'splitEpisodes' ? handleSplitEpisodes : handleAnalyze}
           disabled={!scriptFile || isAnalyzing}
           className="w-full py-2 rounded-lg font-medium text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-500"
         >
           {isAnalyzing ? (
-            <><Sparkles size={12} className="animate-pulse" />处理中...</>
+            <><Sparkles size={12} className="animate-pulse" />{analysisProgress}%</>
           ) : (
             <><Sparkles size={12} />{selectedAction === 'splitEpisodes' ? '开始分集' : '开始处理'}</>
           )}

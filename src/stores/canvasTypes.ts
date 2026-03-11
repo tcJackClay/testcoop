@@ -37,12 +37,6 @@ export interface Connection {
   targetId: string;
   sourceHandle?: string;
   targetHandle?: string;
-export interface Connection {
-  id: string;
-  sourceId: string;
-  targetId: string;
-  sourceHandle?: string;
-  targetHandle?: string;
   inputType?: string; // 输入类型: 'default', 'image', 'text' 等
 }
 

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { 
   X, Upload, FileText, Sparkles, Package, Wand2,
   ListOrdered, ChevronDown, Check, File,
@@ -8,7 +7,8 @@ import {
 
 import { scriptApi, episodeScriptApi } from '../../../api';
 import { useProjectStore } from '../../../stores/projectStore';
-import { Episode, splitScriptIntoEpisodes } from './scriptUtils';
+import { useEpisodeStore, Episode } from '../../../stores/episodeStore';
+import { splitScriptIntoEpisodes } from './scriptUtils';
 
 interface ScriptPanelProps {
   onClose: () => void;
@@ -39,6 +39,7 @@ interface SplitResult {
 
 export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const { currentProjectId } = useProjectStore();
+  const { episodes, selectedEpisodeId, setSelectedEpisodeId, loadEpisodes } = useEpisodeStore();
   
   const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [scriptContent, setScriptContent] = useState<string>('');
@@ -47,45 +48,16 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>('script');
   const [showActionDropdown, setShowActionDropdown] = useState(false);
   
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
-  const [selectedEpisodeId, setSelectedEpisodeId] = useState<number | null>(null);
-  
-  const currentEpisode = episodes.find(ep => ep.id === selectedEpisodeId) || episodes[0];
+  // 使用 store 中的 episodes 和 selectedEpisodeId
+  const currentEpisode = episodes.find(ep => String(ep.id) === selectedEpisodeId) || episodes[0];
   const selectedOption = actionOptions.find(o => o.key === selectedAction);
 
-  // 加载分集剧本
+  // 加载分集剧本 - 使用 store
   useEffect(() => {
-    if (!currentProjectId) return;
-    
-    const loadEpisodes = async () => {
-      try {
-        const response = await episodeScriptApi.getList(currentProjectId);
-        
-        // 处理两种响应格式
-        let scriptList: any[] = [];
-        if (Array.isArray(response.data)) {
-          scriptList = response.data;
-        } else if (response.data?.code === 0 && Array.isArray(response.data?.data)) {
-          scriptList = response.data.data;
-        }
-        
-        if (scriptList.length > 0) {
-          const firstScript = scriptList[0];
-          if (firstScript.resourceContent) {
-            const content = JSON.parse(firstScript.resourceContent) as SplitResult;
-            if (content.episodes && content.episodes.length > 0) {
-              setEpisodes(content.episodes);
-              setSelectedEpisodeId(content.episodes[0].id);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('加载分集剧本失败:', error);
-      }
-    };
-    
-    loadEpisodes();
-  }, [currentProjectId]);
+    if (currentProjectId) {
+      loadEpisodes(currentProjectId);
+    }
+  }, [currentProjectId, loadEpisodes]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -122,8 +94,11 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
         console.error('保存分集剧本失败:', saveError);
       }
 
-      setEpisodes(splitEpisodes);
-      setSelectedEpisodeId(splitEpisodes[0]?.id || null);
+      // 重新加载分集
+      await loadEpisodes(currentProjectId);
+      if (splitEpisodes.length > 0) {
+        setSelectedEpisodeId(String(splitEpisodes[0].id));
+      }
       
       alert(`分集完成！共分割为 ${splitEpisodes.length} 集`);
     } catch (error) {
@@ -174,7 +149,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
           <div className="space-y-2">
             <select
               value={selectedEpisodeId || ''}
-              onChange={(e) => setSelectedEpisodeId(Number(e.target.value))}
+              onChange={(e) => setSelectedEpisodeId(e.target.value)}
               className="w-full px-2 py-1.5 text-[10px] bg-gray-800 border border-gray-600 rounded text-gray-300 focus:outline-none focus:border-blue-500"
             >
               {episodes.map((ep) => (

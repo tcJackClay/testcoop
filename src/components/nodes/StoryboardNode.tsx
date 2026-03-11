@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Sparkles, Loader2 } from 'lucide-react';
-import { episodeScriptApi, storyboardScriptApi, vectorApi } from '../../api';
+import { storyboardScriptApi, vectorApi } from '../../api';
 import { useProjectStore } from '../../stores/projectStore';
+import { useEpisodeStore, Episode } from '../../stores/episodeStore';
 
 interface Shot {
   id: string;
@@ -18,13 +19,6 @@ interface ShotGroup {
   shots: Shot[];
 }
 
-interface EpisodeScript {
-  id: number;
-  name: string;
-  content: string;
-  episodeNumber: number;
-}
-
 interface StoryboardScript {
   id: number;
   name: string;
@@ -37,19 +31,35 @@ interface StoryboardNodeProps {
   updateData: (key: string, value: unknown) => void;
 }
 
-export default function StoryboardNode({ nodeId, data, updateData }: StoryboardNodeProps) {
+export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: StoryboardNodeProps) {
   const { currentProjectId } = useProjectStore();
+  const { episodes, selectedEpisodeId, setSelectedEpisodeId, loadEpisodes, loading } = useEpisodeStore();
   
-  const episodes = (data.episodes as EpisodeScript[]) || [];
-  const selectedEpisodeId = (data.selectedEpisodeId as string) || '';
-  const shotGroups = (data.shotGroups as ShotGroup[]) || [];
-  const storyboardContent = (data.storyboardContent as string) || '';
-  const isGenerating = (data.isGenerating as boolean) || false;
-  const existingStoryboard = (data.existingStoryboard as StoryboardScript) || null;
-
-  const [localEpisodes, setLocalEpisodes] = useState<EpisodeScript[]>([]);
-  const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+  // 内部状态，用于节点级别的临时状态
+  const [localEpisodes] = useState<Episode[]>([]);
+  const [localSelectedId, setLocalSelectedId] = useState<string>('');
   const [localGenerating, setLocalGenerating] = useState(false);
+
+  // 同步 store 中的 episodes 到本地
+  useEffect(() => {
+    if (currentProjectId) {
+      loadEpisodes(currentProjectId);
+    }
+  }, [currentProjectId, loadEpisodes]);
+
+  // 当 store 中的 selectedEpisodeId 变化时，同步到本地
+  useEffect(() => {
+    if (selectedEpisodeId) {
+      setLocalSelectedId(selectedEpisodeId);
+    }
+  }, [selectedEpisodeId]);
+
+  // 使用本地状态或 store 状态
+  const displayEpisodes = episodes.length > 0 ? episodes : localEpisodes;
+  const displaySelectedId = selectedEpisodeId || localSelectedId;
+
+  // 从 node data 中获取已有的分镜
+  const existingStoryboard = (data.existingStoryboard as StoryboardScript) || null;
 
 
   // 加载已有分镜
@@ -76,8 +86,9 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
     }
   };
 
-  // 选择分集时加载已有分镜
+  // 选择分集时更新 store（同步到 ScriptPanel）
   const handleEpisodeChange = (episodeId: string) => {
+    setSelectedEpisodeId(episodeId);  // 更新 store，ScriptPanel 也会同步
     updateData('selectedEpisodeId', episodeId);
     if (episodeId) {
       loadExistingStoryboard(parseInt(episodeId));
@@ -86,9 +97,9 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
 
   // AI 生成分镜
   const handleGenerate = async () => {
-    if (!selectedEpisodeId || !currentProjectId) return;
+    if (!displaySelectedId || !currentProjectId) return;
     
-    const episode = localEpisodes.find(ep => ep.id === parseInt(selectedEpisodeId));
+    const episode = displayEpisodes.find(ep => ep.id === parseInt(displaySelectedId));
     if (!episode?.content) {
       console.error('分集内容为空');
       return;
@@ -112,7 +123,7 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
         updateData('shotGroups', parsed);
         
         // 保存到后端
-        await saveStoryboard(parseInt(selectedEpisodeId), content);
+        await saveStoryboard(parseInt(displaySelectedId), content);
       }
     } catch (error) {
       console.error('AI 生成分镜失败:', error);
@@ -262,6 +273,7 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
     }
   };
 
+  const shotGroups = (data.shotGroups as ShotGroup[]) || [];
   const totalShots = shotGroups.reduce((sum, g) => sum + g.shots.length, 0);
 
   return (
@@ -270,21 +282,21 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
       <div className="px-2 py-2 border-b border-gray-600 bg-gray-750">
         <div className="flex items-center gap-2">
           <select
-            value={selectedEpisodeId}
+            value={displaySelectedId}
             onChange={(e) => handleEpisodeChange(e.target.value)}
-            disabled={loadingEpisodes || localGenerating}
+            disabled={loading || localGenerating}
             className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">选择分集...</option>
-            {localEpisodes.map(ep => (
+            {displayEpisodes.map(ep => (
               <option key={ep.id} value={ep.id}>
-                {ep.name || `第${ep.episodeNumber}集`}
+                {ep.title || ep.name || `第${ep.episodeNumber}集`}
               </option>
             ))}
           </select>
           <button
             onClick={handleGenerate}
-            disabled={!selectedEpisodeId || localGenerating}
+            disabled={!displaySelectedId || localGenerating}
             className="flex items-center gap-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded text-xs text-white"
           >
             {localGenerating ? (
@@ -295,7 +307,7 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
             AI生成
           </button>
         </div>
-        {loadingEpisodes && (
+        {loading && (
           <div className="text-xs text-gray-500 mt-1">加载分集中...</div>
         )}
       </div>
@@ -304,7 +316,7 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
       <div className="flex-1 overflow-y-auto p-2 space-y-3 max-h-64">
         {shotGroups.length === 0 ? (
           <div className="text-xs text-gray-500 text-center py-6">
-            {selectedEpisodeId ? '点击"AI生成"创建分镜' : '请先选择分集'}
+            {displaySelectedId ? '点击"AI生成"创建分镜' : '请先选择分集'}
           </div>
         ) : (
           shotGroups.map(group => (

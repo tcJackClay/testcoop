@@ -1,20 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, X, Loader2, Bot } from 'lucide-react';
+import { Send, X, Loader2, Bot, Image as ImageIcon, Video, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
+import { useChatStore, type ChatMessage as StoreChatMessage } from '../../stores/chatStore';
 
 export default function ChatPanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { messages: storeMessages, addMessage, addAttachment } = useChatStore();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Use store messages or local state
+  const messages = storeMessages.length > 0 ? storeMessages : [];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,26 +24,20 @@ export default function ChatPanel({ onClose }: { onClose: () => void }) {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
-    const userMessage: ChatMessage = {
-      id: `msg_${Date.now()}`,
+    addMessage({
       role: 'user',
       content: input.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    });
+    
     setInput('');
     setIsLoading(true);
 
     // Simulate AI response (in real app, this would call an API)
     setTimeout(() => {
-      const aiResponse: ChatMessage = {
-        id: `msg_${Date.now()}_ai`,
+      addMessage({
         role: 'assistant',
-        content: `收到您的消息: "${userMessage.content}"\n\n这是一个模拟的AI对话功能。在完整实现中，这里会连接到您配置的大模型API来生成回复。\n\n您可以:\n- 询问关于工作流的问题\n- 获取使用帮助\n- 生成创意内容`,
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, aiResponse]);
+        content: `收到您的消息: "${input.trim()}"\n\n这是一个模拟的AI对话功能。在完整实现中，这里会连接到您配置的大模型API来生成回复。\n\n您可以:\n- 询问关于工作流的问题\n- 获取使用帮助\n- 生成创意内容`,
+      });
       setIsLoading(false);
     }, 1000);
   };
@@ -56,6 +47,29 @@ export default function ChatPanel({ onClose }: { onClose: () => void }) {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  // Render attachment preview
+  const renderAttachment = (attachment: StoreChatMessage['attachment']) => {
+    if (!attachment) return null;
+    
+    return (
+      <div className="mt-2 rounded-lg overflow-hidden border border-gray-600">
+        {attachment.type === 'image' ? (
+          <img 
+            src={attachment.thumbnailUrl || attachment.url} 
+            alt="Attachment" 
+            className="max-w-full max-h-40 object-contain"
+          />
+        ) : (
+          <video 
+            src={attachment.url} 
+            className="max-w-full max-h-40" 
+            controls
+          />
+        )}
+      </div>
+    );
   };
 
   return (
@@ -81,7 +95,7 @@ export default function ChatPanel({ onClose }: { onClose: () => void }) {
             <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
             <p className="text-sm">{t('chat.welcome') || '欢迎使用AI对话'}</p>
             <p className="text-xs mt-2 text-gray-600">
-              可以询问关于工作流的问题
+              可以询问关于工作流的问题，或从历史记录发送图片/视频到这里
             </p>
           </div>
         ) : (
@@ -98,8 +112,9 @@ export default function ChatPanel({ onClose }: { onClose: () => void }) {
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                {msg.attachment && renderAttachment(msg.attachment)}
                 <p className="text-[10px] opacity-60 mt-1">
-                  {msg.timestamp.toLocaleTimeString()}
+                  {new Date(msg.timestamp).toLocaleTimeString()}
                 </p>
               </div>
             </div>

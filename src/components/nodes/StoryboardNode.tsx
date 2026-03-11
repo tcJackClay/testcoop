@@ -265,7 +265,7 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
   const totalShots = shotGroups.reduce((sum, g) => sum + g.shots.length, 0);
 
   return (
-    <div className="w-72 flex flex-col">
+    <div className="min-w-[280px] flex flex-col bg-gray-800 rounded-lg">
       {/* 分集选择 */}
       <div className="px-2 py-2 border-b border-gray-600 bg-gray-750">
         <div className="flex items-center gap-2">

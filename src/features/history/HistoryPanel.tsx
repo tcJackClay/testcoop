@@ -1,17 +1,34 @@
 import { useState } from 'react';
-import { X, Zap, FolderOpen, Layers, Trash2, Download, Image, Video, Grid3X3, List } from 'lucide-react';
+import { X, Zap, FolderOpen, Layers, Trash2, Download, Image, Video, Grid3X3, List, RefreshCw, MessageCircle, Layout, MoreVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useHistoryStore } from '../../stores/historyStore';
+import type { HistoryItem } from '../../types';
 
 export default function HistoryPanel({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [performanceMode, setPerformanceMode] = useState<'off' | 'normal' | 'ultra'>('normal');
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ item: HistoryItem; x: number; y: number } | null>(null);
   
-  const { items, clearAll } = useHistoryStore();
+  const { items, clearAll, sendToCanvas, sendToChat, rebuildThumbnail, getCacheSize } = useHistoryStore();
+
+  const handleContextMenu = (e: React.MouseEvent, item: HistoryItem) => {
+    e.preventDefault();
+    setContextMenu({ item, x: e.clientX, y: e.clientY });
+  };
+
+  const closeContextMenu = () => setContextMenu(null);
+
+  // Format cache size
+  const formatCacheSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onClick={closeContextMenu}>
       {/* Header */}
       <div className="h-12 border-b border-gray-700 flex items-center justify-between px-3 shrink-0">
         <div>
@@ -34,7 +51,7 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
           >
             <Zap size={14} />
           </button>
-          <button className="p-1.5 text-gray-500 hover:text-gray-300 rounded">
+          <button className="p-1.5 text-gray-500 hover:text-gray-300 rounded" title={`缓存: ${formatCacheSize(getCacheSize())}`}>
             <FolderOpen size={14} />
           </button>
           <button className="p-1.5 text-gray-500 hover:text-gray-300 rounded">
@@ -87,7 +104,15 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
             {items.slice(0, 20).map((item) => (
               <div
                 key={item.id}
-                className="aspect-square bg-gray-700 rounded overflow-hidden cursor-pointer hover:ring-2 ring-blue-500"
+                className="aspect-square bg-gray-700 rounded overflow-hidden cursor-pointer hover:ring-2 ring-blue-500 relative group"
+                onMouseEnter={() => setHoveredItem(item.id)}
+                onMouseLeave={() => setHoveredItem(null)}
+                onContextMenu={(e) => handleContextMenu(e, item)}
+                onClick={(e) => {
+                  if (e.shiftKey || e.ctrlKey) {
+                    handleContextMenu(e, item);
+                  }
+                }}
               >
                 {item.thumbnailUrl ? (
                   <img src={item.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -100,6 +125,44 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
                 )}
+                
+                {/* Hover overlay with actions */}
+                {hoveredItem === item.id && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); sendToCanvas(item); }}
+                      className="p-2 bg-blue-600 hover:bg-blue-500 rounded-full"
+                      title="发送到画布"
+                    >
+                      <Layout size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); sendToChat(item); }}
+                      className="p-2 bg-green-600 hover:bg-green-500 rounded-full"
+                      title="发送到聊天"
+                    >
+                      <MessageCircle size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); rebuildThumbnail(item.id); }}
+                      className="p-2 bg-gray-600 hover:bg-gray-500 rounded-full"
+                      title="重建缩略图"
+                    >
+                      <RefreshCw size={16} />
+                    </button>
+                  </div>
+                )}
+                
+                {/* Status badge */}
+                {item.status === 'success' && (
+                  <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full" />
+                )}
+                {item.status === 'failed' && (
+                  <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                )}
+                {item.status === 'pending' && (
+                  <div className="absolute top-1 right-1 w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                )}
               </div>
             ))}
           </div>
@@ -108,7 +171,15 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
             {items.slice(0, 20).map((item) => (
               <div
                 key={item.id}
-                className="flex items-center gap-2 p-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600"
+                className="flex items-center gap-2 p-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 relative group"
+                onMouseEnter={() => setHoveredItem(item.id)}
+                onMouseLeave={() => setHoveredItem(null)}
+                onContextMenu={(e) => handleContextMenu(e, item)}
+                onClick={(e) => {
+                  if (e.shiftKey || e.ctrlKey) {
+                    handleContextMenu(e, item);
+                  }
+                }}
               >
                 <div className="w-12 h-12 bg-gray-600 rounded overflow-hidden shrink-0">
                   {item.thumbnailUrl ? (
@@ -127,11 +198,81 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
                   <p className="text-xs truncate">{item.prompt || '无提示词'}</p>
                   <p className="text-[10px] text-gray-500">{item.modelName}</p>
                 </div>
+                
+                {/* Hover actions for list view */}
+                {hoveredItem === item.id && (
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); sendToCanvas(item); }}
+                      className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded"
+                      title="发送到画布"
+                    >
+                      <Layout size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); sendToChat(item); }}
+                      className="p-1.5 bg-green-600 hover:bg-green-500 rounded"
+                      title="发送到聊天"
+                    >
+                      <MessageCircle size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); rebuildThumbnail(item.id); }}
+                      className="p-1.5 bg-gray-600 hover:bg-gray-500 rounded"
+                      title="重建缩略图"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-1 z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => { sendToCanvas(contextMenu.item); closeContextMenu(); }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <Layout size={14} />
+            发送到画布
+          </button>
+          <button
+            onClick={() => { sendToChat(contextMenu.item); closeContextMenu(); }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <MessageCircle size={14} />
+            发送到聊天
+          </button>
+          <button
+            onClick={() => { rebuildThumbnail(contextMenu.item.id); closeContextMenu(); }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <RefreshCw size={14} />
+            重建缩略图
+          </button>
+          <hr className="my-1 border-gray-600" />
+          <button
+            onClick={() => { 
+              const url = contextMenu.item.type === 'image' ? contextMenu.item.imageUrls?.[0] : contextMenu.item.videoUrl;
+              if (url) window.open(url, '_blank');
+              closeContextMenu();
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+          >
+            <Download size={14} />
+            下载原文件
+          </button>
+        </div>
+      )}
 
       {/* Close Button */}
       <button

@@ -63,6 +63,16 @@ export default function App() {
     return () => window.removeEventListener('auth:login-success', handleLoginSuccess);
   }, []);
 
+  // 监听从历史记录发送到聊天的事件
+  useEffect(() => {
+    const handleSendToChat = () => {
+      setRightPanel('chat');
+    };
+    
+    window.addEventListener('history:send-to-chat', handleSendToChat);
+    return () => window.removeEventListener('history:send-to-chat', handleSendToChat);
+  }, []);
+
   useEffect(() => {
     if (!isInitialized) return;
     

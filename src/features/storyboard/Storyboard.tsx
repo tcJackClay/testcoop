@@ -5,38 +5,85 @@ import {
   Table, 
   Play, 
   Trash2,
-  Upload
+  Upload,
+  Image,
+  Video,
+  Settings,
+  Sparkles,
+  Layers,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStoryboardStore } from '../../stores/storyboardStore';
 import StoryboardCard from './StoryboardCard';
 import ShotEditor from './ShotEditor';
+import type { StoryboardMode, SplitMode } from '../../types';
 
 export default function Storyboard() {
   const { t } = useTranslation();
   const [showEditor, setShowEditor] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const {
     shots,
     selectedShotId,
     viewMode,
+    storyboardMode,
     isGenerating,
+    splitMode,
+    llmPrompt,
+    batchQueue,
     addShot,
     selectShot,
     setViewMode,
+    setStoryboardMode,
+    setSplitMode,
+    setLlmPrompt,
     clearAllShots,
     importFromScript,
+    importFromLLM,
+    importFromNovel,
+    importFromTable,
+    addToBatchQueue,
+    removeFromBatchQueue,
+    clearBatchQueue,
+    generateBatch,
   } = useStoryboardStore();
 
-  const handleImport = () => {
+  const selectedShot = shots.find((s) => s.id === selectedShotId);
+
+  // Handle script import
+  const handleImport = (type: SplitMode) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.txt,.md';
+    
+    if (type === 'table_summary') {
+      input.accept = '.txt,.md,.csv';
+    } else {
+      input.accept = '.txt,.md';
+    }
+    
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = (ev) => {
-          importFromScript(ev.target?.result as string);
+          const content = ev.target?.result as string;
+          switch (type) {
+            case 'script':
+              importFromScript(content);
+              break;
+            case 'novel':
+              importFromNovel(content);
+              break;
+            case 'table_summary':
+              importFromTable(content);
+              break;
+            default:
+              importFromScript(content);
+          }
+          setShowImportModal(false);
         };
         reader.readAsText(file);
       }
@@ -44,15 +91,49 @@ export default function Storyboard() {
     input.click();
   };
 
-  const selectedShot = shots.find((s) => s.id === selectedShotId);
+  // Handle LLM split
+  const handleLLMSplit = async (type: SplitMode) => {
+    const prompt = window.prompt(t('storyboard.enterScript') || '请输入脚本内容:');
+    if (!prompt) return;
+    
+    switch (type) {
+      case 'script':
+        await importFromLLM(prompt);
+        break;
+      case 'novel':
+        await importFromNovel(prompt);
+        break;
+      case 'table_summary':
+        await importFromTable(prompt);
+        break;
+    }
+  };
+
+  // Toggle shot in batch queue
+  const toggleShotInBatch = (shotId: string) => {
+    if (batchQueue.includes(shotId)) {
+      removeFromBatchQueue(shotId);
+    } else {
+      addToBatchQueue([shotId]);
+    }
+  };
+
+  // Select all unlocked shots
+  const selectAllForBatch = () => {
+    const unlockedIds = shots
+      .filter((s) => s.outputEnabled && !s.locked)
+      .map((s) => s.id);
+    addToBatchQueue(unlockedIds);
+  };
 
   return (
     <div className="h-full flex">
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="h-12 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
+        <div className="h-14 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-2">
+            {/* Add Shot */}
             <button
               onClick={() => addShot()}
               className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded text-sm"
@@ -60,13 +141,64 @@ export default function Storyboard() {
               <Plus className="w-4 h-4" />
               {t('storyboard.addShot')}
             </button>
-            <button
-              onClick={handleImport}
-              className="flex items-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm"
-            >
-              <Upload className="w-4 h-4" />
-              {t('storyboard.import')}
-            </button>
+
+            {/* Import Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowImportModal(!showImportModal)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm"
+              >
+                <Upload className="w-4 h-4" />
+                {t('storyboard.import')}
+              </button>
+              
+              {showImportModal && (
+                <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-[160px]">
+                  <button
+                    onClick={() => handleImport('script')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700"
+                  >
+                    从脚本导入
+                  </button>
+                  <button
+                    onClick={() => handleImport('novel')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700"
+                  >
+                    从小说导入
+                  </button>
+                  <button
+                    onClick={() => handleImport('table_summary')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700"
+                  >
+                    从表格导入
+                  </button>
+                  <hr className="my-1 border-gray-700" />
+                  <button
+                    onClick={() => { setShowImportModal(false); handleLLMSplit('script'); }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <Sparkles size={14} />
+                    LLM 脚本拆分
+                  </button>
+                  <button
+                    onClick={() => { setShowImportModal(false); handleLLMSplit('novel'); }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <Sparkles size={14} />
+                    LLM 小说拆分
+                  </button>
+                  <button
+                    onClick={() => { setShowImportModal(false); handleLLMSplit('table_summary'); }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <Sparkles size={14} />
+                    LLM 表格汇总
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Clear All */}
             {shots.length > 0 && (
               <button
                 onClick={clearAllShots}
@@ -78,25 +210,128 @@ export default function Storyboard() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Mode Toggle: Image/Video */}
+            <div className="flex bg-gray-700 rounded p-0.5">
+              <button
+                onClick={() => setStoryboardMode('image')}
+                className={`flex items-center gap-1 px-3 py-1 rounded text-xs ${
+                  storyboardMode === 'image' ? 'bg-gray-600 text-white' : 'text-gray-400'
+                }`}
+                title={t('storyboard.imageMode')}
+              >
+                <Image size={14} />
+                图片
+              </button>
+              <button
+                onClick={() => setStoryboardMode('video')}
+                className={`flex items-center gap-1 px-3 py-1 rounded text-xs ${
+                  storyboardMode === 'video' ? 'bg-gray-600 text-white' : 'text-gray-400'
+                }`}
+                title={t('storyboard.videoMode')}
+              >
+                <Video size={14} />
+                视频
+              </button>
+            </div>
+
+            {/* Batch Generate Button */}
+            {shots.length > 0 && (
+              <button
+                onClick={generateBatch}
+                disabled={batchQueue.length === 0 || isGenerating}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm ${
+                  batchQueue.length === 0
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                <Play className="w-4 h-4" />
+                批量生成 ({batchQueue.length})
+              </button>
+            )}
+
+            {/* Settings */}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-1.5 rounded ${showSettings ? 'bg-gray-600' : ''}`}
+              title={t('common.settings')}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            {/* View Mode Toggle */}
             <div className="flex bg-gray-700 rounded p-0.5">
               <button
                 onClick={() => setViewMode('card')}
                 className={`p-1.5 rounded ${viewMode === 'card' ? 'bg-gray-600' : ''}`}
                 title={t('storyboard.cardView')}
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid size={14} />
               </button>
               <button
                 onClick={() => setViewMode('table')}
                 className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-gray-600' : ''}`}
                 title={t('storyboard.tableView')}
               >
-                <Table className="w-4 h-4" />
+                <Table size={14} />
               </button>
             </div>
           </div>
         </div>
+
+        {/* Settings Panel */}
+        {showSettings && (
+          <div className="bg-gray-800 border-b border-gray-700 p-3 space-y-3">
+            <div className="flex items-center gap-4">
+              <label className="text-sm text-gray-400">拆分模式:</label>
+              <select
+                value={splitMode}
+                onChange={(e) => setSplitMode(e.target.value as SplitMode)}
+                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm"
+              >
+                <option value="script">脚本拆分</option>
+                <option value="novel">小说拆分</option>
+                <option value="custom">自定义</option>
+                <option value="table_summary">表格汇总</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">LLM Prompt:</label>
+              <textarea
+                value={llmPrompt}
+                onChange={(e) => setLlmPrompt(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white resize-none h-24"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Batch Queue Bar */}
+        {batchQueue.length > 0 && (
+          <div className="bg-green-900/30 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Layers size={14} className="text-green-400" />
+              <span className="text-sm text-green-400">
+                已选择 {batchQueue.length} 个镜头待生成
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={selectAllForBatch}
+                className="text-xs text-green-400 hover:text-green-300"
+              >
+                全选未锁定
+              </button>
+              <button
+                onClick={clearBatchQueue}
+                className="text-xs text-red-400 hover:text-red-300"
+              >
+                清空队列
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-4">
@@ -115,11 +350,13 @@ export default function Storyboard() {
                   key={shot.id}
                   shot={shot}
                   isSelected={shot.id === selectedShotId}
+                  isInBatchQueue={batchQueue.includes(shot.id)}
                   onClick={() => selectShot(shot.id)}
                   onDoubleClick={() => {
                     selectShot(shot.id);
                     setShowEditor(true);
                   }}
+                  onToggleBatch={() => toggleShotInBatch(shot.id)}
                 />
               ))}
             </div>
@@ -128,6 +365,7 @@ export default function Storyboard() {
               <table className="w-full">
                 <thead className="bg-gray-750">
                   <tr>
+                    <th className="px-2 py-2 text-left text-sm font-medium w-8"></th>
                     <th className="px-4 py-2 text-left text-sm font-medium">#</th>
                     <th className="px-4 py-2 text-left text-sm font-medium">{t('storyboard.scene')}</th>
                     <th className="px-4 py-2 text-left text-sm font-medium">{t('storyboard.description')}</th>
@@ -144,6 +382,18 @@ export default function Storyboard() {
                       }`}
                       onClick={() => selectShot(shot.id)}
                     >
+                      <td className="px-2 py-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleShotInBatch(shot.id); }}
+                          className="text-gray-400 hover:text-white"
+                        >
+                          {batchQueue.includes(shot.id) ? (
+                            <CheckSquare size={16} className="text-green-400" />
+                          ) : (
+                            <Square size={16} />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-4 py-2 text-sm">{shot.shotNumber}</td>
                       <td className="px-4 py-2 text-sm">{shot.sceneNumber}</td>
                       <td className="px-4 py-2 text-sm truncate max-w-xs">{shot.description}</td>
@@ -166,10 +416,10 @@ export default function Storyboard() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setShowEditor(true);
                             selectShot(shot.id);
+                            setShowEditor(true);
                           }}
-                          className="text-blue-400 hover:text-blue-300"
+                          className="text-blue-400 hover:text-blue-300 text-sm"
                         >
                           {t('common.edit')}
                         </button>
@@ -189,6 +439,16 @@ export default function Storyboard() {
           shot={selectedShot}
           onClose={() => setShowEditor(false)}
         />
+      )}
+
+      {/* Loading Overlay */}
+      {isGenerating && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg text-center">
+            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-white">处理中...</p>
+          </div>
+        </div>
       )}
     </div>
   );

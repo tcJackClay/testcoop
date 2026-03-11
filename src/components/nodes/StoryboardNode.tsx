@@ -356,7 +356,12 @@ export default function StoryboardNode({ nodeId, data, updateData }: StoryboardN
         </button>
       </div>
 
+
       {/* 统计信息 */}
+      <div className="px-2 py-1.5 border-t border-gray-600 text-xs text-gray-500 flex justify-between">
+        <span>{shotGroups.length} 个场景</span>
+        <span>{totalShots} 个分镜</span>
+      </div>
 
       {/* 统计信息 */}
       {shotGroups.length > 0 && (

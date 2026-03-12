@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Trash2, Download, Eye } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Trash2, Download, Eye, ChevronRight, Tag } from 'lucide-react';
 import type { Image as AssetImage } from '../../api/image';
+import { useAssetStore } from '../../stores/assetStore';
 
 interface ContextMenuProps {
   asset: AssetImage;
@@ -8,16 +9,40 @@ interface ContextMenuProps {
   onClose: () => void;
   onDelete: (asset: AssetImage) => void;
   onViewDetails?: (asset: AssetImage) => void;
+  currentCategory?: string;
 }
+
+const CATEGORIES = [
+  { key: '主要角色', label: '主要角色', color: 'text-blue-400' },
+  { key: '次要角色', label: '次要角色', color: 'text-blue-300' },
+  { key: '主要场景', label: '主要场景', color: 'text-green-400' },
+  { key: '次要场景', label: '次要场景', color: 'text-green-300' },
+  { key: '主要道具', label: '主要道具', color: 'text-yellow-400' },
+  { key: '次要道具', label: '次要道具', color: 'text-yellow-300' },
+];
 
 export default function ContextMenu({ 
   asset, 
   position, 
   onClose, 
   onDelete,
-  onViewDetails 
+  onViewDetails,
+  currentCategory: initialCategory 
 }: ContextMenuProps) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
+  const typeMenuRef = useRef<HTMLDivElement>(null);
+  const { updateAssetCategory } = useAssetStore();
+  
+  // 获取当前资产分类（优先使用传入的值）
+  const [currentCategory, setCurrentCategory] = useState<string>(initialCategory || '次要道具');
+  
+  // 当 prop 变化时更新
+  useEffect(() => {
+    if (initialCategory) {
+      setCurrentCategory(initialCategory);
+    }
+  }, [initialCategory]);
 
   // Handle click outside to close menu
   const handleOverlayClick = () => {
@@ -58,6 +83,15 @@ export default function ContextMenu({
     onClose();
   };
 
+  const handleTypeChange = async (category: string) => {
+    if (asset.id) {
+      await updateAssetCategory(asset.id, category);
+      setCurrentCategory(category);
+    }
+    setShowTypeMenu(false);
+    onClose();
+  };
+
   // Adjust position to keep menu in viewport
   const menuStyle: React.CSSProperties = {
     left: position.x,
@@ -93,6 +127,41 @@ export default function ContextMenu({
           <Download size={14} />
           下载
         </button>
+        
+        {/* 更改分类 */}
+        <div className="relative">
+          <button
+            onClick={() => setShowTypeMenu(!showTypeMenu)}
+            className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center justify-between gap-2"
+          >
+            <span className="flex items-center gap-2">
+              <Tag size={14} />
+              更改分类
+            </span>
+            <ChevronRight size={14} className={`transition-transform ${showTypeMenu ? 'rotate-90' : ''}`} />
+          </button>
+          
+          {/* 子菜单 */}
+          {showTypeMenu && (
+            <div className="absolute left-full top-0 ml-1 bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-1 min-w-[140px]">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.key}
+                  onClick={() => handleTypeChange(cat.key)}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
+                    currentCategory === cat.key ? 'bg-gray-700' : 'text-white'
+                  }`}
+                >
+                  <span className={cat.color}>●</span>
+                  {cat.label}
+                  {currentCategory === cat.key && (
+                    <span className="ml-auto text-blue-400">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         
         <div className="border-t border-gray-700 my-1" />
         

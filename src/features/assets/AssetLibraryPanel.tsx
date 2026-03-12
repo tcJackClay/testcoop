@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   X, 
   Plus, 
@@ -45,6 +45,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     setSearchTerm,
     getFilteredAssets,
     selectAsset,
+    syncVariants,
   } = useAssetStore();
   
   const { addNode, nodes } = useCanvasStore();
@@ -53,6 +54,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   const [contextMenu, setContextMenu] = useState<{
     asset: Image;
     position: { x: number; y: number };
+    currentCategory?: string;
   } | null>(null);
   
   // Delete loading state
@@ -75,12 +77,60 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return assets.filter((asset) => asset.parentId === primaryName);
   };
   
+  // 获取资产分类（与 assetStore 保持一致）
+  const getAssetCategory = (asset: Image): string => {
+    const resourceName = asset.resourceName || asset.name || '';
+    
+    // 检查名称是否包含 " - " （变体命名模式）
+    if (resourceName.includes(' - ')) {
+      const parentName = resourceName.split(' - ')[0].trim();
+      if (parentName.includes('角色')) return '次要角色';
+      if (parentName.includes('场景')) return '次要场景';
+      if (parentName.includes('道具')) return '次要道具';
+      // 查找父资产
+      const parentAsset = assets.find((a) => 
+        a.name === parentName || a.resourceName === parentName
+      );
+      if (parentAsset) {
+        const parentCategory = mapCategoryToType(parentAsset.resourceType);
+        return parentCategory.replace('主要', '次要');
+      }
+    }
+    
+    // 检查 ext1
+    if (asset.ext1) {
+      try {
+        const ext1Data = JSON.parse(asset.ext1);
+        if (ext1Data.parent) {
+          const parentName = ext1Data.parent;
+          if (parentName.includes('角色')) return '次要角色';
+          if (parentName.includes('场景')) return '次要场景';
+          if (parentName.includes('道具')) return '次要道具';
+        }
+        if (ext1Data.type) {
+          return mapCategoryToType(ext1Data.type);
+        }
+      } catch (e) {
+        return mapCategoryToType(asset.ext1);
+      }
+    }
+    
+    // 使用 resourceType
+    if (asset.resourceType && asset.resourceType !== 'image') {
+      return mapCategoryToType(asset.resourceType);
+    }
+    
+    return '次要道具';
+  };
+  
   // Handle right-click on asset
   const handleContextMenu = (e: React.MouseEvent, asset: Image) => {
     e.preventDefault();
+    const category = getAssetCategory(asset);
     setContextMenu({
       asset,
       position: { x: e.clientX, y: e.clientY },
+      currentCategory: category,
     });
   };
   
@@ -105,10 +155,18 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     }
   };
   
-  // Component mount: fetch assets
+  // Component mount: fetch assets and sync variants only once
+  const hasSyncedRef = useRef(false);
+  
   useEffect(() => {
-    fetchAssets();
-  }, [fetchAssets]);
+    if (hasSyncedRef.current) return;
+    hasSyncedRef.current = true;
+    
+    // 先同步变体，再获取最新资产列表
+    syncVariants().then(() => {
+      fetchAssets();
+    });
+  }, []);
   
   // Calculate canvas center position
   const getCanvasCenterPosition = () => {
@@ -289,6 +347,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
           position={contextMenu.position}
           onClose={handleCloseContextMenu}
           onDelete={handleDeleteAsset}
+          currentCategory={contextMenu.currentCategory}
         />
       )}
     </div>

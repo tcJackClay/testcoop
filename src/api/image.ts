@@ -176,14 +176,17 @@ export const imageApi = {
   /**
    * 更新图片
    */
-  update: async (id: number, data: UpdateImageRequest): Promise<Image | null> => {
+  put: async (id: number, data: UpdateImageRequest): Promise<Image | null> => {
+    // 构建完整请求体，包含 id 字段
     const payload = {
-      resourceName: data.resourceName,
-      resourceType: data.resourceType,
-      resourceContent: data.resourceContent,
-      resourceStatus: data.resourceStatus,
-      ext1: data.ext1,
-      ext2: data.ext2,
+      id: id,
+      resourceName: data.resourceName || '',
+      resourceType: data.resourceType || 'image',
+      resourceContent: data.resourceContent || '',
+      resourceStatus: data.resourceStatus || '',
+      ext1: data.ext1 || '',
+      ext2: data.ext2 || '',
+      status: 0,
     }
     const response = await apiClient.put<ApiResponse<Image>>(`/image/${id}`, payload)
     

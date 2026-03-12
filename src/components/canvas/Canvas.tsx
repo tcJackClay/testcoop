@@ -176,11 +176,16 @@ export default function Canvas() {
         const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
         const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
         
+        // 获取图片 URL - 优先使用 resourceContent (base64)
+        const imageUrl = asset.resourceContent || asset.imageUrl || asset.url || '';
+        
+        console.log('[Canvas] 拖放资产:', asset.name, 'imageUrl:', imageUrl?.substring(0, 50));
+        
         addNode('imageNode', { 
           x, 
           y,
-          imageUrl: asset.imageUrl || asset.resourceContent,
-          label: asset.name || 'Asset'
+          imageUrl,
+          label: asset.name || asset.resourceName || 'Asset'
         });
         return;
       } catch (err) {

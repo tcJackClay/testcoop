@@ -11,7 +11,7 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
   createCharacter: { type: 'createCharacter', width: 200, height: 100, data: { label: 'Create Character' } },
   createScene: { type: 'createScene', width: 200, height: 100, data: { label: 'Create Scene' } },
   videoAnalyze: { type: 'videoAnalyze', width: 200, height: 100, data: { label: 'Video Analyze' } },
-  storyboardNode: { type: 'storyboardNode', width: 300, height: 200, data: { label: 'Storyboard', shots: [] } },
+  storyboardNode: { type: 'storyboardNode', width: 520, height: 620, data: { label: 'Storyboard', shots: [] } },
   aiVideo: { type: 'aiVideo', width: 200, height: 120, data: { label: 'AI Video', prompt: '', modelId: '' } },
   imageCompare: { type: 'imageCompare', width: 200, height: 120, data: { label: 'Image Compare', imageA: '', imageB: '' } },
   imageNode: { 

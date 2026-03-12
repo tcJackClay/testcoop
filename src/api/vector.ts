@@ -95,8 +95,8 @@ export const vectorApi = {
   /**
    * 文生文聊天
    */
-  chatCompletion: async (data: VectorChatCompletionRequest): Promise<ApiResponse<string>> => {
-    const response = await apiClient.post('/vector/chat-completion', data)
+  chatCompletion: async (data: VectorChatCompletionRequest, timeout: number = 120000): Promise<ApiResponse<string>> => {
+    const response = await apiClient.post('/vector/chat-completion', data, { timeout })
     return response.data
   },
 

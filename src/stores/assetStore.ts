@@ -515,8 +515,21 @@ export const useAssetStore = create<AssetStore>()(
 );
 export default useAssetStore;
 
-// 全局调试方法 - 可在控制台直接调�?
+// 全局调试方法 - 可在控制台直接调用
 window.debugAssetStore = {
+  // 查看所有变体资产
+  listVariants: () => {
+    const store = useAssetStore.getState();
+    const assets = store.assets;
+    const variants = assets.filter(a => a.parentId || (a.name && a.name.includes(' - ')));
+    console.log('=== 变体资产数量:', variants.length);
+    variants.forEach((v, i) => {
+      console.log(`[${i}] ${v.name}`);
+      console.log('    resourceContent:', v.resourceContent?.substring(0, 80));
+      console.log('    ext1:', v.ext1);
+    });
+    return variants;
+  },
   // 查看列表中第一个图片的 resourceContent
   listContent: () => {
     const store = useAssetStore.getState();

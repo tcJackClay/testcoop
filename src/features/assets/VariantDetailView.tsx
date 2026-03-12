@@ -35,9 +35,9 @@ export default function VariantDetailView({ selectedPrimaryAsset, variants, onBa
           {selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}
         </h3>
         <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
-          {selectedPrimaryAsset.url || selectedPrimaryAsset.resourceContent ? (
+          {selectedPrimaryAsset.resourceContent ? (
             <img
-              src={selectedPrimaryAsset.url || selectedPrimaryAsset.resourceContent}
+              src={selectedPrimaryAsset.resourceContent}
               alt={selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}
               className="w-full h-full object-cover"
             />
@@ -57,9 +57,9 @@ export default function VariantDetailView({ selectedPrimaryAsset, variants, onBa
             {variants.map((variant) => (
               <div key={variant.id} className="flex flex-col gap-1">
                 <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
-                  {variant.url || variant.resourceContent ? (
+                  {variant.resourceContent ? (
                     <img
-                      src={variant.url || variant.resourceContent}
+                      src={variant.resourceContent}
                       alt={variant.name || variant.resourceName}
                       className="w-full h-full object-cover"
                     />

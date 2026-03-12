@@ -155,7 +155,9 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
         try {
           const response = await fetch(inputImageUrl);
           const blob = await response.blob();
-          const file = new File([blob], `${name}.png`, { type: 'image/png' });
+          // 清理文件名中的特殊字符（/ \ : * ? " < > |）
+          const safeName = name.replace(/[\\/:*?"<>|]/g, '_');
+          const file = new File([blob], `${safeName}.png`, { type: 'image/png' });
           const uploadResult = await vectorApi.uploadImageFile(file);
           if (uploadResult.code === 0 && uploadResult.data) {
             // 使用 localPath，让后端 getImageById 能正常读取

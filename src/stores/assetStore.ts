@@ -67,63 +67,71 @@ const mapAssetTypeToCategory = (assetType?: string): string => {
   return '次要道具';
 };
 
-// 从资产对象获取分�?
+// 从资产对象获取分类
+// 优先级：ext1.type > ext1.parent(从父资产推断) > resourceType > 默认
 const getAssetCategory = (asset: any, allAssets: any[]): string => {
   const resourceName = asset.resourceName || asset.name || '';
   
-  // 0. 检查名称是否包�?" - " （变体命名模式）
-  // 如果是变体，从父资产名称推断类型
-  if (resourceName.includes(' - ')) {
-    const parentName = resourceName.split(' - ')[0].trim();
-    // 尝试从父资产名称推断类型
-    if (parentName.includes('角色')) return '次要角色';
-    if (parentName.includes('场景')) return '次要场景';
-    if (parentName.includes('道具')) return '次要道具';
-    // 查找父资产获取类�?
-    const parentAsset = allAssets.find((a: any) => 
-      (a.name === parentName || a.resourceName === parentName)
-    );
-    if (parentAsset) {
-      const parentCategory = mapAssetTypeToCategory(parentAsset.resourceType);
-      return parentCategory.replace('主要', '次要');
-    }
-  }
-  
-  // 1. 首先检�?ext1 JSON 中的信息
+  // 1. 优先使用 ext1.type（6个平行分类）
   if (asset.ext1) {
     try {
       const ext1Data = JSON.parse(asset.ext1);
-      // 检查是否是变体（有 parent 字段�?
+      if (ext1Data.type) {
+        return mapAssetTypeToCategory(ext1Data.type);
+      }
+      
+      // 2. 如果有 parent（变体），从父资产推断分类
       if (ext1Data.parent) {
-        // 是变体，从父资产推断类型
-        const parentAsset = allAssets.find(a => a.name === ext1Data.parent || a.resourceName === ext1Data.parent);
-        if (parentAsset) {
-          const parentCategory = mapAssetTypeToCategory(parentAsset.resourceType);
-          // 将主要改为次�?
-          return parentCategory.replace('主要', '次要');
-        }
-        // 如果找不到父资产，从 parent 名称推断
         const parentName = ext1Data.parent;
+        const parentAsset = allAssets.find((a: any) => 
+          a.name === parentName || a.resourceName === parentName
+        );
+        if (parentAsset) {
+          // 优先用父资产的 ext1.type
+          let parentExt1;
+          try {
+            parentExt1 = parentAsset.ext1 ? JSON.parse(parentAsset.ext1) : {};
+          } catch {}
+          if (parentExt1?.type) {
+            return mapAssetTypeToCategory(parentExt1.type);
+          }
+          return mapAssetTypeToCategory(parentAsset.resourceType);
+        }
+        // 找不到父资产，从名称推断
         if (parentName.includes('角色')) return '次要角色';
         if (parentName.includes('场景')) return '次要场景';
         if (parentName.includes('道具')) return '次要道具';
       }
-      // 检�?ext1 中是否有直接�?type 字段
-      if (ext1Data.type) {
-        return mapAssetTypeToCategory(ext1Data.type);
-      }
-    } catch (e) {
-      // ext1 不是有效 JSON，尝试直接解�?
-      return mapAssetTypeToCategory(asset.ext1);
-    }
+    } catch (e) {}
   }
   
-  // 2. 使用 resourceType 字段
+  // 3. 检查名称是否包含 " - " （旧版变体命名模式）
+  if (resourceName.includes(' - ')) {
+    const parentName = resourceName.split(' - ')[0].trim();
+    const parentAsset = allAssets.find((a: any) => 
+      a.name === parentName || a.resourceName === parentName
+    );
+    if (parentAsset) {
+      let parentExt1;
+      try {
+        parentExt1 = parentAsset.ext1 ? JSON.parse(parentAsset.ext1) : {};
+      } catch {}
+      if (parentExt1?.type) {
+        return mapAssetTypeToCategory(parentExt1.type);
+      }
+      return mapAssetTypeToCategory(parentAsset.resourceType);
+    }
+    if (parentName.includes('角色')) return '次要角色';
+    if (parentName.includes('场景')) return '次要场景';
+    if (parentName.includes('道具')) return '次要道具';
+  }
+  
+  // 4. 使用 resourceType（兼容旧数据）
   if (asset.resourceType && asset.resourceType !== 'image') {
     return mapAssetTypeToCategory(asset.resourceType);
   }
   
-  // 3. 默认返回次要道具
+  // 5. 默认返回次要道具
   return '次要道具';
 };
 export const useAssetStore = create<AssetStore>()(
@@ -168,31 +176,25 @@ export const useAssetStore = create<AssetStore>()(
               } catch (e) {}
             }
             
-            // 获取图片 base64 - 调用单独�?getImage API
+            // 获取图片 base64 - 调用 getImage API
             if (image.id) {
               try {
                 const imageResource: any = await imageApi.getImage(image.id);
-                console.log(`[资产${image.id}] getImage返回:`, imageResource);
-                
                 let base64 = imageResource?.resourceContent;
                 
-                // 如果 resourceContent 不存在，尝试直接使用 imageResource（可能是 base64 字符串本身）
                 if (!base64 && typeof imageResource === 'string' && imageResource.length > 100) {
                   base64 = imageResource;
                 }
                 
-                // 解析 JSON 格式 {data: 'iVBORw0...'} �?{image: '...'}
+                // 解析 JSON 格式
                 if (base64 && base64.startsWith('{')) {
                   try {
                     const jsonContent = JSON.parse(base64);
                     base64 = jsonContent.image || jsonContent.data || '';
-                    console.log(`[资产${image.id}] 解析JSON�?base64长度:`, base64?.length);
-                  } catch (e) {
-                    console.warn(`[assetStore] 解析图片JSON失败, id=${image.id}:`, e);
-                  }
+                  } catch (e) {}
                 }
                 
-                // 转换�?data URL
+                // 转换为 data URL
                 if (base64) {
                   if (base64.startsWith('data:')) {
                     imageUrl = base64;
@@ -203,56 +205,13 @@ export const useAssetStore = create<AssetStore>()(
                     else if (base64.startsWith('UklGR')) mimeType = 'image/webp';
                     imageUrl = `data:${mimeType};base64,${base64}`;
                   }
-                  console.log(`[资产${image.id}] �?获取图片成功, imageUrl长度=${imageUrl.length}`);
-                } else {
-                  console.warn(`[资产${image.id}] 警告: base64为空, imageResource=`, imageResource);
                 }
-              } catch (e) {
-                console.error(`[assetStore] 获取图片${image.id}失败:`, e);
-              }
-            }
-            
-            // 备用：也从列表API�?resourceContent 解析（如�?getImage 返回空）
-            if (!imageUrl && image.resourceContent) {
-              let listBase64 = image.resourceContent;
-              
-              // 情况1: JSON 格式 {image: '...'} �?{data: '...'}
-              if (listBase64.startsWith('{')) {
-                try {
-                  const jsonContent = JSON.parse(listBase64);
-                  listBase64 = jsonContent.image || jsonContent.data || '';
-                  if (listBase64) {
-                    let mimeType = 'image/png';
-                    if (listBase64.startsWith('/9j/')) mimeType = 'image/jpeg';
-                    else if (listBase64.startsWith('iVBOR')) mimeType = 'image/png';
-                    else if (listBase64.startsWith('UklGR')) mimeType = 'image/webp';
-                    imageUrl = `data:${mimeType};base64,${listBase64}`;
-                  }
-                } catch (e) {}
-              }
-              // 情况2: 文件路径 images/xxx.jpg -> 需要转换为 URL
-              else if (listBase64.startsWith('images/') || listBase64.startsWith('/images/')) {
-                // 假设后端提供图片访问服务，拼接完�?URL
-                // 需要根据实际情况修改图片服务的基础 URL
-                imageUrl = listBase64; // 或者拼接后端图片服务地址
-              }
-              // 情况3: base64 原始数据
-              else if (listBase64.startsWith('/9j/') || listBase64.startsWith('iVBOR') || listBase64.startsWith('UklGR')) {
-                let mimeType = 'image/png';
-                if (listBase64.startsWith('/9j/')) mimeType = 'image/jpeg';
-                else if (listBase64.startsWith('iVBOR')) mimeType = 'image/png';
-                else if (listBase64.startsWith('UklGR')) mimeType = 'image/webp';
-                imageUrl = `data:${mimeType};base64,${listBase64}`;
-              }
-              // 情况4: 已经是完�?URL
-              else if (listBase64.startsWith('http') || listBase64.startsWith('/')) {
-                imageUrl = listBase64;
-              }
+              } catch (e) {}
             }
             
             return {
               ...image,
-              resourceContent: imageUrl || image.resourceContent,
+              resourceContent: imageUrl || '',
               parentId,
               variants,
             };

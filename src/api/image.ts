@@ -121,29 +121,28 @@ export const imageApi = {
 
   /**
    * 获取单个图片(包含base64数据)
-   * 后端返回格式：{ data: { id, resourceName, resourceContent, ... } }
+   * 后端返回格式：{ code: 0, data: "base64字符串" }
    */
   getImage: async (id: number): Promise<Image | null> => {
     try {
-      const response = await apiClient.get<ApiResponse<Image>>(`/image/${id}`)
+      const response = await apiClient.get<ApiResponse<string>>(`/image/${id}`)
       
       const res = response.data
-      console.log('[imageApi.getImage] 原始响应:', res)
       
-      // 处理两种响应格式：
-      // 1. { code: 0, data: { id, resourceName, resourceContent, ... } }
-      // 2. { data: { id, resourceName, resourceContent, ... } }
+      // 后端返回格式: { code: 0, data: "base64字符串" }
       if (res.code === 0 && res.data) {
-        return convertToImage(res.data)
-      }
-      if (res.data) {
         // 检查是否是直接 base64 字符串
         if (typeof res.data === 'string') {
-          return { id, resourceName: '', resourceType: 'image', resourceContent: res.data } as Image
+          return { 
+            id, 
+            resourceName: '', 
+            resourceType: 'image', 
+            resourceContent: res.data 
+          } as Image
         }
+        // 兼容对象格式
         return convertToImage(res.data)
       }
-      return null
       return null
     } catch (error) {
       console.error('[imageApi.getImage] 获取图片失败:', error)
@@ -174,20 +173,50 @@ export const imageApi = {
   },
 
   /**
+   * 根据项目ID和资源名称查询资产
+   */
+  getByName: async (projectId: number, resourceName: string): Promise<Image | null> => {
+    try {
+      const response = await apiClient.get<ApiResponse<Image[]>>(`/image/list`, {
+        params: { projectId }
+      })
+      
+      const res = response.data
+      let images: Image[] = []
+      
+      if (res.code === 0 && res.data) {
+        images = res.data.map(convertToImage)
+      } else if (res.data) {
+        images = res.data.map(convertToImage)
+      }
+      
+      // 按名称查找匹配的资源
+      const matched = images.find(img => img.resourceName === resourceName)
+      return matched || null
+    } catch (error) {
+      console.error('[imageApi.getByName] 查询失败:', error)
+      return null
+    }
+  },
+
+  /**
    * 更新图片
    */
   put: async (id: number, data: UpdateImageRequest): Promise<Image | null> => {
     // 构建完整请求体，包含 id 字段
-    const payload = {
+    // 注意：不使用 || 默认值，让后端区分"未传"和"传空"
+    const payload: Record<string, any> = {
       id: id,
-      resourceName: data.resourceName || '',
-      resourceType: data.resourceType || 'image',
-      resourceContent: data.resourceContent || '',
-      resourceStatus: data.resourceStatus || '',
-      ext1: data.ext1 || '',
-      ext2: data.ext2 || '',
-      status: 0,
     }
+    // 只添加有值的字段
+    if (data.resourceName !== undefined) payload.resourceName = data.resourceName;
+    if (data.resourceType !== undefined) payload.resourceType = data.resourceType;
+    if (data.resourceContent !== undefined) payload.resourceContent = data.resourceContent;
+    if (data.resourceStatus !== undefined) payload.resourceStatus = data.resourceStatus;
+    if (data.ext1 !== undefined) payload.ext1 = data.ext1;
+    if (data.ext2 !== undefined) payload.ext2 = data.ext2;
+    payload.status = 0;
+    
     const response = await apiClient.put<ApiResponse<Image>>(`/image/${id}`, payload)
     
     const res = response.data

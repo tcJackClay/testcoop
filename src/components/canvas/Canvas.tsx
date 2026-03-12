@@ -195,7 +195,7 @@ export default function Canvas() {
       const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
       addNode(nodeType as NodeType, { x, y });
     }
-  }, [addNode, viewPort]);
+  }, [addNode, viewPort.x, viewPort.y, viewPort.zoom]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

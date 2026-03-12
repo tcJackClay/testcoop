@@ -83,8 +83,8 @@ const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
 const getImageUrl = (asset: AssetWithVariants | Image): string | undefined => {
   // 优先使用 resourceContent (API返回的实际图片URL/ base64)
   if (asset.resourceContent) return asset.resourceContent;
-  // 兼容其他字段
-  return asset.imageUrl || ('url' in asset ? asset.url : undefined);
+  // 兼容其他字段 - imageUrl 或 url
+  return (asset as any).imageUrl || asset.url;
 };
 
 export default function AssetCard({ 

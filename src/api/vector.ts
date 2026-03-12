@@ -27,6 +27,8 @@ export interface ImageGenRequest {
 export interface ImageResponse {
   imageUrl: string
   imageId: string
+  base64?: string
+  localPath?: string
   width: number
   height: number
 }

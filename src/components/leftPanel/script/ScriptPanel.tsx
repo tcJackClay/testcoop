@@ -252,26 +252,37 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
       if (!assets || !Array.isArray(assets)) return;
       for (const item of assets) {
         // 主资产记录 - 保存完整信息到 ext1
+        const ext1Json = { 
+          id: item.id, 
+          name: item.name, 
+          type: ext1Type,
+          description: item.description || item.background || '',
+          background: item.background || '',
+          role: item.role || ''
+        };
+        
+        // 调试：打印第一个资产的 ext1 JSON
+        if (requests.length === 0) {
+          console.log('[ScriptPanel] 第一个资产 ext1 JSON:', JSON.stringify(ext1Json, null, 2));
+        }
+        
         requests.push({
           resourceName: item.name || '未命名',
           resourceType: 'image',
           resourceContent: '',
           projectId,
           userId,
-          ext1: JSON.stringify({ 
-            id: item.id, 
-            name: item.name, 
-            type: ext1Type,
-            description: item.description || item.background || '',
-            background: item.background || '',
-            role: item.role || ''
-          }),
+          ext1: JSON.stringify(ext1Json),
           createdBy: username,
           updatedBy: username,
         });
         
         // 为每个 variant 创建独立记录
         for (const variant of item.variants || []) {
+          const variantExt1 = { name: item.name, variant, type: ext1Type };
+          if (requests.length === 1) {
+            console.log('[ScriptPanel] 第一个变体 ext1 JSON:', JSON.stringify(variantExt1, null, 2));
+          }
           requests.push({
             resourceName: `${item.name} - ${variant}`,
             resourceType: 'image',
@@ -291,12 +302,17 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     // 2. { characters: { primary: [...], secondary: [...] } } - 嵌套对象
     const assetsData = result.assets as any;
     
-    console.log('[ScriptPanel] syncAssetsToBackend 接收到的数据:', assetsData);
+    console.log('[ScriptPanel] ========== 资产提取结果 ==========');
+    console.log('[ScriptPanel] 完整数据:', JSON.stringify(assetsData, null, 2));
+    console.log('[ScriptPanel] ===================================');
     
     // 直接处理数据
     const chars = Array.isArray(assetsData?.characters) ? assetsData.characters : 
                   Array.isArray(assetsData?.characters?.primary) ? assetsData.characters.primary : [];
-    console.log('[ScriptPanel] 处理角色:', chars.length);
+    console.log('[ScriptPanel] 主要角色数量:', chars.length);
+    if (chars.length > 0) {
+      console.log('[ScriptPanel] 第一个主要角色原始数据:', JSON.stringify(chars[0], null, 2));
+    }
     
     processAssets(chars, 'character', 'character_primary');
     processAssets(Array.isArray(assetsData?.scenes) ? assetsData.scenes : [], 'scene', 'scene_primary');
@@ -335,10 +351,22 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
             console.log('[ScriptPanel] 更新资产:', request.resourceName, 'ID:', existingId, 'ext1:', request.ext1);
             
             if (existingId) {
-              await imageApi.update(existingId, {
+              // 合并已有 ext1，避免丢失数据
+              const existingAsset = existingAssets[existingIndex];
+              let mergedExt1 = request.ext1;
+              if (existingAsset?.ext1) {
+                try {
+                  const existingExt1 = JSON.parse(existingAsset.ext1);
+                  const newExt1 = JSON.parse(request.ext1);
+                  mergedExt1 = JSON.stringify({ ...existingExt1, ...newExt1 });
+                  console.log('[ScriptPanel] 合并 ext1 - 原有:', existingExt1, '新:', newExt1, '合并后:', JSON.parse(mergedExt1));
+                } catch {}
+              }
+              console.log('[ScriptPanel] 更新资产:', request.resourceName, '发送 ext1:', mergedExt1);
+              await imageApi.put(existingId, {
                 resourceName: request.resourceName,
                 resourceType: request.resourceType,
-                ext1: request.ext1,
+                ext1: mergedExt1,
                 ext2: request.ext2,
               });
               updatedCount++;
@@ -347,7 +375,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
             }
           } else {
             // 资产不存在，创建新资产
-            console.log('[ScriptPanel] 创建资产:', request.resourceName, 'ext1:', request.ext1);
+            console.log('[ScriptPanel] 创建资产:', request.resourceName, '发送 ext1:', request.ext1);
             await imageApi.create(request);
             createdCount++;
           }

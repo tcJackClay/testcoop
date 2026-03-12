@@ -23,7 +23,8 @@ interface CreateAssetNodeProps {
 
 export default function CreateAssetNode({ nodeId, data, updateData }: CreateAssetNodeProps) {
   const name = data.name as string || '';
-  const assetType = data.assetType as string || 'character_primary';
+  // 确保 assetType 有默认值，避免空字符串导致保存为 'image'
+  const assetType = (data.assetType as string) || 'character_primary';
   const isVariant = data.isVariant as boolean || false;
   const parentAssetId = data.parentAssetId as number | null;
   const description = data.description as string || '';
@@ -106,21 +107,50 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
 
       // Get parent asset name if isVariant
       let parentAssetName: string | null = null;
+      let parentAssetType: string | null = null;
       if (isVariant && parentAssetId) {
         const parentAsset = useAssetStore.getState().assets.find((a) => a.id === parentAssetId);
         parentAssetName = parentAsset?.name || null;
+        // 获取父资产的类型
+        if (parentAsset?.ext1) {
+          try {
+            const parentExt1 = JSON.parse(parentAsset.ext1);
+            parentAssetType = parentExt1.type || parentAsset.resourceType || null;
+          } catch {}
+        }
+        if (!parentAssetType) {
+          parentAssetType = parentAsset?.resourceType || null;
+        }
       }
 
-      // Build ext1 JSON for variant info
-      const ext1Json = {
-        variant: isVariant ? name : null,
-        parent: parentAssetName,
-      };
+      // Determine asset type: 变体继承父资产类型，否则使用当前选择的类型
+      const finalAssetType = isVariant && parentAssetType 
+        ? parentAssetType 
+        : (assetType || 'character_primary');
+
+      // Build ext1 JSON - 更新时合并已有 ext1
+      let ext1Json: Record<string, any> = {};
+      
+      // 先查询是否存在同名资产
+      const existingAsset = await imageApi.getByName(projectId, name);
+      const existingAssetId = existingAsset?.id;
+      
+      // 如果是更新，合并已有 ext1
+      if (existingAssetId && existingAsset?.ext1) {
+        try {
+          ext1Json = JSON.parse(existingAsset.ext1);
+        } catch {}
+      }
+      
+      // 更新 ext1 字段
+      ext1Json.variant = isVariant ? name : null;
+      ext1Json.parent = parentAssetName;
+      ext1Json.type = finalAssetType;
 
       // Get image URL from input node
       let uploadedUrl = inputImageUrl;
 
-      // If the image is a local blob/base64, upload it
+      // If the image is a local blob/base64, upload it and get localPath
       if (inputImageUrl.startsWith('data:') || inputImageUrl.startsWith('blob:')) {
         try {
           const response = await fetch(inputImageUrl);
@@ -128,7 +158,14 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
           const file = new File([blob], `${name}.png`, { type: 'image/png' });
           const uploadResult = await vectorApi.uploadImageFile(file);
           if (uploadResult.code === 0 && uploadResult.data) {
-            uploadedUrl = uploadResult.data.imageUrl;
+            // 使用 localPath，让后端 getImageById 能正常读取
+            uploadedUrl = uploadResult.data.localPath || uploadResult.data.imageUrl || '';
+            if (!uploadedUrl) {
+              console.error('上传结果为空:', uploadResult);
+              alert('图片上传失败');
+              updateData('status', 'idle');
+              return;
+            }
           } else {
             console.error('图片上传失败:', uploadResult);
             alert('图片上传失败');
@@ -143,23 +180,34 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
         }
       }
 
-      // Create asset via API
-      const result = await imageApi.create({
-        resourceName: name,
-        resourceType: isVariant ? 'character_secondary' : assetType,
-        resourceContent: uploadedUrl,
-        projectId: projectId,
-        ext1: JSON.stringify(ext1Json),
-      });
+      // Create or Update asset via API
+      let result;
+      const finalExt1 = JSON.stringify(ext1Json);
+      if (existingAssetId) {
+        result = await imageApi.put(existingAssetId, {
+          resourceName: name,
+          resourceType: finalAssetType,
+          resourceContent: uploadedUrl,
+          ext1: finalExt1,
+        });
+      } else {
+        result = await imageApi.create({
+          resourceName: name,
+          resourceType: finalAssetType,
+          resourceContent: uploadedUrl,
+          projectId: projectId,
+          ext1: finalExt1,
+        });
+      }
 
       if (result) {
-        console.log('资产创建成功:', result);
-        updateData('status', 'saved');
+        console.log(existingAssetId ? '资产更新成功:' : '资产创建成功:', result);
+        updateData('status', existingAssetId ? 'updated' : 'saved');
         // Refresh asset list
         useAssetStore.getState().fetchAssets();
         setTimeout(() => updateData('status', 'idle'), 2000);
       } else {
-        alert('资产创建失败');
+        alert(existingAssetId ? '资产更新失败' : '资产创建失败');
         updateData('status', 'idle');
       }
     } catch (error) {
@@ -266,7 +314,7 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
           onClick={(e) => e.stopPropagation()}
         />
 
-        {/* Save Button */}
+        {/* Save/Update Button */}
         <button
           className={`w-full py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${
             status === 'saving' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'

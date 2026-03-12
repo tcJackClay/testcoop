@@ -127,7 +127,7 @@ export function useCanvasConnections({
     const worldX = (x - viewPort.x) / viewPort.zoom;
     const worldY = (y - viewPort.y) / viewPort.zoom;
     setMousePos({ x: worldX, y: worldY });
-  }, [containerRef, viewPort]);
+  }, [containerRef, viewPort.x, viewPort.y, viewPort.zoom]);
 
   // Canvas 点击 - 空白处取消连接
   const onCanvasClick = useCallback(() => {

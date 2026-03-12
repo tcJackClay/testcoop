@@ -215,7 +215,7 @@ export default function NodeRenderer({
       }
       selectNode(node.id, e.shiftKey);
     },
-    [node.position, node.id, selectNode, viewPort, connectingSource]
+    [node.position, node.id, selectNode, viewPort.zoom, connectingSource]
   );
 
   const handleMouseMove = useCallback(
@@ -231,7 +231,7 @@ export default function NodeRenderer({
         moveNode(node.id, { x: newX, y: newY });
       }
     },
-    [isDragging, node.id, moveNode, viewPort]
+    [isDragging, node.id, moveNode, viewPort.zoom]
   );
 
   const handleMouseUp = useCallback(() => {

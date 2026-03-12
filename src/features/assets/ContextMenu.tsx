@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Trash2, Download, Eye, ChevronRight, Tag } from 'lucide-react';
+import { Trash2, Download, Eye, ChevronRight, Tag, Plus } from 'lucide-react';
 import type { Image as AssetImage } from '../../api/image';
 import { useAssetStore } from '../../stores/assetStore';
+import { useCanvasStore } from '../../stores/canvasStore';
 
 interface ContextMenuProps {
   asset: AssetImage;
@@ -10,6 +11,7 @@ interface ContextMenuProps {
   onDelete: (asset: AssetImage) => void;
   onViewDetails?: (asset: AssetImage) => void;
   currentCategory?: string;
+  canvasCenterPosition?: { x: number; y: number };
 }
 
 const CATEGORIES = [
@@ -27,12 +29,14 @@ export default function ContextMenu({
   onClose, 
   onDelete,
   onViewDetails,
-  currentCategory: initialCategory 
+  currentCategory: initialCategory,
+  canvasCenterPosition
 }: ContextMenuProps) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showTypeMenu, setShowTypeMenu] = useState(false);
   const typeMenuRef = useRef<HTMLDivElement>(null);
   const { updateAssetCategory } = useAssetStore();
+  const { addNode, nodes } = useCanvasStore();
   
   // 获取当前资产分类（优先使用传入的值）
   const [currentCategory, setCurrentCategory] = useState<string>(initialCategory || '次要道具');
@@ -83,6 +87,23 @@ export default function ContextMenu({
     onClose();
   };
 
+  // 添加资产到画布
+  const handleAddToCanvas = () => {
+    const position = canvasCenterPosition || { x: 100, y: 100 };
+    const imageUrl = asset.url || asset.resourceContent || '';
+    const assetName = asset.name || asset.resourceName || '';
+    
+    addNode('createAsset', position, {
+      data: {
+        name: assetName,
+        imageUrl: imageUrl,
+        assetId: asset.id,
+        category: initialCategory || '次要道具',
+      }
+    });
+    onClose();
+  };
+
   const handleTypeChange = async (category: string) => {
     if (asset.id) {
       await updateAssetCategory(asset.id, category);
@@ -128,6 +149,14 @@ export default function ContextMenu({
           下载
         </button>
         
+        <button
+          onClick={handleAddToCanvas}
+          className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center gap-2"
+        >
+          <Plus size={14} />
+          更新资产
+        </button>
+        
         {/* 更改分类 */}
         <div className="relative">
           <button
@@ -148,15 +177,10 @@ export default function ContextMenu({
                 <button
                   key={cat.key}
                   onClick={() => handleTypeChange(cat.key)}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2 ${
-                    currentCategory === cat.key ? 'bg-gray-700' : 'text-white'
-                  }`}
+                  className="w-full px-3 py-2 text-left text-sm text-white hover:bg-gray-700 flex items-center gap-2"
                 >
                   <span className={cat.color}>●</span>
                   {cat.label}
-                  {currentCategory === cat.key && (
-                    <span className="ml-auto text-blue-400">✓</span>
-                  )}
                 </button>
               ))}
             </div>

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAssetStore } from '../../stores/assetStore';
 import { useCanvasStore } from '../../stores/canvasStore';
+import { Image as AssetImageType } from '../../api/image';
 import AssetCard from './AssetCard';
 import AssetSidebar from './AssetSidebar';
 import VariantDetailView from './VariantDetailView';
@@ -55,6 +56,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     asset: Image;
     position: { x: number; y: number };
     currentCategory?: string;
+    canvasCenterPosition?: { x: number; y: number };
   } | null>(null);
   
   // Delete loading state
@@ -124,13 +126,14 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   };
   
   // Handle right-click on asset
-  const handleContextMenu = (e: React.MouseEvent, asset: Image) => {
+  const handleContextMenu = (asset: Image, e: React.MouseEvent) => {
     e.preventDefault();
     const category = getAssetCategory(asset);
     setContextMenu({
       asset,
       position: { x: e.clientX, y: e.clientY },
       currentCategory: category,
+      canvasCenterPosition: getCanvasCenterPosition(),
     });
   };
   
@@ -315,7 +318,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
                   asset={asset as any}
                   onDragStart={(asset) => console.log('Drag start:', asset.name)}
                   onDragEnd={() => {}}
-                  onContextMenu={(e) => handleContextMenu(e, asset)}
+                  onContextMenu={(assetParam, e) => handleContextMenu(assetParam, e)}
                   onClick={() => handleAssetClick(asset)}
                 />
               ))}
@@ -348,6 +351,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
           onClose={handleCloseContextMenu}
           onDelete={handleDeleteAsset}
           currentCategory={contextMenu.currentCategory}
+          canvasCenterPosition={contextMenu.canvasCenterPosition}
         />
       )}
     </div>

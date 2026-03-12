@@ -411,6 +411,7 @@ export const useAssetStore = create<AssetStore>()(
         // 第一步：识别所有变体并更新变体资产�?parent
         for (const asset of assets) {
           const resourceName = asset.resourceName || asset.name || '';
+          const assetId = asset.id;
           
           // 检查是否是变体（名称包�?" - "�?
           if (resourceName.includes(' - ')) {
@@ -420,8 +421,7 @@ export const useAssetStore = create<AssetStore>()(
             
             // 检查 ID 是否有效
             if (!assetId || assetId === 0) {
-              console.warn(`[assetStore] 跳过变体 ${resourceName}，无效 ID:`, assetId);
-              return;
+              continue;
             }
             
             // 解析现有 ext1

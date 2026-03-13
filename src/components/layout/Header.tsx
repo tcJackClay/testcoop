@@ -11,6 +11,7 @@ interface HeaderProps {
   onChatClick?: () => void;
   chatOpen?: boolean;
   onProjectClick?: () => void;
+  onLogout?: () => void;
 }
 
 const navItems: { key: ViewMode; labelKey: string }[] = [
@@ -26,15 +27,20 @@ export default function Header({
   onSettingsClick, 
   onChatClick, 
   chatOpen,
-  onProjectClick
+  onProjectClick,
+  onLogout
 }: HeaderProps) {
   const { t } = useTranslation();
   
-  const { user, token, openLoginModal, logout } = useAuthStore();
+  const { user, token, openLoginModal, logout: storeLogout } = useAuthStore();
   const { currentProject } = useProjectStore();
 
   const handleLogout = async () => {
-    await logout();
+    if (onLogout) {
+      onLogout();
+    } else {
+      await storeLogout();
+    }
   };
 
   // 检查是否可以切换视图（需要先选择项目）

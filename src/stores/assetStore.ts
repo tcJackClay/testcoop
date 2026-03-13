@@ -296,15 +296,11 @@ export const useAssetStore = create<AssetStore>()(
         // 只更新 ext1 中的 type
         ext1Obj.type = ext1Type;
         
-        console.log('[assetStore] 更新资产分类:', { id, category, ext1Type, ext1: JSON.stringify(ext1Obj) });
-        
         try {
           // 只更新 ext1，不更新 resourceType
           const result = await imageApi.put(id, {
             ext1: JSON.stringify(ext1Obj)
           });
-          
-          console.log('[assetStore] 更新结果:', result);
           
           // 更新本地状态
           set((state) => ({
@@ -317,8 +313,6 @@ export const useAssetStore = create<AssetStore>()(
                 : a
             ),
           }));
-          
-          console.log(`[assetStore] 更新资产 ${id} 分类成功: ${category} (${ext1Type})`);
         } catch (error) {
           console.error('[assetStore] 更新资产分类失败:', error);
           set({ error: '更新分类失败，请重试' });

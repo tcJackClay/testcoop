@@ -106,7 +106,6 @@ export default function ContextMenu({
   };
 
   const handleTypeChange = async (category: string) => {
-    console.log('[ContextMenu] 更改分类:', asset.name, asset.id, '->', category);
     if (asset.id) {
       await updateAssetCategory(asset.id, category);
       setCurrentCategory(category);

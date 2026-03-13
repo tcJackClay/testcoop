@@ -10,6 +10,7 @@ interface ProjectCardProps {
   onDoubleClick: (project: ProjectView) => void;
   onEdit: (project: ProjectView) => void;
   onDelete: (id: number) => void;
+  onSetCurrent?: (project: ProjectView) => void;
 }
 
 export default function ProjectCard({

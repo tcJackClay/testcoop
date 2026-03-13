@@ -215,7 +215,7 @@ export const imageApi = {
     if (data.resourceStatus !== undefined) payload.resourceStatus = data.resourceStatus;
     if (data.ext1 !== undefined) payload.ext1 = data.ext1;
     if (data.ext2 !== undefined) payload.ext2 = data.ext2;
-    payload.status = 0;
+    payload.status = 1;  // 状态 1 表示正常
     
     const response = await apiClient.put<ApiResponse<Image>>(`/image/${id}`, payload)
     

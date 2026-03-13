@@ -5,15 +5,28 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useEpisodeStore, Episode } from '../../stores/episodeStore';
 
+// Frame - 帧
+interface Frame {
+  id: string;
+  frameNumber: string;
+  time: string;
+  scale: string;
+  description: string;
+}
+
+// Shot - 镜头
 interface Shot {
   id: string;
   index: number;
   shotNumber: number;
+  cameraWork: string;
   description: string;
+  frames: Frame[];
   prompt?: string;
   status: 'pending' | 'generating' | 'completed' | 'failed';
 }
 
+// ShotGroup - 场景/镜头组
 interface ShotGroup {
   id: string;
   name: string;
@@ -61,6 +74,10 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
   const [localGenerating, setLocalGenerating] = useState(false);
   const [localSaving, setLocalSaving] = useState(false);
   const [localLoading, setLocalLoading] = useState(false);
+  
+  // 当前选中的场景和 shot
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
+  const [currentShotId, setCurrentShotId] = useState<string | null>(null);
 
   // 同步 store 中的 episodes 到本地，加载完成后检查是否需要加载已有分镜
   useEffect(() => {
@@ -87,6 +104,7 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
   const displaySelectedId = selectedEpisodeId || localSelectedId;
 
   // 从 node data 中获取已有的分镜
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const existingStoryboard = (data.existingStoryboard as StoryboardScript) || null;
 
   // 加载已有分镜
@@ -137,9 +155,18 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
             }
           } catch {}
           
+          const parsed = parseStoryboardScript(parsedContent);
+          
+          // 设置选中第一个场景和镜头
+          if (parsed.length > 0) {
+            setCurrentGroupId(parsed[0].id);
+            if (parsed[0].shots.length > 0) {
+              setCurrentShotId(parsed[0].shots[0].id);
+            }
+          }
+          
           updateData('existingStoryboard', matched);
           updateData('storyboardContent', parsedContent);
-          const parsed = parseStoryboardScript(parsedContent);
           updateData('shotGroups', parsed);
           console.log('[StoryboardNode] 加载完成, 场景数:', parsed.length);
           setLocalLoading(false);
@@ -210,6 +237,14 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
         const parsed = parseStoryboardScript(content);
         updateData('shotGroups', parsed);
         console.log('[StoryboardNode] 解析完成, 场景数:', parsed.length, '镜头数:', parsed.reduce((sum, g) => sum + g.shots.length, 0));
+        
+        // 设置选中第一个场景和镜头
+        if (parsed.length > 0) {
+          setCurrentGroupId(parsed[0].id);
+          if (parsed[0].shots.length > 0) {
+            setCurrentShotId(parsed[0].shots[0].id);
+          }
+        }
         
         // 保存到后端 (使用 huanu 格式)
         await saveStoryboard(parseInt(displaySelectedId), content);
@@ -352,20 +387,18 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
       // 序列化当前的 shotGroups
       let scriptContent = '';
       currentShotGroups.forEach((group) => {
-        scriptContent += `#【Shot ${group.name}】`;
+        scriptContent += `#【Shot ${group.name}】\n`;
         group.shots.forEach((shot) => {
-          // 提取 Frame 信息
-          const frames = extractFrames(shot.description);
-          if (frames.length > 0) {
-            frames.forEach((frame) => {
-              scriptContent += `【Frame ${frame.time}】【中景】${frame.desc}`;
+          // 使用新的 Frame 数组结构
+          if (shot.frames && shot.frames.length > 0) {
+            shot.frames.forEach((frame) => {
+              scriptContent += `【Frame ${frame.time}】【${frame.scale}】${frame.description}\n`;
             });
           } else {
-            // 没有 Frame 格式，直接保存描述
-            scriptContent += `【Frame 3s】【中景】${shot.description || ''}`;
+            // 兼容旧格式
+            scriptContent += `【Frame 3s】【中景】${shot.description || ''}\n`;
           }
         });
-        scriptContent += '\n';
       });
       
       console.log('[StoryboardNode] 序列化内容长度:', scriptContent.length);
@@ -462,19 +495,23 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
         if (!currentGroup) {
           currentGroup = { id: `group_${groups.length}`, name: '场景 1', shots: [] };
         }
-        // 提取分镜编号
+        // 提取分镜编号（暂未使用）
         const shotMatch = trimmed.match(/Shot\s*(\d+)[-](\d+)/);
-        const shotNum = shotMatch ? `${shotMatch[1]}-${shotMatch[2]}` : `${currentGroup.shots.length + 1}`;
+        const _shotNum = shotMatch ? `${shotMatch[1]}-${shotMatch[2]}` : `${currentGroup.shots.length + 1}`;
         
         currentShot = {
-          id: `shot_${currentGroup.shots.length}`,
+          id: `shot_${Date.now()}_${currentGroup.shots.length}`,
           index: currentGroup.shots.length,
           shotNumber: currentGroup.shots.length + 1,
+          cameraWork: '',
           description: '',
+          frames: [],
           prompt: '',
           status: 'pending',
         };
-        currentGroup.shots.push(currentShot);
+        if (currentGroup && currentShot) {
+          currentGroup.shots.push(currentShot);
+        }
         currentField = 'description';
         return;
       }
@@ -483,12 +520,21 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
       if (trimmed.startsWith('画面描述：') || trimmed.startsWith('【Frame')) {
         if (currentShot) {
           // 提取 Frame 信息
-          const frameMatch = trimmed.match(/【Frame\s*(\d+)s?】?(.*)/);
+          const frameMatch = trimmed.match(/【Frame\s*(\d+)s?】?\s*【?(.*?)】?(.*)/);
           if (frameMatch) {
-            const frameNum = frameMatch[1];
-            const frameDesc = frameMatch[2]?.trim() || '';
-            currentShot.description += `[${frameNum}s] ` + frameDesc + '\n';
+            const time = `${frameMatch[1]}s`;
+            const scale = frameMatch[2]?.trim() || '中景';
+            const desc = frameMatch[3]?.trim() || '';
+            // 添加到 frames 数组
+            currentShot.frames.push({
+              id: `frame_${Date.now()}_${currentShot.frames.length}`,
+              frameNumber: String(currentShot.frames.length + 1).padStart(2, '0'),
+              time,
+              scale,
+              description: desc,
+            });
           } else {
+            // 兼容旧格式，添加到 description
             currentShot.description += trimmed.replace('画面描述：', '') + '\n';
           }
         }
@@ -518,10 +564,12 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
           currentGroup = { id: `group_${groups.length}`, name: '场景 1', shots: [] };
         }
         currentShot = {
-          id: `shot_${currentGroup.shots.length}`,
+          id: `shot_${Date.now()}_${currentGroup.shots.length}`,
           index: currentGroup.shots.length,
           shotNumber: currentGroup.shots.length + 1,
+          cameraWork: '',
           description: '',
+          frames: [],
           prompt: '',
           status: 'pending',
         };
@@ -556,16 +604,145 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
         id: `shot_${Date.now()}`,
         index: 0,
         shotNumber: 1,
+        cameraWork: '',
         description: '',
+        frames: [{
+          id: `frame_${Date.now()}_0`,
+          frameNumber: '01',
+          time: '3s',
+          scale: '中景',
+          description: '',
+        }],
         prompt: '',
         status: 'pending',
       }],
     };
     updateData('shotGroups', [...shotGroups, newGroup]);
+    // 自动选中新添加的场景和 shot
+    setCurrentGroupId(newGroup.id);
+    setCurrentShotId(newGroup.shots[0].id);
   };
 
   const handleDeleteGroup = (groupId: string) => {
     updateData('shotGroups', shotGroups.filter(g => g.id !== groupId));
+    // 如果删除的是当前选中的，清除选中状态
+    if (currentGroupId === groupId) {
+      setCurrentGroupId(null);
+      setCurrentShotId(null);
+    }
+  };
+
+  // 添加 Shot 到场景
+  const handleAddShotToGroup = (groupId: string) => {
+    const group = shotGroups.find(g => g.id === groupId);
+    const newShot: Shot = {
+      id: `shot_${Date.now()}`,
+      index: group?.shots.length || 0,
+      shotNumber: (group?.shots.length || 0) + 1,
+      cameraWork: '',
+      description: '',
+      frames: [{
+        id: `frame_${Date.now()}_0`,
+        frameNumber: '01',
+        time: '3s',
+        scale: '中景',
+        description: '',
+      }],
+      prompt: '',
+      status: 'pending',
+    };
+    
+    const newGroups = shotGroups.map(g => {
+      if (g.id !== groupId) return g;
+      return { ...g, shots: [...g.shots, newShot] };
+    });
+    updateData('shotGroups', newGroups);
+    // 选中新添加的 shot
+    setCurrentGroupId(groupId);
+    setCurrentShotId(newShot.id);
+  };
+
+  // 删除 Shot
+  const handleDeleteShot = (groupId: string, shotId: string) => {
+    const newGroups = shotGroups.map(g => {
+      if (g.id !== groupId) return g;
+      const newShots = g.shots.filter(s => s.id !== shotId).map((s, i) => ({ ...s, shotNumber: i + 1, index: i }));
+      return { ...g, shots: newShots };
+    });
+    updateData('shotGroups', newGroups);
+    // 如果删除的是当前选中的，清除选中状态
+    if (currentShotId === shotId) {
+      setCurrentShotId(null);
+    }
+  };
+
+  // 添加 Frame 到 Shot
+  const handleAddFrame = (groupId: string, shotId: string, insertAfterFrameId?: string) => {
+    const newFrame: Frame = {
+      id: `frame_${Date.now()}`,
+      frameNumber: '01',
+      time: '3s',
+      scale: '中景',
+      description: '',
+    };
+    
+    const newGroups = shotGroups.map(g => {
+      if (g.id !== groupId) return g;
+      return {
+        ...g,
+        shots: g.shots.map(s => {
+          if (s.id !== shotId) return s;
+          // 找到插入位置
+          let newFrames = [...s.frames];
+          if (insertAfterFrameId) {
+            const insertIdx = newFrames.findIndex(f => f.id === insertAfterFrameId);
+            if (insertIdx >= 0) {
+              newFrames.splice(insertIdx + 1, 0, newFrame);
+            } else {
+              newFrames.push(newFrame);
+            }
+          } else {
+            newFrames.push(newFrame);
+          }
+          // 重新编号
+          newFrames = newFrames.map((f, i) => ({ ...f, frameNumber: String(i + 1).padStart(2, '0') }));
+          return { ...s, frames: newFrames };
+        }),
+      };
+    });
+    updateData('shotGroups', newGroups);
+  };
+
+  // 删除 Frame
+  const handleDeleteFrame = (groupId: string, shotId: string, frameId: string) => {
+    const newGroups = shotGroups.map(g => {
+      if (g.id !== groupId) return g;
+      return {
+        ...g,
+        shots: g.shots.map(s => {
+          if (s.id !== shotId) return s;
+          const newFrames = s.frames.filter(f => f.id !== frameId).map((f, i) => ({ ...f, frameNumber: String(i + 1).padStart(2, '0') }));
+          return { ...s, frames: newFrames };
+        }),
+      };
+    });
+    updateData('shotGroups', newGroups);
+  };
+
+  // 更新 Frame
+  const handleUpdateFrame = (groupId: string, shotId: string, frameId: string, field: keyof Frame, value: string) => {
+    const newGroups = shotGroups.map(g => {
+      if (g.id !== groupId) return g;
+      return {
+        ...g,
+        shots: g.shots.map(s => {
+          if (s.id !== shotId) return s;
+          const newFrames = s.frames.map(f => f.id === frameId ? { ...f, [field]: value } : f);
+          return { ...s, frames: newFrames };
+        }),
+      };
+    });
+    updateData('shotGroups', newGroups);
   };
 
   const handleUpdateShot = (groupId: string, shotId: string, field: string, value: string) => {
@@ -579,13 +756,10 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
     updateData('shotGroups', newGroups);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-500';
-      case 'generating': return 'bg-yellow-500';
-      case 'failed': return 'bg-red-500';
-      default: return 'bg-gray-500';
-    }
+  // 更新 Group 名称
+  const handleUpdateGroup = (groupId: string, name: string) => {
+    const newGroups = shotGroups.map(g => g.id === groupId ? { ...g, name } : g);
+    updateData('shotGroups', newGroups);
   };
 
   const shotGroups = (data.shotGroups as ShotGroup[]) || [];
@@ -646,94 +820,242 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
         )}
       </div>
 
-      {/* 分镜列表 - 按场景分组显示 */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-4" style={{ maxHeight: '500px' }}>
+      {/* 分镜内容区域 - 两栏结构：上方帧编辑 + 下方场景/镜头选择 */}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ maxHeight: '480px' }}>
         {shotGroups.length === 0 ? (
-          <div className="text-xs text-gray-500 text-center py-6">
-            {displaySelectedId ? '点击"AI生成"创建分镜' : '请先选择分集'}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-xs text-gray-500 text-center">
+              {displaySelectedId ? '点击"AI生成"创建分镜' : '请先选择分集'}
+            </div>
           </div>
         ) : (
-          shotGroups.map((group, groupIdx) => (
-            <div key={group.id} className="bg-gray-700 rounded-lg p-3 space-y-3 border-l-4 border-blue-500">
-              {/* 场景标题 */}
-              <div className="flex items-center justify-between pb-2 border-b border-gray-600">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-blue-400">场景 {groupIdx + 1}</span>
-                  <span className="text-xs font-medium text-gray-300 truncate max-w-[280px]" title={group.name}>
-                    {group.name}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleDeleteGroup(group.id)}
-                  className="p-1 text-gray-500 hover:text-red-400"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-              
-              {/* 镜头列表 - 横向排列 */}
-              <div className="space-y-3 ml-1">
-                {group.shots.map((shot, idx) => (
-                  <div key={shot.id} className="bg-gray-600 rounded-lg p-3 border border-gray-500">
-                    {/* 镜头标题行 */}
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-500">
-                      <span className="text-xs font-bold text-yellow-400">镜头 {idx + 1}</span>
-                      <span className={`w-2 h-2 rounded-full ${getStatusColor(shot.status)}`} />
+          <>
+            {/* 上方 - 主要编辑区域 */}
+            <div className="flex-1 flex overflow-hidden">
+              {/* 左侧 - Shot 列表（缩小宽度） */}
+              <div className="w-24 border-r border-gray-600 overflow-y-auto bg-gray-750">
+                {currentGroupId ? (
+                  <div className="p-1 space-y-1">
+                    <div className="text-xs text-gray-400 px-1 mb-1">
+                      镜头
+                      <button
+                        onClick={() => handleAddShotToGroup(currentGroupId)}
+                        className="ml-1 text-blue-400 hover:text-blue-300"
+                      >
+                        <Plus className="w-3 h-3 inline" />
+                      </button>
                     </div>
-                    
-                    {/* Frame 帧列表 - 横向滚动 */}
-                    <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
-                      {extractFrames(shot.description).map((frame, frameIdx) => (
-                        <div key={frameIdx} className="flex-shrink-0 w-32 bg-gray-500 rounded p-2 text-xs">
-                          <div className="font-medium text-blue-300 mb-1">{frame.time}</div>
-                          <div className="text-gray-200 line-clamp-3">{frame.desc}</div>
+                    {(() => {
+                      const group = shotGroups.find(g => g.id === currentGroupId);
+                      return group?.shots.map((shot, shotIdx) => (
+                        <div
+                          key={shot.id}
+                          onClick={() => setCurrentShotId(shot.id)}
+                          className={`p-1.5 rounded cursor-pointer text-xs ${
+                            currentShotId === shot.id
+                              ? 'bg-yellow-600 text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">#{shotIdx + 1}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('确定要删除这个镜头吗？')) {
+                                  handleDeleteShot(currentGroupId, shot.id);
+                                }
+                              }}
+                              className="text-gray-400 hover:text-red-400"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="text-xs opacity-70">{shot.frames?.length || 0} 帧</div>
                         </div>
-                      ))}
-                      {extractFrames(shot.description).length === 0 && (
-                        <div className="flex-1">
-                          <textarea
-                            value={shot.description}
-                            onChange={(e) => handleUpdateShot(group.id, shot.id, 'description', e.target.value)}
-                            placeholder="输入分镜描述，支持 Frame 格式：\n【Frame 0s】描述\n【Frame 3s】描述..."
-                            rows={3}
-                            className="w-full bg-transparent border-none text-xs text-white placeholder-gray-500 focus:outline-none resize-none"
+                      ));
+                    })()}
+                  </div>
+                ) : (
+                  <div className="p-2 text-xs text-gray-500 text-center">选择场景</div>
+                )}
+              </div>
+
+              {/* 右侧 - Frame 编辑区域 */}
+              <div className="flex-1 overflow-y-auto p-3 bg-gray-800">
+                {currentGroupId && currentShotId ? (
+                  (() => {
+                    const group = shotGroups.find(g => g.id === currentGroupId);
+                    const shot = group?.shots.find(s => s.id === currentShotId);
+                    if (!shot) return null;
+                    
+                    return (
+                      <div className="space-y-3">
+                        {/* 场景/镜头信息 */}
+                        <div className="flex items-center gap-2 pb-2 border-b border-gray-600">
+                          <span className="text-xs text-gray-400">场景:</span>
+                          <input
+                            type="text"
+                            value={group?.name || ''}
+                            onChange={(e) => currentGroupId && handleUpdateGroup(currentGroupId, e.target.value)}
+                            placeholder="场景名称..."
+                            className="flex-1 bg-transparent border border-gray-600 rounded px-2 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                          />
+                          <span className="text-xs text-gray-400">运镜:</span>
+                          <input
+                            type="text"
+                            value={shot.cameraWork}
+                            onChange={(e) => handleUpdateShot(currentGroupId!, shot.id, 'cameraWork', e.target.value)}
+                            placeholder="运镜描述..."
+                            className="flex-1 bg-transparent border border-gray-600 rounded px-2 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                           />
                         </div>
-                      )}
+                        
+                        {/* Frames */}
+                        <div className="space-y-2">
+                          <div className="text-xs text-gray-400 flex items-center justify-between">
+                            <span>帧列表</span>
+                            <button
+                              onClick={() => handleAddFrame(currentGroupId!, shot.id)}
+                              className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                            >
+                              <Plus className="w-3 h-3" />添加帧
+                            </button>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            {shot.frames?.map((frame, frameIdx) => (
+                              <div key={frame.id} className="bg-gray-700 rounded-lg p-2 border border-gray-600">
+                                <div className="flex items-center gap-1 mb-2">
+                                  <span className="text-xs font-bold text-blue-400">帧 {frame.frameNumber}</span>
+                                  <input
+                                    type="text"
+                                    value={frame.time}
+                                    onChange={(e) => handleUpdateFrame(currentGroupId!, shot.id, frame.id, 'time', e.target.value)}
+                                    placeholder="时长"
+                                    className="w-12 bg-gray-600 border border-gray-500 rounded px-1 text-xs text-white text-center"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={frame.scale}
+                                    onChange={(e) => handleUpdateFrame(currentGroupId!, shot.id, frame.id, 'scale', e.target.value)}
+                                    placeholder="景别"
+                                    className="w-16 bg-gray-600 border border-gray-500 rounded px-1 text-xs text-white text-center"
+                                  />
+                                  <div className="flex-1" />
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('确定要在这个帧后面插入新帧吗？')) {
+                                        handleAddFrame(currentGroupId!, shot.id, frame.id);
+                                      }
+                                    }}
+                                    className="text-gray-400 hover:text-blue-400 p-1"
+                                    title="在后面插入帧"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('确定要删除这一帧吗？')) {
+                                        handleDeleteFrame(currentGroupId!, shot.id, frame.id);
+                                      }
+                                    }}
+                                    className="text-gray-400 hover:text-red-400 p-1"
+                                    title="删除帧"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <textarea
+                                  value={frame.description}
+                                  onChange={(e) => handleUpdateFrame(currentGroupId!, shot.id, frame.id, 'description', e.target.value)}
+                                  placeholder="帧描述..."
+                                  rows={2}
+                                  className="w-full bg-transparent border-none text-xs text-white placeholder-gray-500 focus:outline-none resize-none"
+                                />
+                              </div>
+                            ))}
+                            
+                            {(!shot.frames || shot.frames.length === 0) && (
+                              <div className="text-xs text-gray-500 text-center py-4">
+                                暂无帧，点击上方添加
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* AI Prompt */}
+                        <div className="pt-2 border-t border-gray-600">
+                          <div className="text-xs text-gray-400 mb-1">AI 绘图 Prompt</div>
+                          <textarea
+                            value={shot.prompt || ''}
+                            onChange={(e) => handleUpdateShot(currentGroupId!, shot.id, 'prompt', e.target.value)}
+                            placeholder="输入 AI 绘图提示词..."
+                            rows={2}
+                            className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 resize-none"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-xs text-gray-500 text-center">
+                      选择一个场景和镜头<br/>查看和编辑帧
                     </div>
-                    
-                    {/* AI绘图 Prompt */}
-                    <input
-                      type="text"
-                      value={shot.prompt || ''}
-                      onChange={(e) => handleUpdateShot(group.id, shot.id, 'prompt', e.target.value)}
-                      placeholder="AI绘图 Prompt (可选)..."
-                      className="w-full bg-gray-500 rounded px-2 py-1 text-xs text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
                   </div>
-                ))}
+                )}
               </div>
             </div>
-          ))
+
+            {/* 下方 - 场景选择栏 */}
+            <div className="h-16 border-t border-gray-600 bg-gray-750 px-2 flex items-center gap-2 overflow-x-auto">
+              <span className="text-xs text-gray-400 shrink-0">场景:</span>
+              {shotGroups.map((group, groupIdx) => (
+                <div
+                  key={group.id}
+                  onClick={() => {
+                    setCurrentGroupId(group.id);
+                    if (group.shots.length > 0 && !currentShotId) {
+                      setCurrentShotId(group.shots[0].id);
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded cursor-pointer text-xs shrink-0 ${
+                    currentGroupId === group.id
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  <span className="font-medium">{group.name || `场景 ${groupIdx + 1}`}</span>
+                  <span className="text-xs opacity-70">({group.shots.length}镜)</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm('确定要删除这个场景吗？')) {
+                        handleDeleteGroup(group.id);
+                      }
+                    }}
+                    className="text-gray-400 hover:text-red-400"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={handleAddShot}
+                className="flex items-center gap-1 px-2 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-400 shrink-0"
+              >
+                <Plus className="w-3 h-3" />添加
+              </button>
+            </div>
+          </>
         )}
       </div>
-
-      {/* 添加场景按钮 */}
-      <div className="px-2 py-2 border-t border-gray-600">
-        <button
-          onClick={handleAddShot}
-          className="w-full flex items-center justify-center gap-1 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-400"
-        >
-          <Plus className="w-3 h-3" />
-          添加场景
-        </button>
-      </div>
-
 
       {/* 统计信息 */}
       <div className="px-2 py-1.5 border-t border-gray-600 text-xs text-gray-500 flex justify-between">
         <span>{shotGroups.length} 个场景</span>
-        <span>{totalShots} 个分镜</span>
+        <span>{totalShots} 个镜头</span>
       </div>
     </div>
   );

@@ -217,6 +217,8 @@ export const imageApi = {
     if (data.ext2 !== undefined) payload.ext2 = data.ext2;
     payload.status = 1;  // 状态 1 表示正常
     
+    console.log('[imageApi] PUT /image/', id, payload);
+    
     const response = await apiClient.put<ApiResponse<Image>>(`/image/${id}`, payload)
     
     const res = response.data

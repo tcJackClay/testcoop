@@ -335,14 +335,18 @@ export const useAssetStore = create<AssetStore>()(
         // 更新 ext1 中的 type
         ext1Obj.type = assetType;
         
+        console.log('[assetStore] 更新资产分类:', { id, category, assetType, ext1: JSON.stringify(ext1Obj) });
+        
         try {
-          // 更新到后�?
-          await imageApi.put(id, {
+          // 更新到后端
+          const result = await imageApi.put(id, {
             resourceType: assetType,
             ext1: JSON.stringify(ext1Obj)
           });
           
-          // 更新本地状�?
+          console.log('[assetStore] 更新结果:', result);
+          
+          // 更新本地状态
           set((state) => ({
             assets: state.assets.map((a) =>
               a.id === id 
@@ -355,7 +359,7 @@ export const useAssetStore = create<AssetStore>()(
             ),
           }));
           
-          console.log(`[assetStore] 更新资产 ${id} 分类�?${category} (${assetType})`);
+          console.log(`[assetStore] 更新资产 ${id} 分类成功: ${category} (${assetType})`);
         } catch (error) {
           console.error('[assetStore] 更新资产分类失败:', error);
           set({ error: '更新分类失败，请重试' });

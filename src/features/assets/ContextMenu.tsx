@@ -87,13 +87,14 @@ export default function ContextMenu({
     onClose();
   };
 
-  // 添加资产到画布
+  // 添加资产到画布 - 创建 ImageNode 显示预览图
   const handleAddToCanvas = () => {
     const position = canvasCenterPosition || { x: 100, y: 100 };
     const imageUrl = asset.url || asset.resourceContent || '';
     const assetName = asset.name || asset.resourceName || '';
     
-    addNode('createAsset', position, {
+    // 创建 ImageNode 显示预览图
+    addNode('imageNode', position, {
       data: {
         name: assetName,
         imageUrl: imageUrl,

@@ -181,11 +181,11 @@ export default function Canvas() {
         
         console.log('[Canvas] 拖放资产:', asset.name, 'imageUrl:', imageUrl?.substring(0, 50));
         
-        addNode('imageNode', { 
-          x, 
-          y,
-          imageUrl,
-          label: asset.name || asset.resourceName || 'Asset'
+        addNode('imageNode', { x, y }, {
+          data: {
+            imageUrl,
+            label: asset.name || asset.resourceName || 'Asset'
+          }
         });
         return;
       } catch (err) {

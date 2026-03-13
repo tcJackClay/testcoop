@@ -132,7 +132,9 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
       let ext1Json: Record<string, any> = {};
       
       // 先查询是否存在同名资产
+      console.log('[CreateAssetNode] 查找已有资产, projectId:', projectId, 'name:', name);
       const existingAsset = await imageApi.getByName(projectId, name);
+      console.log('[CreateAssetNode] 查找结果:', existingAsset);
       const existingAssetId = existingAsset?.id;
       
       // 如果是更新，合并已有 ext1

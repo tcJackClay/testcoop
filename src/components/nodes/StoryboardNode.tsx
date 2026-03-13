@@ -60,6 +60,7 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
   const [localSelectedId, setLocalSelectedId] = useState<string>('');
   const [localGenerating, setLocalGenerating] = useState(false);
   const [localSaving, setLocalSaving] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false);
 
   // 同步 store 中的 episodes 到本地，加载完成后检查是否需要加载已有分镜
   useEffect(() => {
@@ -88,71 +89,64 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
   // 从 node data 中获取已有的分镜
   const existingStoryboard = (data.existingStoryboard as StoryboardScript) || null;
 
-  // 选择分集时更新 store（同步到 ScriptPanel）
+  // 加载已有分镜
   const loadExistingStoryboard = async (episodeId: number) => {
     if (!currentProjectId) return;
     
     console.log('[StoryboardNode] 加载已有分镜, episodeId:', episodeId, 'projectId:', currentProjectId);
+    setLocalLoading(true);
     
     try {
-      // 遍历多个 projectId 查找数据（因为保存时 projectId 可能被覆盖）
-      const testProjectIds = [1, 2, 3, 4, 5, 10, 20, 50, 100, 200, 500, 1024];
-      let allData: any[] = [];
+      // 直接使用当前 projectId 查询（后端已修复 null projectId 的问题）
+      const resp = await storyboardScriptApi.getAll(undefined, currentProjectId);
       
-      for (const pid of testProjectIds) {
-        const resp = await storyboardScriptApi.getAll(undefined, pid);
-        if (resp.code === 0 && resp.data && resp.data.length > 0) {
-          console.log('[StoryboardNode] projectId', pid, '找到', resp.data.length, '条');
-          allData = resp.data;
-          // 打印最新几条的id
-          const recent = resp.data.slice(-5).map((sb: any) => sb.id);
-          console.log('[StoryboardNode] 最新id:', recent.join(','));
-          break;
-        }
-      }
-      
-      console.log('[StoryboardNode] 共找到:', allData.length, '条');
-      
-      // 打印所有数据
-      if (allData.length > 0) {
-        allData.forEach((sb: any) => {
-          console.log(`[StoryboardNode] 分镜数据: id=${sb.id}, name=${sb.resourceName}, projectId=${sb.projectId}, ext1=${sb.ext1}`);
-        });
-      }
+      if (resp.code === 0 && resp.data) {
+        console.log('[StoryboardNode] 找到', resp.data.length, '条分镜');
         
-      // 匹配分镜：优先通过 ext1.episodeId，其次通过名称（如"第6集分镜"）
-      const matched = allData.find((sb: StoryboardScript) => {
-        // 方式1: 通过 ext1.episodeId 匹配
-        if (sb.ext1) {
-          try {
-            const ext1Data = JSON.parse(sb.ext1);
-            if (ext1Data.episodeId === episodeId) {
+        // 匹配分镜：优先通过 ext1.episodeId，其次通过名称（如"第6集分镜"）
+        const matched = resp.data.find((sb: any) => {
+          // 方式1: 通过 ext1.episodeId 匹配
+          if (sb.ext1) {
+            try {
+              const ext1Data = JSON.parse(sb.ext1);
+              if (ext1Data.episodeId === episodeId) {
+                return true;
+              }
+            } catch {}
+          }
+          // 方式2: 通过 resourceName 匹配（如"第6集分镜"）
+          if (sb.resourceName) {
+            const nameMatch = sb.resourceName.match(/第(\d+)集分镜/);
+            if (nameMatch && parseInt(nameMatch[1]) === episodeId) {
               return true;
             }
-          } catch {}
-        }
-        // 方式2: 通过 resourceName 匹配（如"第6集分镜"）
-        if (sb.resourceName) {
-          const nameMatch = sb.resourceName.match(/第(\d+)集分镜/);
-          if (nameMatch && parseInt(nameMatch[1]) === episodeId) {
-            return true;
           }
+          return false;
+        });
+        
+        if (matched) {
+          console.log('[StoryboardNode] 匹配到已有分镜, id:', matched.id, 'resourceName:', matched.resourceName);
+          const storyboardContent = matched.resourceContent || matched.content || '';
+          
+          // 解析 resourceContent（可能是 JSON 包装格式）
+          let parsedContent = storyboardContent;
+          try {
+            const parsed = JSON.parse(storyboardContent);
+            if (parsed.content) {
+              parsedContent = parsed.content;
+            }
+          } catch {}
+          
+          updateData('existingStoryboard', matched);
+          updateData('storyboardContent', parsedContent);
+          const parsed = parseStoryboardScript(parsedContent);
+          updateData('shotGroups', parsed);
+          console.log('[StoryboardNode] 加载完成, 场景数:', parsed.length);
+          setLocalLoading(false);
+          return;
+        } else {
+          console.log('[StoryboardNode] 未匹配到 episodeId:', episodeId);
         }
-        return false;
-      });
-      
-      if (matched) {
-        console.log('[StoryboardNode] 匹配到已有分镜, id:', matched.id, 'resourceName:', matched.resourceName);
-        const storyboardContent = matched.resourceContent || matched.content || '';
-        updateData('existingStoryboard', matched);
-        updateData('storyboardContent', storyboardContent);
-        const parsed = parseStoryboardScript(storyboardContent);
-        updateData('shotGroups', parsed);
-        console.log('[StoryboardNode] 加载完成, 场景数:', parsed.length);
-        return;
-      } else {
-        // 打印所有名称用于调试
-        console.log('[StoryboardNode] 未匹配到 episodeId:', episodeId, '，现有名称:', allData.map((sb: any) => sb.resourceName).join(', '));
       }
     } catch (error) {
       console.error('[StoryboardNode] 加载分镜失败:', error);
@@ -162,6 +156,7 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
     updateData('existingStoryboard', null);
     updateData('storyboardContent', '');
     updateData('shotGroups', []);
+    setLocalLoading(false);
   };
 
   // 选择分集时更新 store（同步到 ScriptPanel）
@@ -220,11 +215,12 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
         await saveStoryboard(parseInt(displaySelectedId), content);
       } else {
         alert('AI 生成分镜失败: ' + (response.message || '未知错误'));
+        setLocalGenerating(false);
+        updateData('isGenerating', false);
       }
     } catch (error) {
       console.error('[StoryboardNode] AI生成失败:', error);
       alert('AI 生成分镜失败: ' + error);
-    } finally {
       setLocalGenerating(false);
       updateData('isGenerating', false);
     }
@@ -233,6 +229,12 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
   // 保存分镜到后端 (参考 huanu-workbench-frontend 格式)
   // 格式: 【场次概述】xxx \n #【Shot 01】【Frame 3s】【中景】描述
   const saveStoryboard = async (episodeId: number, content?: string) => {
+    const currentExistingStoryboard = (data.existingStoryboard as StoryboardScript) || null;
+    await saveStoryboardWithContent(episodeId, content, currentExistingStoryboard);
+  };
+  
+  // 保存分镜到后端 (内部函数)
+  const saveStoryboardWithContent = async (episodeId: number, content: string | undefined, existingStoryboard: StoryboardScript | null) => {
     if (!currentProjectId) return;
     
     const userId = user?.id || 1;
@@ -244,7 +246,8 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
     if (!scriptContent) {
       // 序列化 shotGroups 为文本格式 (参考 huanu-workbench-frontend)
       scriptContent = '';
-      shotGroups.forEach((group) => {
+      const currentShotGroups = (data.shotGroups as ShotGroup[]) || [];
+      currentShotGroups.forEach((group) => {
         scriptContent += `#【Shot ${group.name}】`;
         group.shots.forEach((shot) => {
           // 提取 Frame 信息
@@ -262,45 +265,30 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
       });
     }
     
-    console.log('[StoryboardNode] 保存分镜到后端, episodeId:', episodeId, 'projectId:', currentProjectId, 'existingStoryboard:', !!existingStoryboard, 'content长度:', scriptContent?.length);
+    console.log('[StoryboardNode] 保存分镜到后端, episodeId:', episodeId, 'projectId:', currentProjectId, 'existingStoryboard:', !!existingStoryboard, 'id:', existingStoryboard?.id, 'content长度:', scriptContent?.length);
     
     try {
-      if (existingStoryboard) {
+      // 直接使用传入的 existingStoryboard
+      if (existingStoryboard?.id) {
         // 更新 - 使用 huanu 格式: { content: scriptContent }
-        console.log('[StoryboardNode] 更新分镜, id:', existingStoryboard.id);
+        console.log('[StoryboardNode] 更新分镜, id:', existingStoryboard.id, 'projectId:', currentProjectId);
         
-        // 查找当前的分镜脚本 ID
-        const storyboardList = await storyboardScriptApi.getAll(undefined, currentProjectId).catch(() => ({ code: 0, data: [] }));
-        const currentScript = storyboardList.data?.find((sb: any) => 
-          sb.ext1 && (() => {
-            try {
-              const ext1Data = JSON.parse(sb.ext1);
-              return ext1Data.episodeId === episodeId;
-            } catch {
-              return false;
-            }
-          })()
-        );
+        const updateDataFormat = {
+          resourceName: `第${episodeId}集分镜`,
+          resourceType: 'storyboard_script',
+          resourceContent: JSON.stringify({ content: scriptContent }), // JSON 包装格式
+          resourceStatus: 'official',
+          status: 1,
+          updatedBy: username,
+          updatedTime: now,
+          ext1: JSON.stringify({ episodeId, type: 'storyboard' }),
+        };
         
-        if (currentScript) {
-          const updateDataFormat = {
-            resourceName: currentScript.resourceName || `第${episodeId}集分镜`,
-            resourceType: currentScript.resourceType || 'storyboard',
-            resourceContent: JSON.stringify({ content: scriptContent }), // JSON 包装格式
-            resourceStatus: currentScript.resourceStatus || 'official',
-            status: currentScript.status ?? 1,
-            updatedBy: username,
-            updatedTime: now,
-            ext1: currentScript.ext1 || JSON.stringify({ episodeId, type: 'storyboard' }),
-            ext2: currentScript.ext2,
-          };
-          
-          const updateResult = await storyboardScriptApi.update(currentScript.id, updateDataFormat);
-          console.log('[StoryboardNode] 更新结果, code:', updateResult.code, 'id:', updateResult.data?.id);
-          
-          if (updateResult.code === 0) {
-            updateData('existingStoryboard', { ...existingStoryboard, resourceContent: scriptContent });
-          }
+        const updateResult = await storyboardScriptApi.update(existingStoryboard.id, updateDataFormat);
+        console.log('[StoryboardNode] 更新结果, code:', updateResult.code, 'id:', updateResult.data?.id);
+        
+        if (updateResult.code === 0) {
+          updateData('existingStoryboard', { ...existingStoryboard, resourceContent: scriptContent });
         }
       } else {
         // 创建新分镜 - 使用 huanu 格式
@@ -340,35 +328,57 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
   // 手动保存分镜
   const handleSave = useCallback(async () => {
     const currentShotGroups = (data.shotGroups as ShotGroup[]) || [];
+    const currentExistingStoryboard = (data.existingStoryboard as StoryboardScript) || null;
     
     if (!displaySelectedId) {
-      alert('请先选择分集');
+      console.warn('[StoryboardNode] 未选择分集');
       return;
     }
     
     if (!currentProjectId) {
-      alert('请先选择项目');
+      console.warn('[StoryboardNode] 未选择项目');
       return;
     }
     
     if (currentShotGroups.length === 0) {
-      alert('没有可保存的分镜数据');
+      console.warn('[StoryboardNode] 没有可保存的分镜数据');
       return;
     }
     
-    console.log('[StoryboardNode] 手动保存分镜');
+    console.log('[StoryboardNode] 手动保存分镜, episodeId:', displaySelectedId, 'existingId:', currentExistingStoryboard?.id, 'groups:', currentShotGroups.length);
     setLocalSaving(true);
     
     try {
-      await saveStoryboard(parseInt(displaySelectedId));
-      alert('保存成功！');
+      // 序列化当前的 shotGroups
+      let scriptContent = '';
+      currentShotGroups.forEach((group) => {
+        scriptContent += `#【Shot ${group.name}】`;
+        group.shots.forEach((shot) => {
+          // 提取 Frame 信息
+          const frames = extractFrames(shot.description);
+          if (frames.length > 0) {
+            frames.forEach((frame) => {
+              scriptContent += `【Frame ${frame.time}】【中景】${frame.desc}`;
+            });
+          } else {
+            // 没有 Frame 格式，直接保存描述
+            scriptContent += `【Frame 3s】【中景】${shot.description || ''}`;
+          }
+        });
+        scriptContent += '\n';
+      });
+      
+      console.log('[StoryboardNode] 序列化内容长度:', scriptContent.length);
+      
+      // 直接保存
+      await saveStoryboardWithContent(parseInt(displaySelectedId), scriptContent, currentExistingStoryboard);
+      console.log('[StoryboardNode] 保存完成');
     } catch (error) {
       console.error('[StoryboardNode] 保存失败:', error);
-      alert('保存失败: ' + error);
     } finally {
       setLocalSaving(false);
     }
-  }, [displaySelectedId, currentProjectId, saveStoryboard, user, data.shotGroups]);
+  }, [displaySelectedId, currentProjectId, data.shotGroups, data.existingStoryboard, saveStoryboard]);
 
   // 解析分镜脚本为 shotGroups
   const parseStoryboardScript = (content: string): ShotGroup[] => {
@@ -589,7 +599,7 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
           <select
             value={displaySelectedId}
             onChange={(e) => handleEpisodeChange(e.target.value)}
-            disabled={loading || localGenerating}
+            disabled={loading || localGenerating || localLoading || localSaving}
             className="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">选择分集...</option>
@@ -625,8 +635,14 @@ export default function StoryboardNode({ nodeId: _nodeId, data, updateData }: St
             保存
           </button>
         </div>
-        {loading && (
-          <div className="text-xs text-gray-500 mt-1">加载分集中...</div>
+        {loading || localLoading ? (
+          <div className="text-xs text-blue-400 mt-1">加载中...</div>
+        ) : localGenerating ? (
+          <div className="text-xs text-yellow-400 mt-1">AI 生成分镜中...</div>
+        ) : localSaving ? (
+          <div className="text-xs text-green-400 mt-1">保存中...</div>
+        ) : (
+          <div className="text-xs text-gray-500 mt-1">已选择: {displaySelectedId ? `第${displaySelectedId}集` : '未选择'}</div>
         )}
       </div>
 

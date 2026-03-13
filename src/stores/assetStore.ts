@@ -33,8 +33,8 @@ interface AssetActions {
 
 type AssetStore = AssetState & AssetActions;
 
-// 从中文分类映射到 resourceType 格式
-const mapCategoryToAssetType = (category: string): string => {
+// 从中文分类映射到 ext1.type 格式
+const mapCategoryToExt1Type = (category: string): string => {
   switch (category) {
     case '主要角色': return 'character_primary';
     case '次要角色': return 'character_secondary';
@@ -46,94 +46,55 @@ const mapCategoryToAssetType = (category: string): string => {
   }
 };
 
-// �?assetType 字段映射到中文类�?
-const mapAssetTypeToCategory = (assetType?: string): string => {
-  if (!assetType) return '次要道具';
-  const lowerType = assetType.toLowerCase();
-  // 处理�?character_primary, scene_primary 等格�?
+// 从 ext1.type 映射到中文分类
+const mapExt1TypeToCategory = (ext1Type?: string): string => {
+  if (!ext1Type) return '次要道具';
+  const lowerType = ext1Type.toLowerCase();
   if (lowerType.includes('character') && lowerType.includes('primary')) return '主要角色';
   if (lowerType.includes('character') && lowerType.includes('secondary')) return '次要角色';
   if (lowerType.includes('scene') && lowerType.includes('primary')) return '主要场景';
   if (lowerType.includes('scene') && lowerType.includes('secondary')) return '次要场景';
   if (lowerType.includes('prop') && lowerType.includes('primary')) return '主要道具';
   if (lowerType.includes('prop') && lowerType.includes('secondary')) return '次要道具';
-  // 兼容旧的命名方式
-  if (assetType.includes('主要') && assetType.includes('角色')) return '主要角色';
-  if (assetType.includes('次要') && assetType.includes('角色')) return '次要角色';
-  if (assetType.includes('主要') && assetType.includes('场景')) return '主要场景';
-  if (assetType.includes('次要') && assetType.includes('场景')) return '次要场景';
-  if (assetType.includes('主要') && assetType.includes('道具')) return '主要道具';
-  if (assetType.includes('次要') && assetType.includes('道具')) return '次要道具';
   return '次要道具';
 };
 
-// 从资产对象获取分类
-// 优先级：ext1.type > ext1.parent(从父资产推断) > resourceType > 默认
+// 从资产对象获取分类（统一从 ext1 推断）
 const getAssetCategory = (asset: any, allAssets: any[]): string => {
-  const resourceName = asset.resourceName || asset.name || '';
-  
-  // 1. 优先使用 ext1.type（6个平行分类）
+  // 只从 ext1 推断
   if (asset.ext1) {
     try {
       const ext1Data = JSON.parse(asset.ext1);
-      if (ext1Data.type) {
-        return mapAssetTypeToCategory(ext1Data.type);
-      }
       
-      // 2. 如果有 parent（变体），从父资产推断分类
+      // 1. 检查 parent（变体）
       if (ext1Data.parent) {
         const parentName = ext1Data.parent;
+        // 查找父资产
         const parentAsset = allAssets.find((a: any) => 
           a.name === parentName || a.resourceName === parentName
         );
-        if (parentAsset) {
-          // 优先用父资产的 ext1.type
-          let parentExt1;
+        if (parentAsset?.ext1) {
           try {
-            parentExt1 = parentAsset.ext1 ? JSON.parse(parentAsset.ext1) : {};
+            const parentExt1 = JSON.parse(parentAsset.ext1);
+            return mapExt1TypeToCategory(parentExt1.type);
           } catch {}
-          if (parentExt1?.type) {
-            return mapAssetTypeToCategory(parentExt1.type);
-          }
-          return mapAssetTypeToCategory(parentAsset.resourceType);
         }
-        // 找不到父资产，从名称推断
+        // 从名称推断
         if (parentName.includes('角色')) return '次要角色';
         if (parentName.includes('场景')) return '次要场景';
         if (parentName.includes('道具')) return '次要道具';
       }
+      
+      // 2. 直接从 type 推断
+      if (ext1Data.type) {
+        return mapExt1TypeToCategory(ext1Data.type);
+      }
     } catch (e) {}
   }
   
-  // 3. 检查名称是否包含 " - " （旧版变体命名模式）
-  if (resourceName.includes(' - ')) {
-    const parentName = resourceName.split(' - ')[0].trim();
-    const parentAsset = allAssets.find((a: any) => 
-      a.name === parentName || a.resourceName === parentName
-    );
-    if (parentAsset) {
-      let parentExt1;
-      try {
-        parentExt1 = parentAsset.ext1 ? JSON.parse(parentAsset.ext1) : {};
-      } catch {}
-      if (parentExt1?.type) {
-        return mapAssetTypeToCategory(parentExt1.type);
-      }
-      return mapAssetTypeToCategory(parentAsset.resourceType);
-    }
-    if (parentName.includes('角色')) return '次要角色';
-    if (parentName.includes('场景')) return '次要场景';
-    if (parentName.includes('道具')) return '次要道具';
-  }
-  
-  // 4. 使用 resourceType（兼容旧数据）
-  if (asset.resourceType && asset.resourceType !== 'image') {
-    return mapAssetTypeToCategory(asset.resourceType);
-  }
-  
-  // 5. 默认返回次要道具
   return '次要道具';
 };
+
 export const useAssetStore = create<AssetStore>()(
   persist(
     (set, get) => ({
@@ -317,9 +278,9 @@ export const useAssetStore = create<AssetStore>()(
         });
       },
       
-      // 更新资产分类
+      // 更新资产分类 - 只更新 ext1 中的 type 字段
       updateAssetCategory: async (id: number, category: string) => {
-        const assetType = mapCategoryToAssetType(category);
+        const ext1Type = mapCategoryToExt1Type(category);
         
         // 解析现有 ext1
         const { assets } = get();
@@ -332,15 +293,14 @@ export const useAssetStore = create<AssetStore>()(
           } catch (e) {}
         }
         
-        // 更新 ext1 中的 type
-        ext1Obj.type = assetType;
+        // 只更新 ext1 中的 type
+        ext1Obj.type = ext1Type;
         
-        console.log('[assetStore] 更新资产分类:', { id, category, assetType, ext1: JSON.stringify(ext1Obj) });
+        console.log('[assetStore] 更新资产分类:', { id, category, ext1Type, ext1: JSON.stringify(ext1Obj) });
         
         try {
-          // 更新到后端
+          // 只更新 ext1，不更新 resourceType
           const result = await imageApi.put(id, {
-            resourceType: assetType,
             ext1: JSON.stringify(ext1Obj)
           });
           
@@ -352,14 +312,13 @@ export const useAssetStore = create<AssetStore>()(
               a.id === id 
                 ? { 
                     ...a, 
-                    resourceType: assetType,
                     ext1: JSON.stringify(ext1Obj)
                   } 
                 : a
             ),
           }));
           
-          console.log(`[assetStore] 更新资产 ${id} 分类成功: ${category} (${assetType})`);
+          console.log(`[assetStore] 更新资产 ${id} 分类成功: ${category} (${ext1Type})`);
         } catch (error) {
           console.error('[assetStore] 更新资产分类失败:', error);
           set({ error: '更新分类失败，请重试' });

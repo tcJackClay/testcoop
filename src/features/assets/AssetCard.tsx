@@ -30,20 +30,22 @@ const categoryColors: Record<AssetCategory, string> = {
   '次要道具': 'bg-orange-400',
 };
 
-// 从 asset 对象推断 category 类型
+// 从 ext1 推断 category 类型（统一使用 ext1 内信息）
 const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
-  // 1. 首先检查 ext1 JSON 中的信息
+  // 只从 ext1 JSON 中推断
   if (asset.ext1) {
     try {
       const ext1Data = JSON.parse(asset.ext1);
-      // 检查是否是变体（有 parent 字段）
+      
+      // 1. 检查是否是变体（有 parent 字段）
       if (ext1Data.parent) {
         const parentName = ext1Data.parent;
         if (parentName.includes('角色')) return '次要角色';
         if (parentName.includes('场景')) return '次要场景';
         if (parentName.includes('道具')) return '次要道具';
       }
-      // 检查 ext1 中是否有直接的 type 字段
+      
+      // 2. 检查 ext1 中是否有直接的 type 字段
       if (ext1Data.type) {
         const type = ext1Data.type.toLowerCase();
         if (type.includes('character') && type.includes('primary')) return '主要角色';
@@ -58,24 +60,7 @@ const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
     }
   }
   
-  // 2. 使用 resourceType 字段
-  const resourceType = asset.resourceType || '';
-  const lowerType = resourceType.toLowerCase();
-  if (lowerType.includes('character') && lowerType.includes('primary')) return '主要角色';
-  if (lowerType.includes('character') && lowerType.includes('secondary')) return '次要角色';
-  if (lowerType.includes('scene') && lowerType.includes('primary')) return '主要场景';
-  if (lowerType.includes('scene') && lowerType.includes('secondary')) return '次要场景';
-  if (lowerType.includes('prop') && lowerType.includes('primary')) return '主要道具';
-  if (lowerType.includes('prop') && lowerType.includes('secondary')) return '次要道具';
-  
-  // 3. 从 name 推断（最后的 fallback）
-  const name = asset.name || '';
-  if (name.includes('主角') || name.includes('女主') || name.includes('角色')) return '主要角色';
-  if (name.includes('反派') || name.includes('配角')) return '次要角色';
-  if (name.includes('主要场景') || name.includes('城堡') || name.includes('王城')) return '主要场景';
-  if (name.includes('森林') || name.includes('山洞')) return '次要场景';
-  if (name.includes('剑') || name.includes('神器') || name.includes('主要道具')) return '主要道具';
-  
+  // 没有 ext1 信息时返回默认分类
   return '次要道具';
 };
 

@@ -21,7 +21,7 @@ import AssetCard from './AssetCard';
 import AssetSidebar from './AssetSidebar';
 import VariantDetailView from './VariantDetailView';
 import ContextMenu from './ContextMenu';
-import { mapCategoryToType, type AssetLibraryPanelProps, type AssetStats, type AssetCategory } from './AssetLibraryPanel.types';
+import { mapExt1TypeToCategory, type AssetLibraryPanelProps, type AssetStats, type AssetCategory } from './AssetLibraryPanel.types';
 import { imageApi } from '../../api/image';
 
 const categories = [
@@ -79,47 +79,37 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return assets.filter((asset) => asset.parentId === primaryName);
   };
   
-  // 获取资产分类（与 assetStore 保持一致）
-  const getAssetCategory = (asset: Image): string => {
-    const resourceName = asset.resourceName || asset.name || '';
-    
-    // 检查名称是否包含 " - " （变体命名模式）
-    if (resourceName.includes(' - ')) {
-      const parentName = resourceName.split(' - ')[0].trim();
-      if (parentName.includes('角色')) return '次要角色';
-      if (parentName.includes('场景')) return '次要场景';
-      if (parentName.includes('道具')) return '次要道具';
-      // 查找父资产
-      const parentAsset = assets.find((a) => 
-        a.name === parentName || a.resourceName === parentName
-      );
-      if (parentAsset) {
-        const parentCategory = mapCategoryToType(parentAsset.resourceType);
-        return parentCategory.replace('主要', '次要');
-      }
-    }
-    
-    // 检查 ext1
+  // 获取资产分类（统一从 ext1 推断）
+  const getAssetCategory = (asset: Image, _allAssets?: Image[]): string => {
+    // 只从 ext1 推断
     if (asset.ext1) {
       try {
         const ext1Data = JSON.parse(asset.ext1);
+        
+        // 1. 检查 parent（变体）
         if (ext1Data.parent) {
           const parentName = ext1Data.parent;
+          // 查找父资产
+          const parentAsset = assets.find((a) => 
+            a.name === parentName || a.resourceName === parentName
+          );
+          if (parentAsset?.ext1) {
+            try {
+              const parentExt1 = JSON.parse(parentAsset.ext1);
+              return mapExt1TypeToCategory(parentExt1.type);
+            } catch {}
+          }
+          // 从名称推断
           if (parentName.includes('角色')) return '次要角色';
           if (parentName.includes('场景')) return '次要场景';
           if (parentName.includes('道具')) return '次要道具';
         }
+        
+        // 2. 直接从 type 推断
         if (ext1Data.type) {
-          return mapCategoryToType(ext1Data.type);
+          return mapExt1TypeToCategory(ext1Data.type);
         }
-      } catch (e) {
-        return mapCategoryToType(asset.ext1);
-      }
-    }
-    
-    // 使用 resourceType
-    if (asset.resourceType && asset.resourceType !== 'image') {
-      return mapCategoryToType(asset.resourceType);
+      } catch (e) {}
     }
     
     return '次要道具';
@@ -200,9 +190,9 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     };
     
     assets.forEach(asset => {
-      const type = mapCategoryToType(asset.name);
-      if (result[type as AssetCategory] !== undefined) {
-        result[type as AssetCategory]++;
+      const category = getAssetCategory(asset, assets);
+      if (result[category as AssetCategory] !== undefined) {
+        result[category as AssetCategory]++;
       }
     });
     

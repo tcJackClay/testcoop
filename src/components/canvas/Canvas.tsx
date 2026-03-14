@@ -185,7 +185,10 @@ export default function Canvas() {
           data: {
             imageUrl: asset.id?.toString() || '',
             assetId: asset.id,
-            label: asset.name || asset.resourceName || 'Asset'
+            label: asset.name || asset.resourceName || 'Asset',
+            // 读取资产的处理链信息
+            ex2: asset.ex2 || null,
+            processChain: asset.ex2 ? JSON.parse(asset.ex2) : [],
           }
         });
         return;

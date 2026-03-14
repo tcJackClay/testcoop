@@ -31,7 +31,7 @@ class RunningHubConfigService {
         return {
           ...{
             enabled: false,
-            apiKey: '',
+            apiKey: '008c7207cedf470ca1e96c191a070809', // 默认 API Key
             baseUrl: '/api/runninghub',
             functions: DEFAULT_FUNCTIONS,
           },
@@ -43,9 +43,9 @@ class RunningHubConfigService {
       console.warn('加载 RunningHub 配置失败:', e);
     }
     return {
-      enabled: false,
-      apiKey: '',
-    baseUrl: '/api/runninghub',
+      enabled: true,
+      apiKey: '008c7207cedf470ca1e96c191a070809',
+      baseUrl: '/api/runninghub',
       functions: DEFAULT_FUNCTIONS,
     };
   }
@@ -77,6 +77,11 @@ class RunningHubConfigService {
 
   getBaseUrl(): string {
     return this.config.baseUrl;
+  }
+
+  // 获取直接调用的 API 地址（绕过代理）
+  getDirectBaseUrl(): string {
+    return 'https://www.runninghub.cn';
   }
 
   getFunctions(): RunningHubFunction[] {

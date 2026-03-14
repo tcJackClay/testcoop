@@ -236,7 +236,7 @@ export default function NodeRenderer({
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  }, {});
+  }, []);
 
   useEffect(() => {
     if (isDragging) {
@@ -332,20 +332,25 @@ export default function NodeRenderer({
     >
 
 
-      {/* Delete Button */}
+      {/* Delete Button - Disable when processing */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           deleteNode(node.id);
         }}
-        className="absolute -top-2.5 -right-2.5 z-[60] p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-gray-400 hover:text-red-500 border-gray-700 hover:bg-gray-700"
+        disabled={node.data.status === 'processing'}
+        className={`absolute -top-2.5 -right-2.5 z-[60] p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 border-gray-700 ${
+          node.data.status === 'processing' 
+            ? 'text-gray-600 cursor-not-allowed' 
+            : 'text-gray-400 hover:text-red-500 hover:bg-gray-700'
+        }`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <X size={12} />
       </button>
 
-      {/* Execute Button - Only for generation nodes */}
-      {generationNodeTypes.includes(node.type) && (
+      {/* Execute Button - Only for generation nodes except imageNode */}
+      {generationNodeTypes.includes(node.type) && node.type !== 'imageNode' && (
         <button
           className="absolute -top-2.5 -right-8 z-[60] p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-green-400 hover:text-green-300 border-gray-700 hover:bg-gray-700"
           onClick={(e) => {

@@ -159,7 +159,7 @@ class RunningHubApiService {
     }
   }
 
-  // 提交任务
+  // 提交任务 - 新版 API
   async submitTask(
     func: RunningHubFunction,
     inputs: Record<string, any>,
@@ -178,12 +178,14 @@ class RunningHubApiService {
     });
 
     try {
-      const response = await fetch(`${baseUrl}/save-nodes`, {
+      // 新版 API: POST /openapi/v2/run/ai-app/{webappId}
+      const response = await fetch(`${baseUrl}/openapi/v2/run/ai-app/${func.webappId}`, {
         method: 'POST',
         headers: this.getHeaders(),
         body: JSON.stringify({
-          webappId: String(func.webappId || ''),
           nodeInfoList,
+          instanceType: 'default',
+          usePersonalQueue: false,
         }),
       });
 
@@ -192,18 +194,22 @@ class RunningHubApiService {
       }
 
       const result = await response.json();
+      console.log('[RunningHub] 提交任务响应:', result);
+      
+      if (result.taskId) {
+        return {
+          success: true,
+          taskId: result.taskId,
+        };
+      }
       
       if (result.code !== 0) {
-        throw new Error(result.message || '任务执行失败');
+        throw new Error(result.message || result.errorMessage || '任务执行失败');
       }
-
-      // 提取图片 URL
-      const imageUrl = this.extractImageUrl(result);
 
       return {
         success: true,
-        taskId: result.data?.taskId,
-        data: { fileUrl: imageUrl },
+        taskId: result.taskId,
       };
     } catch (error) {
       console.error('[RunningHub] submitTask 失败:', error);
@@ -248,9 +254,11 @@ class RunningHubApiService {
     const baseUrl = runningHubConfig.getBaseUrl();
 
     try {
-      const response = await fetch(`${baseUrl}/task/${taskId}`, {
-        method: 'GET',
+      // 新版 API: POST /openapi/v2/query
+      const response = await fetch(`${baseUrl}/openapi/v2/query`, {
+        method: 'POST',
         headers: this.getHeaders(),
+        body: JSON.stringify({ taskId }),
       });
 
       if (!response.ok) {
@@ -258,13 +266,17 @@ class RunningHubApiService {
       }
 
       const data = await response.json();
+      console.log('[RunningHub] 查询任务响应:', data);
+      
+      // 新版 API 返回格式
+      const imageUrl = data.results?.[0]?.url || '';
+      
       return {
         taskId,
-        status: data.status || 'processing',
-        progress: data.progress || 0,
-        result: data.result,
-        estimatedTime: data.estimatedTime,
-        error: data.error,
+        status: data.status?.toLowerCase() || 'processing',
+        progress: data.status === 'SUCCESS' ? 100 : 50,
+        result: imageUrl ? { images: [imageUrl] } : undefined,
+        error: data.errorMessage,
       };
     } catch (error) {
       console.error('获取任务状态失败:', error);
@@ -279,17 +291,19 @@ class RunningHubApiService {
 
   // 上传文件
   async uploadFile(
-    file: File
+    file: File,
+    fileType: string = 'image'
   ): Promise<{ success: boolean; fileId?: string; url?: string; error?: string }> {
     const baseUrl = runningHubConfig.getBaseUrl();
-    console.log('[RunningHub] 上传文件, baseUrl:', baseUrl);
+    console.log('[RunningHub] 上传文件, baseUrl:', baseUrl, 'fileType:', fileType);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('fileType', fileType);
 
       const authHeader = this.getHeaders();
-      const response = await fetch(`${baseUrl}/upload-file`, {
+      const response = await fetch(`${baseUrl}/openapi/v2/media/upload/binary`, {
         method: 'POST',
         headers: {
           'Authorization': (authHeader as Record<string, string>)['Authorization'] || '',
@@ -306,7 +320,8 @@ class RunningHubApiService {
       const data = await response.json();
       console.log('[RunningHub] 上传响应数据:', data);
 
-      const filePath = data.data?.data?.fileName || data.thirdPartyResponse?.filePath || data.thirdPartyResponse?.url || data.url || '';
+      // 新版 API 返回格式
+      const filePath = data.data?.download_url || data.data?.fileName || '';
       
       return {
         success: true,
@@ -361,6 +376,155 @@ class RunningHubApiService {
       success: false,
       error: '未获取到生成结果',
     };
+  }
+
+  // ============================================
+  // Direct API Methods - 前端直接调用 RunningHub
+  // ============================================
+
+  // 直接上传文件到 RunningHub（绕过代理）
+  async uploadFileDirect(
+    file: File
+  ): Promise<{ success: boolean; url?: string; fileName?: string; error?: string }> {
+    const baseUrl = runningHubConfig.getDirectBaseUrl();
+    const apiKey = runningHubConfig.getApiKey();
+    
+    console.log('[RunningHub] 直接上传文件, baseUrl:', baseUrl);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${baseUrl}/openapi/v2/media/upload/binary`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: formData,
+      });
+
+      console.log('[RunningHub] 直接上传响应状态:', response.status);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: 文件上传失败`);
+      }
+
+      const data = await response.json();
+      console.log('[RunningHub] 直接上传响应数据:', data);
+
+      if (data.code === 0 && data.data) {
+        return {
+          success: true,
+          url: data.data.download_url || '',  // 完整下载 URL
+          fileName: data.data.fileName || '',  // 相对路径，用于任务提交
+        };
+      }
+
+      return {
+        success: false,
+        error: data.message || '上传失败',
+      };
+    } catch (error) {
+      console.error('[RunningHub] 直接上传失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '上传失败',
+      };
+    }
+  }
+
+  // 直接提交任务到 RunningHub
+  async submitTaskDirect(
+    webappId: string,
+    nodeInfoList: { nodeId: string; fieldName: string; fieldValue: string; description?: string }[]
+  ): Promise<{ success: boolean; taskId?: string; error?: string }> {
+    const baseUrl = runningHubConfig.getDirectBaseUrl();
+    const apiKey = runningHubConfig.getApiKey();
+    
+    console.log('[RunningHub] 直接提交任务, webappId:', webappId);
+
+    try {
+      const response = await fetch(`${baseUrl}/openapi/v2/run/ai-app/${webappId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          nodeInfoList,
+          instanceType: 'default',
+          usePersonalQueue: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: 任务提交失败`);
+      }
+
+      const result = await response.json();
+      console.log('[RunningHub] 直接提交任务响应:', result);
+
+      if (result.taskId) {
+        return {
+          success: true,
+          taskId: result.taskId,
+        };
+      }
+
+      return {
+        success: false,
+        error: result.message || result.errorMessage || '提交失败',
+      };
+    } catch (error) {
+      console.error('[RunningHub] 直接提交任务失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '提交失败',
+      };
+    }
+  }
+
+  // 直接查询 RunningHub 任务状态
+  async queryTaskDirect(
+    taskId: string
+  ): Promise<{ success: boolean; status?: string; imageUrl?: string; error?: string }> {
+    const baseUrl = runningHubConfig.getDirectBaseUrl();
+    const apiKey = runningHubConfig.getApiKey();
+    
+    console.log('[RunningHub] 直接查询任务, taskId:', taskId);
+
+    try {
+      const response = await fetch(`${baseUrl}/openapi/v2/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ taskId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: 查询失败`);
+      }
+
+      const data = await response.json();
+      console.log('[RunningHub] 直接查询任务响应:', data);
+
+      const status = data.status?.toLowerCase();
+      const imageUrl = data.results?.[0]?.url;
+
+      return {
+        success: true,
+        status,
+        imageUrl,
+      };
+    } catch (error) {
+      console.error('[RunningHub] 直接查询任务失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '查询失败',
+      };
+    }
   }
 
   // 取消任务

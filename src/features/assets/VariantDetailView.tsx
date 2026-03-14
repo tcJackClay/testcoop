@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { ChevronLeft, Image as ImageIcon } from 'lucide-react';
 import type { Image } from '../../api/image';
+import { apiClient } from '../../api/client';
 
 interface Variant {
   id: number;
@@ -7,6 +9,60 @@ interface Variant {
   resourceName?: string;
   url?: string;
   resourceContent?: string;
+}
+
+// 从 API 获取 base64 图片数据
+const fetchImageBase64 = async (imageId: number): Promise<string | null> => {
+  try {
+    const response = await apiClient.get(`/image/${imageId}`);
+    const res = response.data;
+    if (res.code === 0 && res.data) {
+      return res.data;
+    }
+  } catch (error) {
+    console.error('获取图片失败:', error);
+  }
+  return null;
+};
+
+// 图片组件 - 自动获取 base64
+function VariantImage({ imageId, src, alt }: { imageId?: number; src?: string; alt?: string }) {
+  const [base64Image, setBase64Image] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const fetchImage = async () => {
+      // 优先使用 src，如果是相对路径则获取 base64
+      if (imageId && !src?.startsWith('data:') && !src?.startsWith('http')) {
+        const base64 = await fetchImageBase64(imageId);
+        if (base64) {
+          let dataUrl = base64;
+          if (!base64.startsWith('data:')) {
+            dataUrl = `data:image/png;base64,${base64}`;
+          }
+          setBase64Image(dataUrl);
+        }
+      }
+    };
+    fetchImage();
+  }, [imageId, src]);
+  
+  const displaySrc = base64Image || src;
+  
+  if (!displaySrc) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <ImageIcon size={32} className="text-gray-500" />
+      </div>
+    );
+  }
+  
+  return (
+    <img
+      src={displaySrc}
+      alt={alt}
+      className="w-full h-full object-cover"
+    />
+  );
 }
 
 interface VariantDetailViewProps {
@@ -35,17 +91,11 @@ export default function VariantDetailView({ selectedPrimaryAsset, variants, onBa
           {selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}
         </h3>
         <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
-          {selectedPrimaryAsset.resourceContent ? (
-            <img
-              src={selectedPrimaryAsset.resourceContent}
-              alt={selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <ImageIcon size={32} className="text-gray-500" />
-            </div>
-          )}
+          <VariantImage 
+            imageId={selectedPrimaryAsset.id}
+            src={selectedPrimaryAsset.resourceContent}
+            alt={selectedPrimaryAsset.name || selectedPrimaryAsset.resourceName}
+          />
         </div>
       </div>
 
@@ -57,17 +107,11 @@ export default function VariantDetailView({ selectedPrimaryAsset, variants, onBa
             {variants.map((variant) => (
               <div key={variant.id} className="flex flex-col gap-1">
                 <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
-                  {variant.resourceContent ? (
-                    <img
-                      src={variant.resourceContent}
-                      alt={variant.name || variant.resourceName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon size={20} className="text-gray-500" />
-                    </div>
-                  )}
+                  <VariantImage 
+                    imageId={variant.id}
+                    src={variant.resourceContent}
+                    alt={variant.name || variant.resourceName}
+                  />
                 </div>
                 <span className="text-[10px] text-gray-400 text-center truncate">
                   {variant.name || variant.resourceName || '变体'}

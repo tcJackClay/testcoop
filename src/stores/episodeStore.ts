@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { episodeScriptApi } from '../api';
+import { episodeScriptApi } from '@/api';
 
 export interface Episode {
   id: number;

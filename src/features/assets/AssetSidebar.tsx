@@ -31,7 +31,7 @@ export default function AssetSidebar({ categories, filterType, setFilterType }: 
             {cat.icon}
           </span>
           <span className={`text-[8px] writing-vertical ${filterType === cat.key ? 'text-blue-300' : 'text-gray-500'}`}>
-            {cat.label.replace('主要', '').replace('次要', '')}
+            {cat.label}
           </span>
         </button>
       ))}

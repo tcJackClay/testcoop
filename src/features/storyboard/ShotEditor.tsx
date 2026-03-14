@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Save, Upload, Image, Trash2, Plus, GripVertical } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Shot } from '../../types';
-import { useStoryboardStore } from '../../stores/storyboardStore';
+import { useStoryboardStore } from '../../stores';
 import { SHOT_TYPES, CAMERA_MOVEMENTS } from '../../types/storyboard';
 
 interface ShotEditorProps {

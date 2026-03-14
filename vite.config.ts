@@ -11,6 +11,15 @@ export default defineConfig({
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
+      // 图片代理 - 转发图片请求到后端
+      '/api/images': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+      '/images': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
     },
   },
   plugins: [react()],

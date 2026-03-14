@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Trash2, Download, Eye, ChevronRight, Tag, Plus } from 'lucide-react';
 import type { Image as AssetImage } from '../../api/image';
-import { useAssetStore } from '../../stores/assetStore';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useAssetStore } from '@/stores';
+import { useCanvasStore } from '@/stores/canvasStore';
 
 interface ContextMenuProps {
   asset: AssetImage;

@@ -14,8 +14,8 @@ import {
   Package,
   Loader2,
 } from 'lucide-react';
-import { useAssetStore } from '../../stores/assetStore';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useAssetStore } from '@/stores';
+import { useCanvasStore } from '@/stores/canvasStore';
 import { Image as AssetImageType } from '../../api/image';
 import AssetCard from './AssetCard';
 import AssetSidebar from './AssetSidebar';
@@ -65,18 +65,45 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   // Variant detail view state
   const [selectedPrimaryAsset, setSelectedPrimaryAsset] = useState<Image | null>(null);
   
-  // Helper functions
+  // Helper functions - 从 ext1 获取变体信息
   const isSecondaryAsset = (asset: Image): boolean => {
-    return !!asset.parentId && asset.parentId.length > 0;
+    if (asset.ext1) {
+      try {
+        const ext1Data = JSON.parse(asset.ext1);
+        return !!ext1Data.parent;
+      } catch {}
+    }
+    return false;
   };
   
   const isPrimaryAsset = (asset: Image): boolean => {
-    return !isSecondaryAsset(asset);
+    if (isSecondaryAsset(asset)) return false;
+    // 主要资产：其他资产以它为 parent
+    const assetName = asset.name || asset.resourceName;
+    return assets.some(a => {
+      if (a.id === asset.id) return false;
+      if (a.ext1) {
+        try {
+          const ext1Data = JSON.parse(a.ext1);
+          return ext1Data.parent === assetName;
+        } catch {}
+      }
+      return false;
+    });
   };
   
   const getVariantsForPrimary = (primaryAsset: Image): Image[] => {
     const primaryName = primaryAsset.name || primaryAsset.resourceName;
-    return assets.filter((asset) => asset.parentId === primaryName);
+    return assets.filter((asset) => {
+      if (asset.id === primaryAsset.id) return false;
+      if (asset.ext1) {
+        try {
+          const ext1Data = JSON.parse(asset.ext1);
+          return ext1Data.parent === primaryName;
+        } catch {}
+      }
+      return false;
+    });
   };
   
   // 获取资产分类（统一从 ext1 推断）
@@ -175,7 +202,6 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   const handleAddAssetNode = () => {
     const position = getCanvasCenterPosition();
     addNode('createAsset', position);
-    console.log('Added createAsset node to canvas at position:', position);
   };
   
   // Calculate stats

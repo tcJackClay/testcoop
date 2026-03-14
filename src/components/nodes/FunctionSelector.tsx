@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button } from '@heroui/react';
+// TODO: 安装 @heroui/react 或替换为其他 UI 库
+// import { Button } from '@heroui/react';
 import { ChevronDown } from 'lucide-react';
 import type { RunningHubFunction } from '../../api/runningHub/index';
 

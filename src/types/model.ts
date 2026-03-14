@@ -12,6 +12,17 @@ export type ModelProvider =
 
 export type ModelCategory = 'image' | 'video' | 'chat';
 
+// Model 配置接口
+export interface ModelConfig {
+  id: string;
+  name: string;
+  provider: ModelProvider;
+  modelName?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  enabled?: boolean;
+}
+
 export interface ModelParameter {
   id: string;
   name: string;

@@ -1,8 +1,6 @@
 // CreateAssetNode - 创建资产节点组件
 import { Sparkles, ArrowDown } from 'lucide-react';
-import { useAssetStore } from '../../stores/assetStore';
-import { useProjectStore } from '../../stores/projectStore';
-import { useCanvasStore } from '../../stores/canvasStore';
+import { useAssetStore, useProjectStore, useCanvasStore } from '../../stores';
 import { imageApi } from '../../api/image';
 import { vectorApi } from '../../api/vector';
 import { assetTypeOptions } from './nodeConstants';

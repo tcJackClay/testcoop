@@ -2,7 +2,7 @@ import { useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Trash2, Undo2, Redo2 } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
-import { useAssetStore } from '../../stores/assetStore';
+import { useAssetStore } from '../../stores';
 
 interface CanvasToolbarProps {
   viewPort: { x: number; y: number; zoom: number };

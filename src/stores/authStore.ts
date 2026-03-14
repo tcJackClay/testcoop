@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi, LoginRequest, RegisterRequest } from '../api/auth';
+import { authApi, LoginRequest, RegisterRequest } from '@/api/auth';
 
 export interface User {
   id: number;
@@ -31,9 +31,22 @@ const getInitialToken = (): string | null => {
   return localStorage.getItem('auth_token');
 };
 
+const getInitialUser = (): User | null => {
+  if (typeof window === 'undefined') return null;
+  const userStr = localStorage.getItem('auth_user');
+  if (userStr) {
+    try {
+      return JSON.parse(userStr);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: getInitialToken(),
-  user: null,
+  user: getInitialUser(),
   isLoading: false,
   isLoginModalOpen: false,
   error: null,
@@ -46,6 +59,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (response.data?.token) {
         localStorage.setItem('auth_token', response.data.token);
+        localStorage.setItem('auth_user', JSON.stringify(response.data.user || null));
         set({ 
           token: response.data.token, 
           user: response.data.user || null, 
@@ -74,6 +88,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (response.data?.token) {
         localStorage.setItem('auth_token', response.data.token);
+        localStorage.setItem('auth_user', JSON.stringify(response.data.user || null));
         set({ 
           token: response.data.token, 
           user: response.data.user || null, 
@@ -81,7 +96,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isLoginModalOpen: false 
         });
         // 注册成功，用户信息已从注册响应获取
-        return true;
         return true;
       } else {
         set({ error: response.message || '注册失败', isLoading: false });
@@ -102,6 +116,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Ignore
     } finally {
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
       set({ token: null, user: null, isDevMode: false });
     }
   },

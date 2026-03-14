@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Star, User, Mountain, MapPin, Gem, Package, Image as ImageIcon, Video } from 'lucide-react';
 import type { AssetWithVariants, AssetCategory } from '../../types/asset';
 import type { Image } from '../../api/image';
+import { apiClient } from '../../api/client';
 
 
 interface AssetCardProps {
@@ -64,12 +66,29 @@ const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
   return '次要道具';
 };
 
-// 获取 imageUrl
+// 获取图片 URL - 优先使用 base64 数据，否则使用 resourceContent 路径
 const getImageUrl = (asset: AssetWithVariants | Image): string | undefined => {
-  // 优先使用 resourceContent (API返回的实际图片URL/ base64)
-  if (asset.resourceContent) return asset.resourceContent;
-  // 兼容其他字段 - imageUrl 或 url
-  return (asset as any).imageUrl || asset.url;
+  // 如果 resourceContent 是相对路径，需要通过 API 获取 base64
+  if (asset.resourceContent && !asset.resourceContent.startsWith('data:')) {
+    return undefined; // 让组件通过 API 获取
+  }
+  // 直接返回 base64 或完整 URL
+  return asset.resourceContent;
+};
+
+// 从 API 获取 base64 图片数据
+const fetchImageBase64 = async (imageId: number): Promise<string | null> => {
+  try {
+    const response = await apiClient.get(`/image/${imageId}`);
+    const res = response.data;
+    if (res.code === 0 && res.data) {
+      // 假设返回的是 base64 字符串
+      return res.data;
+    }
+  } catch (error) {
+    console.error('获取图片失败:', error);
+  }
+  return null;
 };
 
 export default function AssetCard({ 
@@ -81,12 +100,61 @@ export default function AssetCard({
 }: AssetCardProps) {
   const category = inferCategory(asset);
   const imageUrl = getImageUrl(asset);
+  const [base64Image, setBase64Image] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
-  // 检查是否有有效的图片URL
-  const hasImage = !!imageUrl && imageUrl.length > 0;
-  const hasVariants = 'variants' in asset && asset.variants && asset.variants.length > 0;
-  // Check if this is a secondary asset (has parentId)
-  const isSecondaryAsset = 'parentId' in asset && !!asset.parentId;
+  // 如果没有直接可用的图片URL，通过 API 获取 base64
+  useEffect(() => {
+    const fetchImage = async () => {
+      // 有 id 且没有直接可用图片时获取，且没有正在获取
+      if (asset.id && !imageUrl && !base64Image && !isLoading) {
+        setIsLoading(true);
+        const base64 = await fetchImageBase64(asset.id);
+        if (base64) {
+          // 尝试检测图片类型
+          let dataUrl = base64;
+          if (!base64.startsWith('data:')) {
+            // 尝试检测格式（默认 png）
+            dataUrl = `data:image/png;base64,${base64}`;
+          }
+          setBase64Image(dataUrl);
+        }
+        setIsLoading(false);
+      }
+    };
+    fetchImage();
+  }, [asset.id, imageUrl, base64Image]);
+  
+  // 优先使用 base64 图片
+  const displayImageUrl = base64Image || imageUrl;
+  const hasImage = !!displayImageUrl && displayImageUrl.length > 0;
+  
+  // Get variant count from ext1
+  const getVariantCount = (): number => {
+    if (asset.ext1) {
+      try {
+        const ext1Data = JSON.parse(asset.ext1);
+        if (ext1Data.variants && Array.isArray(ext1Data.variants)) {
+          return ext1Data.variants.length;
+        }
+      } catch {}
+    }
+    return 0;
+  };
+  
+  // Check if this is a variant (has parent in ext1)
+  const isVariant = (): boolean => {
+    if (asset.ext1) {
+      try {
+        const ext1Data = JSON.parse(asset.ext1);
+        return !!ext1Data.parent;
+      } catch {}
+    }
+    return false;
+  };
+  
+  const variantCount = getVariantCount();
+  const isVar = isVariant();
 
   return (
     <div
@@ -104,7 +172,7 @@ export default function AssetCard({
       <div className="aspect-square rounded-lg bg-gray-700 overflow-hidden relative">
         {hasImage ? (
           <img 
-            src={imageUrl} 
+            src={displayImageUrl} 
             alt={asset.name} 
             className="w-full h-full object-cover" 
           />
@@ -114,20 +182,19 @@ export default function AssetCard({
           </div>
         )}
 
-        {/* Category Badge */}
-        <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] text-white flex items-center gap-1 ${categoryColors[category]}`}>
+        {/* Category Badge - only icon */}
+        <div className={`absolute top-2 left-2 p-1 rounded text-white ${categoryColors[category]}`}>
           {categoryIcons[category]}
-          <span>{category}</span>
         </div>
         
-        {/* Variant Badge - shows 变体 for secondary assets, shows count for primary assets with variants */}
-        {isSecondaryAsset ? (
-          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white">
-            变体
+        {/* Variant Badge - only number */}
+        {isVar ? (
+          <div className="absolute top-2 right-2 w-5 h-5 rounded bg-purple-500 text-[8px] text-white flex items-center justify-center">
+            变
           </div>
-        ) : hasVariants ? (
-          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-purple-500 text-[8px] text-white">
-            {asset.variants?.length} 变体
+        ) : variantCount > 0 ? (
+          <div className="absolute top-2 right-2 w-5 h-5 rounded bg-purple-500 text-[10px] text-white flex items-center justify-center">
+            {variantCount}
           </div>
         ) : null}
 

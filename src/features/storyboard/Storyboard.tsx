@@ -15,7 +15,7 @@ import {
   Square
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useStoryboardStore } from '../../stores/storyboardStore';
+import { useStoryboardStore } from '../../stores';
 import StoryboardCard from './StoryboardCard';
 import ShotEditor from './ShotEditor';
 import type { StoryboardMode, SplitMode } from '../../types';

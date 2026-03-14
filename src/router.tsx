@@ -19,28 +19,25 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   const token = useAuthStore(state => state.token);
   const user = useAuthStore(state => state.user);
   const [isReady, setIsReady] = useState(false);
-  const initialized = useRef(false);
   
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-    
-    // 如果 localStorage 有 token，尝试获取用户信息
-    if (hasToken() && !user) {
-      useAuthStore.getState().fetchCurrentUser().finally(() => {
-        setIsReady(true);
-      });
-    } else {
-      setIsReady(true);
+    // 如果有 token 但没有 user，尝试从 localStorage 获取
+    const userStr = localStorage.getItem('auth_user');
+    if (userStr && !user) {
+      try {
+        const storedUser = JSON.parse(userStr);
+        useAuthStore.setState({ user: storedUser });
+      } catch {}
     }
+    setIsReady(true);
   }, []);
   
-  // 如果没有 token，直接跳转到登录页
-  if (!hasToken()) {
+  // 如果没有 token 或用户，直接跳转到登录页
+  if (!token && !localStorage.getItem('auth_token')) {
     return <Navigate to="/login" replace />;
   }
   
-  // 等待用户信息加载完成
+  // 等待初始化完成
   if (!isReady) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-900">
@@ -54,11 +51,8 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 // 公开路由（已登录用户访问自动跳转）
 function PublicRoute({ children }: { children: ReactNode }) {
-  const token = useAuthStore(state => state.token);
-  const user = useAuthStore(state => state.user);
-  
-  // 如果已有登录状态，跳转到项目页
-  if (hasToken() && user) {
+  // 如果已有登录状态（从 localStorage），跳转到项目页
+  if (localStorage.getItem('auth_token')) {
     return <Navigate to="/projects" replace />;
   }
   

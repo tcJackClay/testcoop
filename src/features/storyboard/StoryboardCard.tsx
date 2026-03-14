@@ -1,6 +1,6 @@
 import { Lock, Unlock, Image, Play, CheckSquare, Square, Layers } from 'lucide-react';
 import type { Shot } from '../../types';
-import { useStoryboardStore } from '../../stores/storyboardStore';
+import { useStoryboardStore } from '../../stores';
 
 interface StoryboardCardProps {
   shot: Shot;

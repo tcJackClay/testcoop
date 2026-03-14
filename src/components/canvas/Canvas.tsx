@@ -183,7 +183,8 @@ export default function Canvas() {
         
         addNode('imageNode', { x, y }, {
           data: {
-            imageUrl,
+            imageUrl: asset.id?.toString() || '',
+            assetId: asset.id,
             label: asset.name || asset.resourceName || 'Asset'
           }
         });

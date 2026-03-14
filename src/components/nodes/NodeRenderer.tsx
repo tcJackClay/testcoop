@@ -33,7 +33,7 @@ function updateNodeData(id: string, key: string, value: unknown) {
 }
 
 // 根据节点类型渲染不同的内容
-function renderNodeBody(node: CanvasNode) {
+function renderNodeBody(node: CanvasNode, isSelected: boolean) {
   const updateData = (key: string, value: unknown) => updateNodeData(node.id, key, value);
 
   switch (node.type) {
@@ -101,7 +101,7 @@ function renderNodeBody(node: CanvasNode) {
       );
 
     case 'imageNode':
-      return <ImageNode nodeId={node.id} data={node.data} updateData={updateData} />;
+      return <ImageNode nodeId={node.id} data={node.data} updateData={updateData} selected={isSelected} />;
 
     case 'videoNode':
       return <VideoNode nodeId={node.id} data={node.data} updateData={updateData} />;
@@ -363,7 +363,7 @@ export default function NodeRenderer({
       )}
 
       {/* Body */}
-      <div className="p-3">{renderNodeBody(node)}</div>
+      <div className="p-3">{renderNodeBody(node, isSelected)}</div>
 
       <div
         className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 cursor-pointer"

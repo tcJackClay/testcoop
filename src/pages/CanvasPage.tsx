@@ -141,31 +141,40 @@ export default function CanvasPage() {
                 return;
               }
               
-              const imageId = targetImage.id;
+              const imageId = targetImage.id!;
               
-              // 1. 设置 1031 的 ext2 (A → B)
+              // 设置分支结构: A → B1/B2 → C1/C2/C3
+              // A (1031) → B1(1032), B2(1034)
               const ext2_A = JSON.stringify([
-                { type: '高清放大', sourceId: imageId, targetId: imageId + 1, timestamp: Date.now() - 120000 }
+                { type: '高清放大', sourceId: imageId, targetId: imageId + 1 },
+                { type: '风格转换', sourceId: imageId, targetId: imageId + 3 }
               ]);
               await imageApi.put(imageId, { ext2: ext2_A });
               
-              // 2. 设置 1032 的 ext2 (B → C) - 需要先获取 1032 的信息
-              const img1032 = images.find(img => img.id === imageId + 1);
-              if (img1032) {
-                const ext2_B = JSON.stringify([
-                  { type: '去水印', sourceId: imageId + 1, targetId: imageId + 2, timestamp: Date.now() - 60000 }
-                ]);
-                await imageApi.put(imageId + 1, { ext2: ext2_B });
-              }
+              // B1 (1032) → C1(1033)
+              const ext2_B1 = JSON.stringify([
+                { type: '去水印', sourceId: imageId + 1, targetId: imageId + 2 }
+              ]);
+              await imageApi.put(imageId + 1, { ext2: ext2_B1 });
               
-              alert(`✅ 已设置！\n\n1031.ext2: A→B (高清放大)\n1032.ext2: B→C (去水印)\n\n请刷新页面后拖拽 1031 测试`);
+              // B2 (1034) → C2(1035)
+              const ext2_B2 = JSON.stringify([
+                { type: '滤镜', sourceId: imageId + 3, targetId: imageId + 4 }
+              ]);
+              await imageApi.put(imageId + 3, { ext2: ext2_B2 });
+              
+              alert(`✅ 已设置分支结构！\n\n` + 
+                `A(1031) → B1(1032), B2(1034)\n` +
+                `B1(1032) → C1(1033)\n` +
+                `B2(1034) → C2(1035)\n\n` +
+                `请刷新页面后拖拽 A 测试`);
             } catch (err) {
               alert('❌ ' + err);
             }
           }}
           className="fixed bottom-4 right-4 bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-50"
         >
-          🧪 ext2链
+          🧪 分支
         </button>
       )}
     </div>

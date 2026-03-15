@@ -31,6 +31,15 @@ export default function Canvas() {
     deleteSelectedNodes, selectedNodeIds, undo, redo,
     selectNodesInBox, clearSelection, copyNodes, pasteNodes
   } = useCanvasStore();
+  
+  // SVG 流程线状态
+  const [chainNodes, setChainNodes] = useState<Array<{
+    sourceId: number;
+    targetId: number;
+    type: string;
+    sourcePos?: { x: number; y: number };
+    targetPos?: { x: number; y: number };
+  }>>([]);
 
   // 使用连线 hook (Tapnow 风格)
   const {
@@ -194,62 +203,132 @@ export default function Canvas() {
           chain.push({ id: currentId, type: '原始图片', processType: '' });
           processedIds.add(currentId);
           
-          // 异步递归追溯链条
+          // 异步递归追溯链条（支持分支）
           const traceChain = async (startId: number): Promise<void> => {
-            // 从资产列表中找到 startId 对应的资产
-            const { imageApi } = await import('../../api/image');
-            const allImages = await imageApi.getAll(1024);
+            const allImages = await (await import('../../api/image')).imageApi.getAll(1024);
             
-            let checkId = startId;
-            let found = true;
+            // 存储所有边（连接关系）
+            const edges: Array<{ sourceId: number; targetId: number; type: string }> = [];
             
-            while (found) {
-              found = false;
+            // BFS 遍历构建正确的顺序
+            const queue = [{ id: startId, depth: 0 }];
+            const visited = new Set<number>([startId]);
+            
+            while (queue.length > 0) {
+              const current = queue.shift()!;
+              const currentAsset = allImages.find((img: any) => img.id === current.id);
               
-              // 找到当前资产的 ext2
-              const currentAsset = allImages.find((img: any) => img.id === checkId);
               if (currentAsset?.ext2) {
                 const currentChain = JSON.parse(currentAsset.ext2);
                 
-                for (const record of currentChain) {
-                  if (record.sourceId === checkId && !processedIds.has(record.targetId)) {
-                    chain.push({
-                      id: record.targetId,
-                      type: record.type,
-                      processType: record.type
+                currentChain.forEach((record: any) => {
+                  if (record.sourceId === current.id) {
+                    edges.push({
+                      sourceId: record.sourceId,
+                      targetId: record.targetId,
+                      type: record.type
                     });
-                    processedIds.add(record.targetId);
-                    checkId = record.targetId;
-                    found = true;
-                    break;
+                    
+                    if (!visited.has(record.targetId)) {
+                      visited.add(record.targetId);
+                      queue.push({ id: record.targetId, depth: current.depth + 1 });
+                    }
                   }
-                }
+                });
               }
             }
+            
+            console.log('[Canvas] edges:', edges);
+            
+            // 构建 chain（用于创建节点）- 使用正确的层级计算
+            chain.push({ id: startId, type: '原始图片', processType: '', offsetX: 0, offsetY: 0 });
+            processedIds.add(startId);
+            
+            // 按 BFS 顺序添加节点，每层横向排列
+            let depth = 0;
+            let currentLayer = [startId];
+            
+            while (currentLayer.length > 0) {
+              const nextLayer: number[] = [];
+              let colIndex = 0;
+              
+              currentLayer.forEach((nodeId) => {
+                // 找到这个节点的所有子节点
+                const childEdges = edges.filter(e => e.sourceId === nodeId);
+                
+                childEdges.forEach(edge => {
+                  if (!processedIds.has(edge.targetId)) {
+                    const offsetX = colIndex * 320;
+                    const offsetY = (depth + 1) * 260;
+                    
+                    chain.push({
+                      id: edge.targetId,
+                      type: edge.type,
+                      processType: edge.type,
+                      offsetX,
+                      offsetY
+                    });
+                    processedIds.add(edge.targetId);
+                    nextLayer.push(edge.targetId);
+                    colIndex++;
+                  }
+                });
+              });
+              
+              currentLayer = nextLayer;
+              depth++;
+            }
+            
+            console.log('[Canvas] chain:', chain);
+            
+            // 延迟创建节点和连线
+            setTimeout(() => {
+              const canvasStore = useCanvasStore.getState();
+              const newChainNodes: typeof chainNodes = [];
+              
+              // 创建节点
+              chain.forEach((node) => {
+                const nodeX = x + (node.offsetX || 0);
+                const nodeY = y + (node.offsetY || 0);
+                
+                addNode('imageNode', { x: nodeX, y: nodeY }, {
+                  data: {
+                    imageUrl: node.id?.toString() || '',
+                    assetId: node.id,
+                    label: node.type === '原始图片' ? (asset.name || '原始图片') : `${asset.name}-${node.type}`,
+                    status: 'completed',
+                    processInfo: node.type === '原始图片' ? '原始图片' : node.processType,
+                  }
+                });
+              });
+              
+              // 延迟创建连线 - 使用 edges 数组
+              setTimeout(() => {
+                const canvasStore2 = useCanvasStore.getState();
+                
+                edges.forEach(edge => {
+                  const sourceNodeData = canvasStore2.nodes.find(n => n.data?.assetId === edge.sourceId);
+                  const targetNodeData = canvasStore2.nodes.find(n => n.data?.assetId === edge.targetId);
+                  
+                  if (sourceNodeData && targetNodeData) {
+                    newChainNodes.push({
+                      sourceId: edge.sourceId,
+                      targetId: edge.targetId,
+                      type: edge.type,
+                      sourcePos: { x: sourceNodeData.position.x, y: sourceNodeData.position.y },
+                      targetPos: { x: targetNodeData.position.x, y: targetNodeData.position.y }
+                    });
+                  }
+                });
+                
+                console.log('[Canvas] 设置流程线:', newChainNodes);
+                setChainNodes(newChainNodes);
+              }, 500);
+            }, 100);
           };
           
           // 执行追溯
-          traceChain(currentId).then(() => {
-            console.log('[Canvas] 生成链:', chain);
-            
-            // 创建节点
-            chain.forEach((node, index) => {
-              const row = Math.floor(index / 3);
-              const col = index % 3;
-              const nodeX = x + col * 320;
-              const nodeY = y + row * 280;
-              
-              addNode('imageNode', { x: nodeX, y: nodeY }, {
-                data: {
-                  imageUrl: node.id?.toString() || '',
-                  assetId: node.id,
-                  label: node.type === '原始图片' ? (asset.name || '原始图片') : `${asset.name}-${node.type}`,
-                  status: 'completed',
-                  processInfo: node.type === '原始图片' ? '原始图片' : node.processType,
-                }
-              });
-            });
-          });
+          traceChain(currentId);
         } else {
           addNode('imageNode', { x, y }, {
             data: {
@@ -278,6 +357,32 @@ export default function Canvas() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }, []);
+
+  // 更新流程线位置当节点移动或删除时
+  useEffect(() => {
+    if (chainNodes.length === 0) return;
+    
+    const canvasStore = useCanvasStore.getState();
+    const nodeAssetIds = new Set(canvasStore.nodes.map(n => n.data?.assetId));
+    
+    // 过滤掉已删除节点的连线，并更新位置
+    setChainNodes(prev => prev
+      .filter(link => nodeAssetIds.has(link.sourceId) && nodeAssetIds.has(link.targetId))
+      .map(link => {
+        const sourceNode = canvasStore.nodes.find(n => n.data?.assetId === link.sourceId);
+        const targetNode = canvasStore.nodes.find(n => n.data?.assetId === link.targetId);
+        
+        if (sourceNode && targetNode) {
+          return {
+            ...link,
+            sourcePos: { x: sourceNode.position.x, y: sourceNode.position.y },
+            targetPos: { x: targetNode.position.x, y: targetNode.position.y }
+          };
+        }
+        return link;
+      })
+    );
+  }, [nodes]);
 
   // 键盘事件
   useEffect(() => {
@@ -333,6 +438,58 @@ export default function Canvas() {
         >
           {/* 连线渲染器 */}
           <ConnectionRenderer />
+
+          {/* SVG 流程线层 */}
+          <svg 
+            className="absolute inset-0 pointer-events-none"
+            style={{ width: '100%', height: '100%', overflow: 'visible' }}
+          >
+            {chainNodes.length > 0 && chainNodes.map((link, idx) => {
+              if (!link.sourcePos || !link.targetPos) return null;
+              
+              const x1 = link.sourcePos.x + 160; // 节点中心
+              const y1 = link.sourcePos.y + 100;
+              const x2 = link.targetPos.x + 160;
+              const y2 = link.targetPos.y + 100;
+              
+              // 计算中点和控制点
+              const midY = (y1 + y2) / 2;
+              const path = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+              
+              return (
+                <g key={idx}>
+                  {/* 线条 */}
+                  <path 
+                    d={path} 
+                    fill="none" 
+                    stroke="#8b5cf6" 
+                    strokeWidth="2"
+                    strokeDasharray={link.targetPos ? "0" : "5,5"}
+                  />
+                  {/* 箭头 */}
+                  <circle cx={x2} cy={y2} r="4" fill="#8b5cf6" />
+                  {/* 标签 */}
+                  <rect 
+                    x={(x1 + x2) / 2 - 30} 
+                    y={midY - 8} 
+                    width="60" 
+                    height="16" 
+                    rx="4" 
+                    fill="#8b5cf6" 
+                  />
+                  <text 
+                    x={(x1 + x2) / 2} 
+                    y={midY + 4} 
+                    textAnchor="middle" 
+                    fill="white" 
+                    fontSize="10"
+                  >
+                    {link.type}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
 
           {nodes.map((node) => (
             <NodeRenderer 

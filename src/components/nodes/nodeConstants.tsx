@@ -13,6 +13,7 @@ import {
   Sparkles,
   Clapperboard,
   GitCompare,
+  History,
 } from 'lucide-react';
 import type { NodeType } from '../../stores/canvasStore';
 
@@ -47,6 +48,7 @@ export const nodeIcons: Record<NodeType, React.ReactNode> = {
   generateSceneImage: <Wand2 className="w-4 h-4" />,
   promptNode: <Wand2 className="w-4 h-4" />,
   runninghub: <Sparkles className="w-4 h-4" />,
+  historyNode: <History className="w-4 h-4" />,
 };
 
 // 节点颜色映射
@@ -72,6 +74,7 @@ export const nodeColors: Record<string, string> = {
   generateSceneImage: 'border-pink-300 bg-pink-300/10',
   promptNode: 'border-pink-500 bg-pink-500/10',
   runninghub: 'border-indigo-500 bg-indigo-500/10',
+  historyNode: 'border-purple-500 bg-purple-500/10',
 };
 
 // 资产类型选项

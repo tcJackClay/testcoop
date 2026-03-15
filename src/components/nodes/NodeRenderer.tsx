@@ -9,6 +9,7 @@ import CreateAssetNode from './CreateAssetNode';
 import PromptNode from './PromptNode';
 import RunningHubNode from './RunningHubNode';
 import StoryboardNode from './StoryboardNode';
+import HistoryNode from './HistoryNode';
 
 interface NodeRendererProps {
   node: CanvasNode;
@@ -102,6 +103,9 @@ function renderNodeBody(node: CanvasNode, isSelected: boolean) {
 
     case 'imageNode':
       return <ImageNode nodeId={node.id} data={node.data} updateData={updateData} selected={isSelected} />;
+
+    case 'historyNode':
+      return <HistoryNode nodeId={node.id} data={node.data} updateData={updateData} selected={isSelected} />;
 
     case 'videoNode':
       return <VideoNode nodeId={node.id} data={node.data} updateData={updateData} />;

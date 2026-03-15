@@ -16,24 +16,24 @@ const hasToken = (): boolean => {
 
 // 路由守卫组件 - 保护需要登录的页面
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const token = useAuthStore(state => state.token);
-  const user = useAuthStore(state => state.user);
+  // 直接从 localStorage 检查，避免 zustand 初始化问题
+  const token = localStorage.getItem('auth_token');
   const [isReady, setIsReady] = useState(false);
   
   useEffect(() => {
-    // 如果有 token 但没有 user，尝试从 localStorage 获取
+    // 同步 user 到 store
     const userStr = localStorage.getItem('auth_user');
-    if (userStr && !user) {
+    if (userStr) {
       try {
         const storedUser = JSON.parse(userStr);
-        useAuthStore.setState({ user: storedUser });
+        useAuthStore.setState({ user: storedUser, token: token });
       } catch {}
     }
     setIsReady(true);
-  }, []);
+  }, [token]);
   
-  // 如果没有 token 或用户，直接跳转到登录页
-  if (!token && !localStorage.getItem('auth_token')) {
+  // 如果没有 token，跳转到登录页
+  if (!token) {
     return <Navigate to="/login" replace />;
   }
   

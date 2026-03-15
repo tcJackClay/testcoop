@@ -123,6 +123,51 @@ export default function CanvasPage() {
       )}
 
       <LoginModal />
+      
+      {/* 测试按钮 */}
+      {process.env.NODE_ENV === 'development' && (
+        <button
+          onClick={async () => {
+            try {
+              const { imageApi } = await import('../api/image');
+              const images = await imageApi.getAll(1024);
+              
+              const targetImage = images.find(img => 
+                img.name === '叶枭' || img.resourceName === '叶枭'
+              );
+              
+              if (!targetImage) {
+                alert('未找到 "叶枭"\n可用: ' + images.slice(0, 3).map(i => i.name).join(', '));
+                return;
+              }
+              
+              const imageId = targetImage.id;
+              
+              // 1. 设置 1031 的 ext2 (A → B)
+              const ext2_A = JSON.stringify([
+                { type: '高清放大', sourceId: imageId, targetId: imageId + 1, timestamp: Date.now() - 120000 }
+              ]);
+              await imageApi.put(imageId, { ext2: ext2_A });
+              
+              // 2. 设置 1032 的 ext2 (B → C) - 需要先获取 1032 的信息
+              const img1032 = images.find(img => img.id === imageId + 1);
+              if (img1032) {
+                const ext2_B = JSON.stringify([
+                  { type: '去水印', sourceId: imageId + 1, targetId: imageId + 2, timestamp: Date.now() - 60000 }
+                ]);
+                await imageApi.put(imageId + 1, { ext2: ext2_B });
+              }
+              
+              alert(`✅ 已设置！\n\n1031.ext2: A→B (高清放大)\n1032.ext2: B→C (去水印)\n\n请刷新页面后拖拽 1031 测试`);
+            } catch (err) {
+              alert('❌ ' + err);
+            }
+          }}
+          className="fixed bottom-4 right-4 bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-50"
+        >
+          🧪 ext2链
+        </button>
+      )}
     </div>
   );
 }

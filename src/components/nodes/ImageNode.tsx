@@ -201,7 +201,7 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
     }
   };
   
-  // 高清放大 - 前端上传图片，RunningHub提交任务
+  // 高清放大 - 简化版：ext2 只存储处理元数据，不重复存储图片路径
   const handleUpscale = async () => {
     if (!displayImageUrl || isUpscaling) return;
     
@@ -238,7 +238,7 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
       }
       console.log('[ImageNode] RunningHub 图片上传成功, fileName:', uploadResult.fileName);
       
-      // 使用 fileName（相对路径）提交任务
+      // 5. 提交任务
       const imageField = nodeInfoList.find((field: any) => 
         field.fieldName?.toLowerCase().includes('image') || 
         field.fieldName?.toLowerCase().includes('图片')
@@ -252,7 +252,6 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
       }];
       
       console.log('[ImageNode] 5. 提交任务到 RunningHub');
-      // 提交任务
       const taskResult = await runningHubApi.submitTaskDirect(upscaleFunc.webappId!, nodeInfo);
       if (!taskResult.success || !taskResult.taskId) {
         throw new Error(taskResult.error || '任务提交失败');
@@ -261,142 +260,147 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
       const taskId = taskResult.taskId;
       console.log('[ImageNode] RunningHub 任务提交成功, taskId:', taskId);
       
-      // 6. 轮询查询任务状态
+      // 6. 轮询任务状态
       console.log('[ImageNode] 6. 开始轮询查询任务状态');
       const pollTask = async (): Promise<void> => {
-        try {
-          const queryResult = await runningHubApi.queryTaskDirect(taskId);
+        const queryResult = await runningHubApi.queryTaskDirect(taskId);
+        
+        if (!queryResult.success) {
+          throw new Error(queryResult.error || '查询任务失败');
+        }
+        
+        const status = queryResult.status;
+        console.log('[ImageNode] 任务状态:', status);
+        
+        if (status === 'success' && queryResult.imageUrl) {
+          const resultImage = queryResult.imageUrl;
+          console.log('[ImageNode] 7. 任务成功，获取结果图片:', resultImage);
           
-          if (!queryResult.success) {
-            throw new Error(queryResult.error || '查询任务失败');
-          }
+          // 8. 保存处理后的图片
+          let uploadSuccess = false;
+          let newImageId: number | null = null;
           
-          const status = queryResult.status;
-          console.log('[ImageNode] 任务状态:', status);
-          
-          if (status === 'success' && queryResult.imageUrl) {
-            const resultImage = queryResult.imageUrl;
-            console.log('[ImageNode] 7. 任务成功，获取结果图片:', resultImage);
+          try {
+            console.log('[ImageNode] 8.1 下载结果图片');
+            const imgResponse = await fetch(resultImage);
+            const imgBlob = await imgResponse.blob();
+            console.log('[ImageNode] 8.2 图片下载成功, 大小:', imgBlob.size);
             
-            // 8. 保存处理后的图片
-            console.log('[ImageNode] 8. 开始保存到资产库');
-            let newImageId: number | null = null;
-            let localPath = '';
-            let uploadSuccess = false;
+            const imgFile = new File([imgBlob], `upscale-${Date.now()}.png`, { type: 'image/png' });
             
-            try {
-              console.log('[ImageNode] 8.1 下载结果图片');
-              const imgResponse = await fetch(resultImage);
-              const imgBlob = await imgResponse.blob();
-              console.log('[ImageNode] 8.2 图片下载成功, 大小:', imgBlob.size);
+            // 8.3 上传到后端图床
+            console.log('[ImageNode] 8.3 上传到后端图床');
+            const uploadRes = await vectorApi.uploadImageFile(imgFile);
+            console.log('[ImageNode] 8.3.1 上传响应:', uploadRes);
+            
+            if (uploadRes.code === 0 && uploadRes.data) {
+              const localPath = uploadRes.data.localPath || uploadRes.data.imageUrl || '';
+              console.log('[ImageNode] 8.4 图床上传成功, localPath:', localPath);
               
-              const imgFile = new File([imgBlob], `upscale-${Date.now()}.png`, { type: 'image/png' });
+              // 9. 获取当前资产的处理历史
+              const canvasStore = useCanvasStore.getState();
+              const currentNode = canvasStore.nodes.find(n => n.id === nodeId);
+              const existingEx2 = currentNode?.data?.ex2 ? JSON.parse(currentNode.data.ex2 as string) : [];
               
-              // 8.3 上传到后端
-              console.log('[ImageNode] 8.3 上传到后端图床');
-              try {
-                const uploadResult = await vectorApi.uploadImageFile(imgFile);
-                console.log('[ImageNode] 8.3.1 上传响应:', uploadResult);
+              // 10. 保存到资产库 - ext2 只存储处理元数据（不重复存储图片路径）
+              console.log('[ImageNode] 9. 保存到资产库');
+              const projectStorage = localStorage.getItem('project-storage');
+              const projectId = projectStorage ? JSON.parse(projectStorage).state?.currentProjectId : 1;
+              
+              // 获取当前资产的 assetId
+              const currentAssetId = data.assetId || data.imageUrl;
+              
+              const newAssetEx2 = [
+                ...existingEx2,
+                { 
+                  type: '高清放大', 
+                  sourceId: currentAssetId,  // 保存来源资产 ID
+                  targetId: null,  // 等待创建后填充
+                  timestamp: Date.now() 
+                }
+              ];
+              
+              const newImage = await imageApi.create({
+                resourceName: `${data.label || '图片'}-高清放大`,
+                resourceType: 'image',
+                resourceContent: localPath,
+                projectId: projectId,
+                ext2: JSON.stringify(newAssetEx2),
+              });
+              
+              console.log('[ImageNode] 保存到资产库响应:', newImage);
+              
+              if (newImage && newImage.id) {
+                newImageId = newImage.id;
+                uploadSuccess = true;
+                console.log('[ImageNode] 图片保存到资产库成功, id:', newImageId);
                 
-                if (uploadResult.code === 0 && uploadResult.data) {
-                  localPath = uploadResult.data.localPath || uploadResult.data.imageUrl || '';
-                  console.log('[ImageNode] 8.4 图床上传成功, localPath:', localPath);
+                // 更新新资产的 ext2，填充 targetId
+                const finalEx2 = newAssetEx2.map((item, idx) => 
+                  idx === newAssetEx2.length - 1 ? { ...item, targetId: newImageId } : item
+                );
+                await imageApi.put(newImageId, { ext2: JSON.stringify(finalEx2) });
                 
-                // 9. 保存到资产库
-                console.log('[ImageNode] 9. 保存到资产库');
-                const projectStorage = localStorage.getItem('project-storage');
-                const projectId = projectStorage ? JSON.parse(projectStorage).state?.currentProjectId : 1;
-                
-                // 找到上游节点
-                const canvasStore = useCanvasStore.getState();
-                const connections = canvasStore.connections || [];
-                const incomingConnection = connections.find((c: any) => c.targetId === nodeId);
-                const sourceNodeId = incomingConnection?.sourceId;
-                const sourceNode = sourceNodeId ? canvasStore.nodes.find((n: any) => n.id === sourceNodeId) : null;
-                
-                // 新资产的 ext2：记录处理来源
-                const sourceEx2 = sourceNode?.data?.ex2 ? JSON.parse(sourceNode.data.ex2 as string) : [];
-                const newAssetEx2 = [
-                  ...sourceEx2,
-                  { type: '高清放大', sourceId: sourceNodeId, timestamp: Date.now() }
-                ];
-                
-                console.log('[ImageNode] 9.1 创建资产, ext2:', newAssetEx2);
-                const newImage = await imageApi.create({
-                  resourceName: `${data.label || '图片'}-高清放大`,
-                  resourceType: 'image',
-                  resourceContent: localPath,
-                  projectId: projectId,
-                  ext2: JSON.stringify(newAssetEx2),
-                });
-                
-                console.log('[ImageNode] 保存到资产库响应:', newImage);
-                
-                if (newImage && newImage.id) {
-                  newImageId = newImage.id;
-                  uploadSuccess = true;
-                  console.log('[ImageNode] 图片保存到资产库成功, id:', newImageId, 'ext2:', newAssetEx2);
-                  
-                  // 更新上游节点的 ex2
-                  if (sourceNode && sourceNode.data) {
-                    const existingEx2 = sourceNode.data.ex2 ? JSON.parse(sourceNode.data.ex2 as string) : [];
-                    const updatedEx2 = [...existingEx2, { targetId: newImageId, targetPath: localPath, timestamp: Date.now() }];
-                    
-                    canvasStore.updateNode(sourceNodeId, {
-                      data: { ...sourceNode.data, ex2: JSON.stringify(updatedEx2) }
-                    });
-                    
-                    // 同步到后端
-                    if (sourceNode.data.assetId) {
-                      await imageApi.update(sourceNode.data.assetId, { ext2: JSON.stringify(updatedEx2) });
-                      console.log('[ImageNode] 上游资产 ext2 同步成功');
-                    }
-                  }
+                // 同步更新源资产的 ext2，建立双向链
+                if (currentAssetId) {
+                  const sourceEx2 = existingEx2 || [];
+                  const updatedSourceEx2 = [
+                    ...sourceEx2,
+                    { type: '高清放大', sourceId: currentAssetId, targetId: newImageId, timestamp: Date.now() }
+                  ];
+                  await imageApi.put(Number(currentAssetId), { ext2: JSON.stringify(updatedSourceEx2) });
                 }
               }
-            } catch (err) {
-              console.error('[ImageNode] 8.3 上传图片失败:', err);
             }
-            
-            // 更新当前节点状态
-            if (uploadSuccess) {
-              updateData('status', 'completed');
-              updateData('processInfo', '高清放大');
-              console.log('[ImageNode] ========== 高清放大完成 ==========');
-            } else {
-              updateData('status', 'upload_failed');
-              updateData('processInfo', '高清放大(未保存)');
-            }
-            
-            // 创建新节点显示结果
-            const canvasStore = useCanvasStore.getState();
-            const currentNode = canvasStore.nodes.find(n => n.id === nodeId);
-            const currentPos = currentNode?.position || { x: 0, y: 0 };
-            
+          } catch (err) {
+            console.error('[ImageNode] 8. 保存处理后的图片失败:', err);
+          }
+          
+          // 更新状态
+          updateData('status', uploadSuccess ? 'completed' : 'upload_failed');
+          updateData('processInfo', uploadSuccess ? '高清放大' : '保存失败');
+          
+          // 创建新节点显示结果
+          const canvasStore = useCanvasStore.getState();
+          const currentNode = canvasStore.nodes.find(n => n.id === nodeId);
+          const currentPos = currentNode?.position || { x: 0, y: 0 };
+          
+          // 根据是否有处理历史决定节点类型
+          const currentEx2 = currentNode?.data?.ex2 ? JSON.parse(currentNode.data.ex2 as string) : [];
+          const hasHistory = currentEx2.length > 0 || (currentNode?.data?.processFrom);
+          
+          if (hasHistory || uploadSuccess) {
+            // 有历史记录，创建 HistoryNode
+            canvasStore.addNode('historyNode', { x: currentPos.x + 350, y: currentPos.y }, {
+              data: {
+                assetId: newImageId,
+                originalImageUrl: displayImageUrl,  // 当前节点的图片作为原始图
+                processChain: newAssetEx2,
+              }
+            });
+          } else {
+            // 没有历史，创建普通 ImageNode
             canvasStore.addNode('imageNode', { x: currentPos.x + 350, y: currentPos.y }, {
               data: {
-                imageUrl: resultImage,
+                imageUrl: newImageId?.toString() || '',
+                assetId: newImageId,
                 label: `${data.label || '图片'}-放大`,
                 status: 'completed',
                 processInfo: '高清放大',
                 processFrom: nodeId,
               }
             });
-            
-          } else if (status === 'failed') {
-            updateData('status', 'failed');
-            updateData('error', '任务执行失败');
-          } else {
-            setTimeout(pollTask, 2000);
           }
-        } catch (err) {
-          console.error('[ImageNode] 查询任务失败:', err);
+          
+          console.log('[ImageNode] ========== 高清放大完成 ==========');
+        } else if (status === 'failed') {
           updateData('status', 'failed');
-          updateData('error', err instanceof Error ? err.message : '查询失败');
+          updateData('error', '任务执行失败');
+        } else {
+          setTimeout(pollTask, 2000);
         }
       };
       
-      // 开始轮询
       pollTask();
       
     } catch (err) {

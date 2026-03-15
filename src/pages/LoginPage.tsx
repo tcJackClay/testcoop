@@ -18,12 +18,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
 
-  // 如果已登录，跳转到项目列表
+  // 如果已登录，跳转到项目列表（只在初始化时检查一次）
   useEffect(() => {
-    if (user) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
       navigate('/projects', { replace: true });
     }
-  }, [user, navigate]);
+  }, []);
 
   // Reset form when component mounts
   useEffect(() => {

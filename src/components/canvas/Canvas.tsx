@@ -179,18 +179,86 @@ export default function Canvas() {
         // 获取图片 URL - 优先使用 resourceContent (base64)
         const imageUrl = asset.resourceContent || asset.imageUrl || asset.url || '';
         
-        console.log('[Canvas] 拖放资产:', asset.name, 'imageUrl:', imageUrl?.substring(0, 50));
+        // 解析处理链信息 - 需要逐个从后端加载追溯完整链条
+        const processChain = asset.ext2 ? JSON.parse(asset.ext2) : [];
         
-        addNode('imageNode', { x, y }, {
-          data: {
-            imageUrl: asset.id?.toString() || '',
-            assetId: asset.id,
-            label: asset.name || asset.resourceName || 'Asset',
-            // 读取资产的处理链信息
-            ex2: asset.ex2 || null,
-            processChain: asset.ex2 ? JSON.parse(asset.ex2) : [],
-          }
-        });
+        console.log('[Canvas] 拖放资产:', asset.name, 'ext2:', asset.ext2, 'processChain:', processChain);
+        
+        // 如果有生成历史，追溯完整生成链
+        if (processChain.length > 0) {
+          const chain: Array<{ id: number; type: string; processType: string }> = [];
+          const processedIds = new Set<number>();
+          
+          // 从当前资产开始
+          let currentId = asset.id!;
+          chain.push({ id: currentId, type: '原始图片', processType: '' });
+          processedIds.add(currentId);
+          
+          // 异步递归追溯链条
+          const traceChain = async (startId: number): Promise<void> => {
+            // 从资产列表中找到 startId 对应的资产
+            const { imageApi } = await import('../../api/image');
+            const allImages = await imageApi.getAll(1024);
+            
+            let checkId = startId;
+            let found = true;
+            
+            while (found) {
+              found = false;
+              
+              // 找到当前资产的 ext2
+              const currentAsset = allImages.find((img: any) => img.id === checkId);
+              if (currentAsset?.ext2) {
+                const currentChain = JSON.parse(currentAsset.ext2);
+                
+                for (const record of currentChain) {
+                  if (record.sourceId === checkId && !processedIds.has(record.targetId)) {
+                    chain.push({
+                      id: record.targetId,
+                      type: record.type,
+                      processType: record.type
+                    });
+                    processedIds.add(record.targetId);
+                    checkId = record.targetId;
+                    found = true;
+                    break;
+                  }
+                }
+              }
+            }
+          };
+          
+          // 执行追溯
+          traceChain(currentId).then(() => {
+            console.log('[Canvas] 生成链:', chain);
+            
+            // 创建节点
+            chain.forEach((node, index) => {
+              const row = Math.floor(index / 3);
+              const col = index % 3;
+              const nodeX = x + col * 320;
+              const nodeY = y + row * 280;
+              
+              addNode('imageNode', { x: nodeX, y: nodeY }, {
+                data: {
+                  imageUrl: node.id?.toString() || '',
+                  assetId: node.id,
+                  label: node.type === '原始图片' ? (asset.name || '原始图片') : `${asset.name}-${node.type}`,
+                  status: 'completed',
+                  processInfo: node.type === '原始图片' ? '原始图片' : node.processType,
+                }
+              });
+            });
+          });
+        } else {
+          addNode('imageNode', { x, y }, {
+            data: {
+              imageUrl: asset.id?.toString() || '',
+              assetId: asset.id,
+              label: asset.name || asset.resourceName || 'Asset',
+            }
+          });
+        }
         return;
       } catch (err) {
         console.error('解析资产数据失败:', err);

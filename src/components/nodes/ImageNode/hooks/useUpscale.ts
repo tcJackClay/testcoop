@@ -4,8 +4,8 @@
 import { useState, useRef } from 'react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { imageApi } from '@/api/image';
-import { vectorApi } from '@/api/vector';
 import { runningHubApi, DEFAULT_FUNCTIONS } from '@/api/runningHub';
+import { uploadToOSS } from '@/api/oss';
 import type { UpscaleOptions, ProcessChainItem } from '../ImageNode.types';
 
 interface UseUpscaleOptions {
@@ -223,22 +223,23 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
             const imgBlob = await imgResponse.blob();
             const imgFile = new File([imgBlob], `upscale-${Date.now()}.png`, { type: 'image/png' });
 
-            // 8. 上传到后端图床
+            // 8. 上传到 OSS
+            const projectId = getProjectId();
             while (retryCount < maxRetries && !uploadSuccess) {
               try {
-                const uploadRes = await vectorApi.uploadImageFile(imgFile);
-                if (uploadRes.code === 0 && uploadRes.data) {
-                  uploadSuccess = true;
-                  savedImageUrl = uploadRes.data.localPath || uploadRes.data.imageUrl || '';
-                }
-              } catch {
+                // ========== 使用 OSS 上传 ==========
+                savedImageUrl = await uploadToOSS(imgFile, projectId);
+                console.log('[useUpscale] OSS 上传成功:', savedImageUrl);
+                uploadSuccess = true;
+                // =================================
+              } catch (err) {
+                console.error('[useUpscale] OSS 上传失败:', err);
                 retryCount++;
                 if (retryCount < maxRetries) await new Promise(r => setTimeout(r, 1000));
               }
             }
 
             // 9. 创建结果节点（先显示，后台保存）
-            const projectId = getProjectId();
             const currentAssetId = data.assetId || data.imageUrl;
             const currentEx2 = currentAssetId 
               ? (data.ex2 ? JSON.parse(data.ex2) : [])

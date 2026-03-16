@@ -43,9 +43,7 @@ export default function FlowLinesManager({ assetInfo, onComplete }: { assetInfo:
 
     const buildChain = async () => {
       try {
-        const { imageApi } = await import('../../api/image');
-        
-        // assetInfo 已经包含 ext2，直接用它开始
+        // assetInfo 已经包含 ext2，直接用它开始，不再调用 API
         const edges: Array<{ sourceId: number; targetId: number; type: string }> = [];
         const visited = new Set<number>();
         const queue = [assetInfo.id];
@@ -57,14 +55,13 @@ export default function FlowLinesManager({ assetInfo, onComplete }: { assetInfo:
           visited.add(currentId);
           
           // 优先使用 assetInfo 的 ext2（拖入时传入的）
+          // ========== 优化：只解析根节点的 ext2，不再重复调用 API ==========
+          // ext2 存储在源资产（根节点）上，记录了所有处理结果
           let currentExt2: string | null = null;
           
+          // 优先使用传入的 ext2（不调用 API）
           if (currentId === assetInfo.id && assetInfo.ext2) {
             currentExt2 = assetInfo.ext2;
-          } else {
-            // 其他节点从 API 获取
-            const currentAsset = await imageApi.getById(currentId);
-            currentExt2 = currentAsset?.ext2 || null;
           }
           
           if (currentExt2) {
@@ -88,6 +85,7 @@ export default function FlowLinesManager({ assetInfo, onComplete }: { assetInfo:
                       type: record.type 
                     });
                   }
+                  // 不再调用 API 获取子节点，直接加入队列
                   if (!visited.has(targetId)) {
                     queue.push(targetId);
                   }

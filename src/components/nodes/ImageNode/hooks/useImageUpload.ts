@@ -3,6 +3,7 @@
  */
 import { useRef, useCallback } from 'react';
 import { imageApi } from '@/api/image';
+import { uploadToOSS } from '@/api/oss';
 
 interface UseImageUploadOptions {
   nodeId: string;
@@ -25,40 +26,22 @@ export function useImageUpload({ nodeId, data, updateData, onImageLoaded }: UseI
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 读取文件为 base64
+    // 读取文件为 base64（用于即时预览）
     const reader = new FileReader();
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       
-      // 更新节点显示
+      // ========== 只显示预览，不上传 ==========
       updateData('imageUrl', base64);
-      updateData('status', 'completed');
-      
-      // 保存到资产库
-      try {
-        const projectId = getProjectId();
-        const newImage = await imageApi.create({
-          resourceName: file.name,
-          resourceType: 'image',
-          resourceContent: base64,
-          projectId,
-        });
-
-        if (newImage && newImage.id) {
-          updateData('assetId', newImage.id);
-          updateData('imageUrl', newImage.id.toString());
-          
-          onImageLoaded?.(newImage.id.toString());
-        }
-      } catch (err) {
-        console.error('[useImageUpload] 保存失败:', err);
-      }
+      updateData('status', 'idle');
+      // 上传由用户主动触发（如点击"保存"按钮）
+      // ========================================
     };
     reader.readAsDataURL(file);
 
     // 清空 input，允许重复选择同一文件
     e.target.value = '';
-  }, [nodeId, updateData, onImageLoaded]);
+  }, [nodeId, updateData]);
 
   const triggerUpload = useCallback(() => {
     fileInputRef.current?.click();
@@ -72,25 +55,12 @@ export function useImageUpload({ nodeId, data, updateData, onImageLoaded }: UseI
     const reader = new FileReader();
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
-      updateData('imageUrl', base64);
-      updateData('status', 'completed');
       
-      try {
-        const projectId = getProjectId();
-        const newImage = await imageApi.create({
-          resourceName: file.name,
-          resourceType: 'image',
-          resourceContent: base64,
-          projectId,
-        });
-
-        if (newImage && newImage.id) {
-          updateData('assetId', newImage.id);
-          updateData('imageUrl', newImage.id.toString());
-        }
-      } catch (err) {
-        console.error('[useImageUpload] 保存失败:', err);
-      }
+      // ========== 只显示预览，不上传 ==========
+      updateData('imageUrl', base64);
+      updateData('status', 'idle');
+      // 上传由用户主动触发
+      // ========================================
     };
     reader.readAsDataURL(file);
   }, [updateData]);

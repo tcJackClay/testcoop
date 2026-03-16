@@ -6,7 +6,42 @@
 
 import { apiClient, ApiResponse } from './client'
 
-// Image types - 与 huanu-workbench-frontend 保持一致
+// ========== 多人协同缓存机制 ==========
+// 缓存配置：30秒过期
+const CACHE_TTL = 30000;
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const assetCache: Map<number, CacheEntry<Image[]>> = new Map();
+
+// 获取缓存
+function getCachedAssets(projectId: number): Image[] | null {
+  const entry = assetCache.get(projectId);
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.data;
+  }
+  return null;
+}
+
+// 设置缓存
+function setCachedAssets(projectId: number, data: Image[]): void {
+  assetCache.set(projectId, { data, timestamp: Date.now() });
+}
+
+// 清除指定项目缓存
+function invalidateCache(projectId: number): void {
+  assetCache.delete(projectId);
+}
+
+// 清除所有缓存
+export function clearAssetCache(): void {
+  assetCache.clear();
+}
+
+
 export interface Image {
   id?: number
   resourceName: string
@@ -53,30 +88,7 @@ export interface UpdateImageRequest {
   ext2?: string
 }
 
-// 将后端响应转换为 Image 对象
-const convertToImage = (data: any): Image => {
-  return {
-    id: data.id,
-    resourceName: data.resourceName || data.name || '',
-    resourceType: data.resourceType || 'image',
-    resourceContent: data.resourceContent || data.url || data.resourceContent || '',
-    resourceStatus: data.resourceStatus,
-    projectId: data.projectId,
-    userId: data.userId,
-    ext1: data.ext1,
-    ext2: data.ext2,
-    createdBy: data.createdBy,
-    updatedBy: data.updatedBy,
-    createdTime: data.createdTime,
-    updatedTime: data.updatedTime,
-    // 兼容字段
-    name: data.resourceName || data.name,
-    url: data.resourceContent || data.url,
-    thumbnailUrl: data.ext1,
-    width: data.ext2 ? parseInt(data.ext2.split(',')[0]) : undefined,
-    height: data.ext2 ? parseInt(data.ext2.split(',')[1]) : undefined,
-  }
-}
+
 
 export const imageApi = {
   /**
@@ -87,42 +99,59 @@ export const imageApi = {
       return []
     }
     
+    // 优先使用缓存
+    const cached = getCachedAssets(projectId);
+    if (cached) {
+      console.log('[imageApi.getAll] 使用缓存, projectId:', projectId);
+      return cached;
+    }
+    
     const response = await apiClient.get<ApiResponse<Image[]>>(`/image/list`, {
       params: { projectId }
     })
     
     const res = response.data
+    let images: Image[] = []
+    
     // 兼容两种响应格式：{ code: 0, data: [...] } 或 { data: [...] }
     if (res.code === 0 && res.data) {
-      return res.data.map(convertToImage)
+      images = res.data
+    } else if (res.data) {
+      images = res.data
     }
-    if (res.data) {
-      return res.data.map(convertToImage)
+    
+    // 存入缓存
+    if (images.length > 0) {
+      setCachedAssets(projectId, images);
     }
-    console.warn('[imageApi.getAll] 返回数据为空:', res)
-    return []
+    
+    console.log('[imageApi.getAll] 获取新数据, projectId:', projectId, 'count:', images.length);
+    return images
   },
 
   /**
    * 根据ID获取图片
+   * 直接调用 GET /api/image/{id} 获取单个资产元数据
    */
-  getById: async (id: number): Promise<Image | null> => {
-    // 通过 getAll 获取所有图片，再筛选
-    // 注意：需要 projectId，这里从 localStorage 获取
+  getById: async (id: number): Promise<any> => {
     try {
-      const projectStorage = localStorage.getItem('project-storage');
-      const projectId = projectStorage ? JSON.parse(projectStorage).state?.currentProjectId : null;
+      const response = await apiClient.get(`/image/${id}`);
+      const res = response.data;
       
-      if (!projectId) {
-        console.warn('[imageApi.getById] 未找到 projectId');
-        return null;
+      // ===== 临时日志 =====
+      console.log('[imageApi.getById] 原始返回:', res);
+      // ====================
+      
+      // 直接返回元数据
+      if (res && res.code === 0 && res.data) {
+        return res.data;
+      }
+      if (res && res.id) {
+        return res;
       }
       
-      const allImages = await imageApi.getAll(projectId);
-      const image = allImages.find(img => img.id === id);
-      
-      console.log('[imageApi.getById] 筛选结果:', { id, found: !!image, image });
-      return image || null;
+      console.warn('[imageApi.getById] 未找到资产:', id);
+      return null;
     } catch (err) {
       console.error('[imageApi.getById] 获取失败:', err);
       return null;
@@ -130,35 +159,43 @@ export const imageApi = {
   },
 
   /**
-   * 获取单个图片(包含base64数据)
-   * 后端返回格式：{ code: 0, data: "base64字符串" }
+   * 获取可直接显示的图片 URL（统一入口）
+
+   * @param id - 图片资产 ID
+   * @returns 可直接用于 <img src=""> 的 URL
    */
-  getImage: async (id: number): Promise<Image | null> => {
+  getDisplayUrl: async (id: number): Promise<string | null> => {
     try {
-      const response = await apiClient.get<ApiResponse<string>>(`/image/${id}`)
+      // 获取资产信息
+      const asset = await imageApi.getById(id);
       
-      const res = response.data
-      
-      // 后端返回格式: { code: 0, data: "base64字符串" }
-      if (res.code === 0 && res.data) {
-        // 检查是否是直接 base64 字符串
-        if (typeof res.data === 'string') {
-          return { 
-            id, 
-            resourceName: '', 
-            resourceType: 'image', 
-            resourceContent: res.data 
-          } as Image
-        }
-        // 兼容对象格式
-        return convertToImage(res.data)
+      if (!asset || !asset.resourceContent) {
+        console.warn('[imageApi.getDisplayUrl] 资产不存在或无内容');
+        return null;
       }
-      return null
-    } catch (error) {
-      console.error('[imageApi.getImage] 获取图片失败:', error)
-      return null
+      
+      const content = asset.resourceContent;
+      
+      // 直接返回的情况
+      if (
+        content.startsWith('http://') || 
+        content.startsWith('https://') ||
+        content.startsWith('data:') ||
+        content.startsWith('blob:')
+      ) {
+        return content;
+      }
+      
+      // 其他情况，假设是 OSS 路径，拼接完整 URL
+      // TODO: 如果有自定义域名，在这里配置
+      return `https://huanu.oss-cn-hangzhou.aliyuncs.com/${content}`;
+    } catch (err) {
+      console.error('[imageApi.getDisplayUrl] 获取失败:', err);
+      return null;
     }
   },
+
+
   /**
    * 创建图片
    */
@@ -176,7 +213,9 @@ export const imageApi = {
     
     const res = response.data
     if (res.code === 0 && res.data) {
-      return convertToImage(res.data)
+      // 创建成功后清除缓存，确保下次获取最新数据
+      invalidateCache(data.projectId);
+      return res.data
     }
     console.warn('[imageApi.create] 创建失败:', res)
     return null
@@ -192,16 +231,16 @@ export const imageApi = {
       })
       
       const res = response.data
-      let images: Image[] = []
+      let images: any[] = []
       
       if (res.code === 0 && res.data) {
-        images = res.data.map(convertToImage)
+        images = res.data
       } else if (res.data) {
-        images = res.data.map(convertToImage)
+        images = res.data
       }
       
       // 按名称查找匹配的资源
-      const matched = images.find(img => img.resourceName === resourceName)
+      const matched = images.find((img: any) => img.resourceName === resourceName)
       return matched || null
     } catch (error) {
       console.error('[imageApi.getByName] 查询失败:', error)
@@ -231,8 +270,10 @@ export const imageApi = {
     
     const res = response.data
     if (res.code === 0) {
+      // 更新成功后清除缓存
+      clearAssetCache();
       // 更新操作可能不返回 data，只要成功就返回
-      return res.data ? convertToImage(res.data) : { id, ...payload };
+      return res.data ? res.data : { id, ...payload } as Image;
     }
     return null
   },
@@ -244,6 +285,10 @@ export const imageApi = {
     const response = await apiClient.delete<ApiResponse<void>>(`/image/${id}`)
     
     const res = response.data
+    // 删除成功后清除缓存
+    if (res.code === 0) {
+      clearAssetCache();
+    }
     return res.code === 0
   },
 }

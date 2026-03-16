@@ -2,7 +2,7 @@
 import { Sparkles, ArrowDown } from 'lucide-react';
 import { useAssetStore, useProjectStore, useCanvasStore } from '../../stores';
 import { imageApi } from '../../api/image';
-import { vectorApi } from '../../api/vector';
+import { uploadToOSS } from '../../api/oss';
 import { assetTypeOptions } from './nodeConstants';
 import { useMemo } from 'react';
 
@@ -148,26 +148,19 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
       // Get image URL from input node
       let uploadedUrl = inputImageUrl;
 
-      // If the image is a local blob/base64, upload it and get localPath
+      // If the image is a local blob/base64, upload to OSS
       if (inputImageUrl.startsWith('data:') || inputImageUrl.startsWith('blob:')) {
         try {
-          const response = await fetch(inputImageUrl);
-          const blob = await response.blob();
           // 清理文件名中的特殊字符（/ \ : * ? " < > |）
           const safeName = name.replace(/[\\/:*?"<>|]/g, '_');
-          const file = new File([blob], `${safeName}.png`, { type: 'image/png' });
-          const uploadResult = await vectorApi.uploadImageFile(file);
-          if (uploadResult.code === 0 && uploadResult.data) {
-            // 使用 localPath，让后端 getImageById 能正常读取
-            uploadedUrl = uploadResult.data.localPath || uploadResult.data.imageUrl || '';
-            if (!uploadedUrl) {
-              console.error('上传结果为空:', uploadResult);
-              alert('图片上传失败');
-              updateData('status', 'idle');
-              return;
-            }
-          } else {
-            console.error('图片上传失败:', uploadResult);
+          
+          // ========== 使用 OSS 上传 ==========
+          uploadedUrl = await uploadToOSS(inputImageUrl, projectId, `${safeName}.png`);
+          console.log('[CreateAssetNode] OSS 上传成功:', uploadedUrl);
+          // ==================================
+          
+          if (!uploadedUrl) {
+            console.error('上传结果为空');
             alert('图片上传失败');
             updateData('status', 'idle');
             return;

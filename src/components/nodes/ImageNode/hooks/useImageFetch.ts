@@ -2,7 +2,7 @@
  * useImageFetch - 图片获取逻辑
  */
 import { useState, useEffect } from 'react';
-import { apiClient } from '@/api/client';
+import { imageApi } from '@/api/image';
 import type { ProcessChainItem } from '../ImageNode.types';
 
 interface UseImageFetchOptions {
@@ -21,41 +21,36 @@ export function useImageFetch({ imageUrl, assetId, processChain, ex2 }: UseImage
     const fetchImage = async () => {
       // 1. 优先使用 imageUrl
       if (imageUrl) {
-        // 如果是 base64 或 data URL，直接使用
-        if (imageUrl.startsWith('data:') || imageUrl.startsWith('http')) {
+        // 如果是可直接使用的 URL，直接使用
+        if (
+          imageUrl.startsWith('data:') || 
+          imageUrl.startsWith('blob:') ||
+          imageUrl.startsWith('http://') || 
+          imageUrl.startsWith('https://')
+        ) {
           setDisplayImageUrl(imageUrl);
           return;
         }
         
-        // 如果是数字 ID，尝试获取 base64
+        // 如果是数字 ID，使用统一方法获取显示 URL
         const numId = parseInt(imageUrl);
         if (!isNaN(numId)) {
           try {
-            const response = await apiClient.get(`/image/${numId}`);
-            const res = response.data;
-            if (res.code === 0 && res.data) {
-              let base64 = res.data;
-              if (!base64.startsWith('data:')) {
-                base64 = `data:image/png;base64,${base64}`;
-              }
-              setDisplayImageUrl(base64);
+            const displayUrl = await imageApi.getDisplayUrl(numId);
+            if (displayUrl) {
+              setDisplayImageUrl(displayUrl);
               return;
             }
           } catch {}
         }
       }
 
-      // 2. 如果有 assetId，获取图片
+      // 2. 如果有 assetId，获取显示 URL
       if (assetId) {
         try {
-          const response = await apiClient.get(`/image/${assetId}`);
-          const res = response.data;
-          if (res.code === 0 && res.data) {
-            let base64 = res.data;
-            if (!base64.startsWith('data:')) {
-              base64 = `data:image/png;base64,${base64}`;
-            }
-            setDisplayImageUrl(base64);
+          const displayUrl = await imageApi.getDisplayUrl(assetId);
+          if (displayUrl) {
+            setDisplayImageUrl(displayUrl);
             return;
           }
         } catch {}
@@ -77,14 +72,9 @@ export function useImageFetch({ imageUrl, assetId, processChain, ex2 }: UseImage
         for (const item of chain) {
           if (item.targetId) {
             try {
-              const response = await apiClient.get(`/image/${item.targetId}`);
-              const res = response.data;
-              if (res.code === 0 && res.data) {
-                let base64 = res.data;
-                if (!base64.startsWith('data:')) {
-                  base64 = `data:image/png;base64,${base64}`;
-                }
-                images.push({ type: item.type, url: base64 });
+              const displayUrl = await imageApi.getDisplayUrl(item.targetId);
+              if (displayUrl) {
+                images.push({ type: item.type, url: displayUrl });
               }
             } catch {}
           }

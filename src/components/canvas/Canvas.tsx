@@ -189,25 +189,15 @@ export default function Canvas() {
         const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
         const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
         
-        // 从 API 获取资产的最新数据（包括最新的 ext2）
-        let latestExt2 = asset.ext2 || null;
-        if (asset.id) {
-          try {
-            const { imageApi } = await import('../../api/image');
-            const latestAsset = await imageApi.getById(asset.id);
-            if (latestAsset?.ext2) {
-              latestExt2 = latestAsset.ext2;
-              console.log('[Canvas] 获取最新资产 ext2:', latestExt2);
-            }
-          } catch (err) {
-            console.error('[Canvas] 获取资产最新数据失败:', err);
-          }
-        }
+        // ========== 优化：先用资产卡携带的数据立即响应，后台异步获取最新 ==========
+        
+        // 优先使用资产卡携带的 ext2（不阻塞拖拽）
+        const assetExt2 = asset.ext2 || null;
         
         // 解析处理链信息
-        const processChain = latestExt2 ? JSON.parse(latestExt2) : [];
+        const processChain = assetExt2 ? JSON.parse(assetExt2) : [];
         
-        console.log('[Canvas] 拖放资产:', asset.name, 'ext2:', latestExt2, 'processChain:', processChain);
+        console.log('[Canvas] 拖放资产:', asset.name, 'ext2:', assetExt2, 'processChain:', processChain);
         
         // 如果有生成历史，触发 FlowLinesManager 处理
         if (processChain.length > 0) {
@@ -217,20 +207,35 @@ export default function Canvas() {
             y,
             id: asset.id,
             name: asset.name,
-            ext2: latestExt2,
-            assetData: asset  // 存储完整资产信息
+            ext2: assetExt2,
+            assetData: asset
           });
         } else {
-          // 存储资产完整信息（包括 ext2），方便后续处理
+          // 立即创建节点（不等待 API）
           addNode('imageNode', { x, y }, {
             data: {
               imageUrl: asset.id?.toString() || '',
               assetId: asset.id,
               label: asset.name || asset.resourceName || 'Asset',
-              // 存储完整资产信息
               assetData: asset,
             }
           });
+          
+          // ========== 后台异步获取最新数据，获取后更新节点 ==========
+          if (asset.id) {
+            (async () => {
+              try {
+                const { imageApi } = await import('../../api/image');
+                const latestAsset = await imageApi.getById(asset.id);
+                if (latestAsset?.ext2 && latestAsset.ext2 !== assetExt2) {
+                  console.log('[Canvas] 后台获取到最新 ext2:', latestAsset.ext2);
+                  // 可以选择更新节点或提示用户
+                }
+              } catch (err) {
+                console.error('[Canvas] 后台获取资产最新数据失败:', err);
+              }
+            })();
+          }
         }
         return;
       } catch (err) {

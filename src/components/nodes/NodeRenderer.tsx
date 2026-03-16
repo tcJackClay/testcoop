@@ -3,7 +3,7 @@ import { GripVertical, X, Loader2, Play, Sparkles } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import type { CanvasNode } from '../../stores/canvasTypes';
 import { nodeIcons, nodeColors, generationNodeTypes } from './nodeConstants';
-import ImageNode from './ImageNode';
+import ImageNode from './ImageNode/ImageNode';
 import VideoNode from './VideoNode';
 import CreateAssetNode from './CreateAssetNode';
 import PromptNode from './PromptNode';

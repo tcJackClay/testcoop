@@ -107,16 +107,26 @@ export const imageApi = {
    * 根据ID获取图片
    */
   getById: async (id: number): Promise<Image | null> => {
-    const response = await apiClient.get<ApiResponse<Image>>(`/image/${id}`)
-    
-    const res = response.data
-    if (res.code === 0 && res.data) {
-      return convertToImage(res.data)
+    // 通过 getAll 获取所有图片，再筛选
+    // 注意：需要 projectId，这里从 localStorage 获取
+    try {
+      const projectStorage = localStorage.getItem('project-storage');
+      const projectId = projectStorage ? JSON.parse(projectStorage).state?.currentProjectId : null;
+      
+      if (!projectId) {
+        console.warn('[imageApi.getById] 未找到 projectId');
+        return null;
+      }
+      
+      const allImages = await imageApi.getAll(projectId);
+      const image = allImages.find(img => img.id === id);
+      
+      console.log('[imageApi.getById] 筛选结果:', { id, found: !!image, image });
+      return image || null;
+    } catch (err) {
+      console.error('[imageApi.getById] 获取失败:', err);
+      return null;
     }
-    if (res.data) {
-      return convertToImage(res.data)
-    }
-    return null
   },
 
   /**

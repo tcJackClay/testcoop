@@ -53,7 +53,7 @@ export default function Canvas() {
   });
 
   // 资产流程线状态
-  const [assetInfo, setAssetInfo] = useState<{ x: number; y: number; id: number; name: string; ext2?: string } | null>(null);
+  const [assetInfo, setAssetInfo] = useState<{ x: number; y: number; id: number; name: string; ext2?: string; assetData?: any } | null>(null);
   const [flowLineCount, setFlowLineCount] = useState(0);
   
   // 监听流程线数量变化后清空 assetInfo
@@ -178,7 +178,7 @@ export default function Canvas() {
   }, [isSelecting, selectionBox, selectNodesInBox]);
   
   // 拖放
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     
     const assetData = e.dataTransfer.getData('application/json');
@@ -189,10 +189,25 @@ export default function Canvas() {
         const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
         const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
         
-        // 解析处理链信息
-        const processChain = asset.ext2 ? JSON.parse(asset.ext2) : [];
+        // 从 API 获取资产的最新数据（包括最新的 ext2）
+        let latestExt2 = asset.ext2 || null;
+        if (asset.id) {
+          try {
+            const { imageApi } = await import('../../api/image');
+            const latestAsset = await imageApi.getById(asset.id);
+            if (latestAsset?.ext2) {
+              latestExt2 = latestAsset.ext2;
+              console.log('[Canvas] 获取最新资产 ext2:', latestExt2);
+            }
+          } catch (err) {
+            console.error('[Canvas] 获取资产最新数据失败:', err);
+          }
+        }
         
-        console.log('[Canvas] 拖放资产:', asset.name, 'ext2:', asset.ext2, 'processChain:', processChain);
+        // 解析处理链信息
+        const processChain = latestExt2 ? JSON.parse(latestExt2) : [];
+        
+        console.log('[Canvas] 拖放资产:', asset.name, 'ext2:', latestExt2, 'processChain:', processChain);
         
         // 如果有生成历史，触发 FlowLinesManager 处理
         if (processChain.length > 0) {
@@ -202,14 +217,18 @@ export default function Canvas() {
             y,
             id: asset.id,
             name: asset.name,
-            ext2: asset.ext2
+            ext2: latestExt2,
+            assetData: asset  // 存储完整资产信息
           });
         } else {
+          // 存储资产完整信息（包括 ext2），方便后续处理
           addNode('imageNode', { x, y }, {
             data: {
               imageUrl: asset.id?.toString() || '',
               assetId: asset.id,
               label: asset.name || asset.resourceName || 'Asset',
+              // 存储完整资产信息
+              assetData: asset,
             }
           });
         }

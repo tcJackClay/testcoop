@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Star, User, Mountain, MapPin, Gem, Package, Image as ImageIcon, Video } from 'lucide-react';
 import type { AssetWithVariants, AssetCategory } from '../../types/asset';
 import type { Image } from '../../api/image';
-import { apiClient } from '../../api/client';
+import { imageApi } from '../../api/image';
 
 
 interface AssetCardProps {
@@ -32,22 +32,17 @@ const categoryColors: Record<AssetCategory, string> = {
   '次要道具': 'bg-orange-400',
 };
 
-// 从 ext1 推断 category 类型（统一使用 ext1 内信息）
-const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
-  // 只从 ext1 JSON 中推断
-  if (asset.ext1) {
+// 从 ext1 推断 category 类型
+const inferCategory = (ext1: string | undefined): AssetCategory => {
+  if (ext1) {
     try {
-      const ext1Data = JSON.parse(asset.ext1);
-      
-      // 1. 检查是否是变体（有 parent 字段）
+      const ext1Data = JSON.parse(ext1);
       if (ext1Data.parent) {
         const parentName = ext1Data.parent;
         if (parentName.includes('角色')) return '次要角色';
         if (parentName.includes('场景')) return '次要场景';
         if (parentName.includes('道具')) return '次要道具';
       }
-      
-      // 2. 检查 ext1 中是否有直接的 type 字段
       if (ext1Data.type) {
         const type = ext1Data.type.toLowerCase();
         if (type.includes('character') && type.includes('primary')) return '主要角色';
@@ -57,38 +52,53 @@ const inferCategory = (asset: AssetWithVariants | Image): AssetCategory => {
         if (type.includes('prop') && type.includes('primary')) return '主要道具';
         if (type.includes('prop') && type.includes('secondary')) return '次要道具';
       }
-    } catch (e) {
-      // ext1 不是有效 JSON
-    }
+    } catch {}
   }
-  
-  // 没有 ext1 信息时返回默认分类
   return '次要道具';
 };
 
-// 获取图片 URL - 优先使用 base64 数据，否则使用 resourceContent 路径
-const getImageUrl = (asset: AssetWithVariants | Image): string | undefined => {
-  // 如果 resourceContent 是相对路径，需要通过 API 获取 base64
-  if (asset.resourceContent && !asset.resourceContent.startsWith('data:')) {
-    return undefined; // 让组件通过 API 获取
+// 从 ext1 获取变体数量
+const getVariantCount = (ext1: string | undefined): number => {
+  if (ext1) {
+    try {
+      const ext1Data = JSON.parse(ext1);
+      if (ext1Data.variants && Array.isArray(ext1Data.variants)) {
+        return ext1Data.variants.length;
+      }
+    } catch {}
   }
-  // 直接返回 base64 或完整 URL
-  return asset.resourceContent;
+  return 0;
 };
 
-// 从 API 获取 base64 图片数据
-const fetchImageBase64 = async (imageId: number): Promise<string | null> => {
+// 从 ext1 判断是否变体
+const isVariant = (ext1: string | undefined): boolean => {
+  if (ext1) {
+    try {
+      const ext1Data = JSON.parse(ext1);
+      return !!ext1Data.parent;
+    } catch {}
+  }
+  return false;
+};
+
+// 获取直接可用的图片 URL
+const getDirectUrl = (resourceContent: string | undefined): string | undefined => {
+  if (!resourceContent) return undefined;
+  if (resourceContent.startsWith('http://') || resourceContent.startsWith('https://') ||
+      resourceContent.startsWith('data:') || resourceContent.startsWith('blob:')) {
+    return resourceContent;
+  }
+  return undefined;
+};
+
+// 从 API 获取图片 URL
+const fetchImageUrl = async (imageId: number): Promise<string | null> => {
   try {
-    const response = await apiClient.get(`/image/${imageId}`);
-    const res = response.data;
-    if (res.code === 0 && res.data) {
-      // 假设返回的是 base64 字符串
-      return res.data;
-    }
+    return await imageApi.getDisplayUrl(imageId);
   } catch (error) {
     console.error('获取图片失败:', error);
+    return null;
   }
-  return null;
 };
 
 export default function AssetCard({ 
@@ -98,63 +108,66 @@ export default function AssetCard({
   onContextMenu,
   onClick 
 }: AssetCardProps) {
-  const category = inferCategory(asset);
-  const imageUrl = getImageUrl(asset);
-  const [base64Image, setBase64Image] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // 通过 API 获取完整资产信息
+  const [fullAsset, setFullAsset] = useState<Image | null>(null);
+
+  // 优先使用 API 获取的数据，否则使用 props 传入的数据
+  // 统一使用 Image 类型
+  const data = fullAsset || asset as Image;
   
-  // 如果没有直接可用的图片URL，通过 API 获取 base64
+  // 解析 ext1 相关数据
+  const ext1 = data.ext1;
+  const category = useMemo(() => inferCategory(ext1), [ext1]);
+  const variantCount = useMemo(() => getVariantCount(ext1), [ext1]);
+  const isVar = useMemo(() => isVariant(ext1), [ext1]);
+  
+  // 图片 URL 处理
+  const directUrl = getDirectUrl(data.resourceContent);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  // 加载完整资产信息
   useEffect(() => {
-    const fetchImage = async () => {
-      // 有 id 且没有直接可用图片时获取，且没有正在获取
-      if (asset.id && !imageUrl && !base64Image && !isLoading) {
-        setIsLoading(true);
-        const base64 = await fetchImageBase64(asset.id);
-        if (base64) {
-          // 尝试检测图片类型
-          let dataUrl = base64;
-          if (!base64.startsWith('data:')) {
-            // 尝试检测格式（默认 png）
-            dataUrl = `data:image/png;base64,${base64}`;
+    const loadAssetData = async () => {
+      if (asset.id && !fullAsset) {
+        try {
+          const assetData = await imageApi.getById(Number(asset.id));
+          if (assetData) {
+            setFullAsset(assetData);
           }
-          setBase64Image(dataUrl);
+        } catch (error) {
+          console.error('获取资产详情失败:', error);
         }
-        setIsLoading(false);
       }
     };
-    fetchImage();
-  }, [asset.id, imageUrl, base64Image]);
-  
-  // 优先使用 base64 图片
-  const displayImageUrl = base64Image || imageUrl;
+    loadAssetData();
+  }, [asset.id, fullAsset]);
+
+  // 加载图片
+  useEffect(() => {
+    const loadImage = async () => {
+      if (asset.id && !directUrl && !imageUrl) {
+        const url = await fetchImageUrl(Number(asset.id));
+        if (url) setImageUrl(url);
+      }
+    };
+    loadImage();
+  }, [asset.id, directUrl, imageUrl]);
+
+  const displayImageUrl = imageUrl || directUrl;
   const hasImage = !!displayImageUrl && displayImageUrl.length > 0;
-  
-  // Get variant count from ext1
-  const getVariantCount = (): number => {
-    if (asset.ext1) {
+
+  // 获取名称和描述
+  const assetName = data.name || data.resourceName;
+  // 尝试从 ext2 获取描述
+  const description = useMemo(() => {
+    if (data.ext2) {
       try {
-        const ext1Data = JSON.parse(asset.ext1);
-        if (ext1Data.variants && Array.isArray(ext1Data.variants)) {
-          return ext1Data.variants.length;
-        }
+        const ext2Data = JSON.parse(data.ext2);
+        return ext2Data.description;
       } catch {}
     }
-    return 0;
-  };
-  
-  // Check if this is a variant (has parent in ext1)
-  const isVariant = (): boolean => {
-    if (asset.ext1) {
-      try {
-        const ext1Data = JSON.parse(asset.ext1);
-        return !!ext1Data.parent;
-      } catch {}
-    }
-    return false;
-  };
-  
-  const variantCount = getVariantCount();
-  const isVar = isVariant();
+    return '';
+  }, [data.ext2]);
 
   return (
     <div
@@ -173,7 +186,7 @@ export default function AssetCard({
         {hasImage ? (
           <img 
             src={displayImageUrl} 
-            alt={asset.name} 
+            alt={assetName} 
             className="w-full h-full object-cover" 
           />
         ) : (
@@ -182,12 +195,12 @@ export default function AssetCard({
           </div>
         )}
 
-        {/* Category Badge - only icon */}
+        {/* Category Badge */}
         <div className={`absolute top-2 left-2 p-1 rounded text-white ${categoryColors[category]}`}>
           {categoryIcons[category]}
         </div>
         
-        {/* Variant Badge - only number */}
+        {/* Variant Badge */}
         {isVar ? (
           <div className="absolute top-2 right-2 w-5 h-5 rounded bg-purple-500 text-[8px] text-white flex items-center justify-center">
             变
@@ -209,10 +222,10 @@ export default function AssetCard({
       </div>
 
       {/* Info */}
-      <div className="px-1">
-        <p className="text-[10px] font-medium text-gray-300 truncate">{asset.name}</p>
-        {'description' in asset && asset.description && (
-          <p className="text-[8px] text-gray-500 truncate">{asset.description}</p>
+      <div className="px-1 text-center">
+        <p className="text-[10px] font-medium text-gray-300 truncate">{assetName}</p>
+        {description && (
+          <p className="text-[8px] text-gray-500 truncate">{description}</p>
         )}
       </div>
     </div>

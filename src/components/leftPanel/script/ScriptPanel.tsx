@@ -1,7 +1,6 @@
 // src/components/leftPanel/script/ScriptPanel.tsx - 脚本面板
 import { useEffect } from 'react';
-import { Upload, Loader2, X, ChevronDown, Sparkles, Package, Users, Network, BookOpen, ScrollText, File, Check, Wand2, ListOrdered, FileText } from 'lucide-react';
-import { useProjectStore } from '../../../stores';
+import { Upload, X, ChevronDown, Sparkles, Package, Users, Network, BookOpen, ScrollText, File, Check, Wand2, ListOrdered, FileText } from 'lucide-react';
 import { useScriptPanel } from './hooks';
 
 interface ScriptPanelProps {
@@ -13,9 +12,6 @@ const actionOptions = [
   { key: 'extractAssets', label: '提取资产', icon: Package, desc: '提取角色、场景、道具' },
   { key: 'analyzeScript', label: '剧本分析', icon: Wand2, desc: '生成大纲、人物小传' },
   { key: 'splitEpisodes', label: '剧集分集', icon: ListOrdered, desc: '智能分集、剧情概要' },
-  { key: 'splitScenes', label: '拆分为多场景', icon: FileText, desc: '将剧本拆分为多个场景' },
-  { key: 'generateShots', label: '生成AI分镜', icon: BookOpen, desc: '生成详细的AI分镜描述' },
-  { key: 'transformScript', label: '格式转换', icon: ScrollText, desc: '转换为其他格式' },
 ];
 
 // 5个选项卡：资产、人物、关系、大纲、剧本
@@ -28,16 +24,12 @@ const resultTabs = [
 ];
 
 export default function ScriptPanel({ onClose }: ScriptPanelProps) {
-  const { currentProjectId } = useProjectStore();
-  
   const {
     episodes,
     currentEpisode,
     localSelectedEpisodeId,
     setLocalSelectedEpisodeId,
     scriptFile,
-    scriptContent,
-    setScriptContent,
     isAnalyzing,
     analysisProgress,
     currentAnalysisStep,
@@ -50,11 +42,9 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     setShowActionDropdown,
     analysisResult,
     backendAssets,
-    loadEpisodes,
     loadEpisodeScript,
     handleFileUpload,
     handleAnalyze,
-    clearResult,
   } = useScriptPanel({ onClose });
 
   // 加载选中的分集剧本
@@ -259,7 +249,7 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
               className="w-full px-2 py-1.5 text-[10px] bg-gray-800 border border-gray-600 rounded text-gray-300 focus:outline-none focus:border-blue-500"
             >
               {episodes.map((ep) => (
-                <option key={ep.id} value={ep.id}>{ep.name || `第${ep.order}集`}</option>
+                <option key={ep.id} value={ep.id}>{ep.name || `第${ep.episodeNumber || ep.id}集`}</option>
               ))}
             </select>
             <pre className="text-[9px] text-gray-400 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto">

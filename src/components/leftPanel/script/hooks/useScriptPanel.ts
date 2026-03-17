@@ -1,8 +1,10 @@
 // src/components/leftPanel/script/hooks/useScriptPanel.ts - 脚本面板业务逻辑
 import { useState, useCallback, useEffect } from 'react';
-import { useProjectStore, useAuthStore, useEpisodeStore } from '../../../../stores';
+import { useProjectStore, useEpisodeStore } from '../../../../stores';
+import { vectorApi, episodeScriptApi } from '../../../../api';
+import { splitScriptIntoEpisodes } from '../scriptUtils';
 
-type ActionType = 'extractAssets' | 'analyzeScript' | 'splitEpisodes' | 'splitScenes' | 'generateShots' | 'transformScript';
+type ActionType = 'extractAssets' | 'analyzeScript' | 'splitEpisodes';
 type ResultTab = 'assets' | 'bios' | 'relationships' | 'outline' | 'script';
 
 interface ScriptAnalysisResult {
@@ -46,8 +48,6 @@ interface UseScriptPanelOptions {
 
 export const useScriptPanel = (_options?: UseScriptPanelOptions) => {
   const { currentProjectId } = useProjectStore();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { user } = useAuthStore();
   const { episodes, selectedEpisodeId, loadEpisodes } = useEpisodeStore();
 
   // Local state
@@ -67,19 +67,53 @@ export const useScriptPanel = (_options?: UseScriptPanelOptions) => {
   // Computed
   const currentEpisode = episodes.find(ep => String(ep.id) === localSelectedEpisodeId) || episodes[0];
 
+  // Load backend assets when panel opens
+  const loadBackendAssets = useCallback(async () => {
+    if (!currentProjectId) return;
+    
+    try {
+      // TODO: 调用后端API获取项目资产
+      // const response = await assetApi.getProjectAssets(currentProjectId);
+      // if (response.code === 0 && response.data) {
+      //   setBackendAssets(response.data);
+      // }
+      console.log('加载后端资产需要后端 API 支持');
+    } catch (error) {
+      console.error('加载后端资产失败:', error);
+    }
+  }, [currentProjectId]);
+
+  // 面板打开时自动加载项目分集和后端资产
+  useEffect(() => {
+    if (currentProjectId) {
+      loadEpisodes(currentProjectId);
+      loadBackendAssets();
+    }
+  }, [currentProjectId, loadEpisodes, loadBackendAssets]);
+
   // Sync with store
   useEffect(() => {
     if (selectedEpisodeId) {
       setLocalSelectedEpisodeId(selectedEpisodeId);
+    } else if (episodes.length > 0 && !localSelectedEpisodeId) {
+      setLocalSelectedEpisodeId(String(episodes[0].id));
     }
-  }, [selectedEpisodeId]);
+  }, [selectedEpisodeId, episodes]);
 
-  // Load episode script (TODO: 需要后端 API 支持)
-  const loadEpisodeScript = useCallback(async (_episodeId: number) => {
-    // TODO: 实现 loadEpisodeScript
-    // const resp = await vectorApi.getEpisodeScript(episodeId);
-    console.log('加载剧本需要后端 API 支持');
-  }, []);
+  // Load episode script from backend
+  const loadEpisodeScript = useCallback(async (episodeId: number) => {
+    if (!currentProjectId) return;
+    
+    try {
+      // 查找对应的分集数据
+      const episode = episodes.find(ep => ep.id === episodeId);
+      if (episode?.content) {
+        setScriptContent(episode.content);
+      }
+    } catch (error) {
+      console.error('加载剧本失败:', error);
+    }
+  }, [currentProjectId, episodes]);
 
   // File upload
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,7 +124,7 @@ export const useScriptPanel = (_options?: UseScriptPanelOptions) => {
     setScriptContent(text);
   }, []);
 
-  // Analyze script (TODO: 需要后端 API 支持)
+  // Analyze script - 接入真实API
   const handleAnalyze = useCallback(async () => {
     if (!scriptContent.trim()) {
       setAnalysisError('请输入脚本内容');
@@ -104,107 +138,95 @@ export const useScriptPanel = (_options?: UseScriptPanelOptions) => {
     setIsAnalyzing(true);
     setAnalysisError(null);
     setAnalysisProgress(10);
-    setCurrentAnalysisStep('正在分析脚本...');
+    setCurrentAnalysisStep('正在提交任务...');
 
     try {
-      // TODO: 调用后端 API
-      // switch (selectedAction) {
-      //   case 'extractAssets':
-      //     response = await vectorApi.extractAssets(...)
-      //   case 'analyzeScript':
-      //     response = await vectorApi.analyzeScript(...)
-      // }
+      // 剧集分集 - 使用前端正则实现
+      if (selectedAction === 'splitEpisodes') {
+        setCurrentAnalysisStep('智能分集中...');
+        setAnalysisProgress(30);
+        
+        // 使用前端正则分集逻辑
+        const episodes = splitScriptIntoEpisodes(scriptContent);
+        
+        setAnalysisProgress(60);
+        setCurrentAnalysisStep('保存分集数据...');
+        
+        // 调用后端API保存分集结果
+        const userId = 1; // TODO: 从authStore获取
+        await episodeScriptApi.create(
+          '分集剧本',
+          { episodes },
+          currentProjectId,
+          userId
+        );
+        
+        setAnalysisProgress(100);
+        setCurrentAnalysisStep('分集完成');
+        
+        // 更新本地状态
+        setAnalysisResult({
+          script: episodes.map(ep => `# ${ep.title}\n\n${ep.content}`).join('\n\n')
+        });
+        setActiveResultTab('script');
+        
+        // 刷新分集列表
+        loadEpisodes(currentProjectId);
+        return;
+      }
+
+      // 提取资产 / 剧本分析 - 调用向量引擎API
+      const type = selectedAction === 'extractAssets' ? 1 : 2;
+      const actionLabel = selectedAction === 'extractAssets' ? '提取资产' : '剧本分析';
       
-      // 模拟处理
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setAnalysisProgress(30);
-      setCurrentAnalysisStep('AI 分析中...');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setAnalysisProgress(60);
+      setCurrentAnalysisStep(`${actionLabel}中...`);
+      setAnalysisProgress(40);
+
+      // 调用向量引擎API
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response: any = await vectorApi.chatCompletion({
+        type: type as 1 | 2,
+        prompt: scriptContent,
+      }, 180000);
+
+      setAnalysisProgress(80);
       setCurrentAnalysisStep('解析结果...');
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      // 根据不同操作返回不同的模拟结果
-      let result: ScriptAnalysisResult;
-      
-      if (selectedAction === 'extractAssets') {
-        // 资产提取结果
-        result = {
-          assets: {
-            characters: [
-              { name: '主角A', description: '年轻勇敢的冒险家', type: 'character_primary', role: '主角', background: '出身贫寒的村落' },
-              { name: '主角B', description: '聪明的技术天才', type: 'character_primary', role: '主角' },
-              { name: '反派C', description: '企图统治世界的黑暗势力', type: 'character_primary', role: '反派' },
-              { name: '配角D', description: '主角的导师', type: 'character_secondary', role: '导师' },
-            ],
-            scenes: [
-              { name: '起始村庄', description: '故事开始的地方', type: 'scene_primary', background: '宁静的小村庄' },
-              { name: '王城', description: '繁华的首都', type: 'scene_primary', background: '金色皇宫' },
-              { name: '黑暗城堡', description: '反派的老巢', type: 'scene_secondary' },
-            ],
-            props: [
-              { name: '魔法剑', description: '传说中的神器', type: 'prop_primary' },
-              { name: '传送卷轴', description: '一次性传送道具', type: 'prop_secondary' },
-            ],
-          },
-        };
-        setBackendAssets(result.assets as any);
-        setActiveResultTab('assets');
-      } else if (selectedAction === 'analyzeScript') {
-        // 剧本分析结果
-        result = {
-          characterBios: [
-            { name: '主角A', age: '22', background: '出身贫寒的村落，从小梦想成为冒险家', role: '主角' },
-            { name: '主角B', age: '24', background: '天才科学家，擅长各种发明', role: '主角' },
-            { name: '反派C', age: '45', background: '曾是正义英雄，因误会堕入黑暗', role: '反派' },
-          ],
-          relationships: [
-            { from: '主角A', to: '主角B', type: '挚友', description: '生死之交' },
-            { from: '主角A', to: '反派C', type: '宿敌', description: '灭族之仇' },
-            { from: '主角B', to: '反派C', type: '对手', description: '科技与魔法的对决' },
-          ],
-          storyOutline: {
-            title: '冒险之旅',
-            genre: '奇幻冒险',
-            summary: '讲述两位主角踏上寻找传说中魔法之源的旅程，途中对抗黑暗势力的故事。',
-            chapters: ['第一章：出发', '第二章：考验', '第三章：成长', '第四章：决战'],
-          },
-        };
-        setActiveResultTab('bios');
-      } else if (selectedAction === 'splitEpisodes') {
-        // 剧集分集结果
-        result = {
-          script: `# 第1集：起始之村\n\n【场景1】清晨的村庄... \n【场景2】主角决定踏上旅程...\n\n# 第2集：新的伙伴\n\n【场景1】主角遇到新伙伴...\n【场景2】他们一起面对挑战...\n\n# 第3集：真相大白\n\n【场景1】黑暗势力的真相...\n【场景2】最终决战...`,
-        };
-        setActiveResultTab('script');
-      } else if (selectedAction === 'generateShots') {
-        // AI分镜结果
-        result = {
-          storyboard: `# 分镜1：开场\n\n镜头1：远景 - 宁静的村庄晨景\n- 阳光洒在屋顶\n- 鸟鸣声起\n\n镜头2：近景 - 主角A起床\n- 起床伸懒腰\n- 望向窗外\n\n# 分镜2：出发\n\n镜头1：中景 - 三人集合\n- 主角A、B、导师D\n- 整装待发\n`,
-        };
-        setActiveResultTab('outline');
+
+      if (response.code === 0 && response.data) {
+        const resultText = response.data;
+        
+        // 解析JSON结果
+        try {
+          const parsed = JSON.parse(resultText);
+          
+          if (selectedAction === 'extractAssets') {
+            setBackendAssets(parsed);
+            setActiveResultTab('assets');
+          } else {
+            setAnalysisResult(parsed);
+            setActiveResultTab('bios');
+          }
+        } catch {
+          // 如果不是JSON，直接显示文本结果
+          setAnalysisResult({ script: resultText });
+          setActiveResultTab('script');
+        }
+        
+        setAnalysisProgress(100);
+        setCurrentAnalysisStep(`${actionLabel}完成`);
       } else {
-        // 默认/通用结果
-        result = {
-          script: `# 第1集\n\n## 场景1：起始村庄\n\n【开场】清晨的阳光洒在村庄...\n\n## 场景2：出发\n\n【准备】主角们整理行装...\n`,
-          outline: `# 故事大纲\n\n## 第一章：起源\n- 介绍主角\n- 村庄被袭击\n\n## 第二章：冒险\n- 踏上旅程\n- 遇到伙伴\n`,
-        };
-        setActiveResultTab('script');
+        throw new Error(response.message || 'API调用失败');
       }
       
-      setAnalysisResult(result);
-      setAnalysisProgress(100);
-      setCurrentAnalysisStep('分析完成');
     } catch (error) {
-      setAnalysisError('分析失败: ' + (error as Error).message);
+      setAnalysisError(`分析失败: ${(error as Error).message}`);
     } finally {
       setIsAnalyzing(false);
     }
-  }, [scriptContent, selectedAction, currentProjectId]);
+  }, [scriptContent, selectedAction, currentProjectId, loadEpisodes]);
 
   // Sync assets to backend (TODO: 需要后端 API 支持)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const syncAssetsToBackend = useCallback(async (result: ScriptAnalysisResult, _projectId: number) => {
+  const syncAssetsToBackend = useCallback(async (_result: ScriptAnalysisResult, _projectId: number) => {
     // TODO: 实现 syncAssetsToBackend
     // for (const asset of result.assets || []) {
     //   await imageApi.create({...})
@@ -251,6 +273,7 @@ export const useScriptPanel = (_options?: UseScriptPanelOptions) => {
     // Actions
     loadEpisodes,
     loadEpisodeScript,
+    loadBackendAssets,
     handleFileUpload,
     handleAnalyze,
     syncAssetsToBackend,

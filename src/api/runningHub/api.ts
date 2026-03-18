@@ -663,6 +663,47 @@ class RunningHubApiService {
       };
     }
   }
+
+  // 通过后端上传图片URL（后端下载图片并上传到RunningHub）
+  async uploadByUrl(imageUrl: string, webappId: string): Promise<{ success: boolean; fileUrl?: string; error?: string }> {
+    try {
+      // 获取认证 token
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch('/api/runninghub/upload-by-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          imageUrl,
+          webappId,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('[RunningHub] uploadByUrl 响应:', data);
+      
+      if (data.code === 0 && data.data) {
+        return {
+          success: true,
+          fileUrl: data.data.fileUrl,
+        };
+      }
+
+      return {
+        success: false,
+        error: data.message || data.msg || '上传失败',
+      };
+    } catch (error) {
+      console.error('[RunningHub] uploadByUrl 失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '上传失败',
+      };
+    }
+  }
 }
 
 // ============================================

@@ -195,49 +195,36 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
     updateData('status', 'processing');
 
     try {
-      // 1. 获取当前图片（使用 img + canvas 绕过 CORS）
-      let file: File | null = null;
-      let useOriginalUrl = false;
-      
-      try {
-        file = await loadImageAsFile(displayImageUrl);
-      } catch (loadErr) {
-        console.error('[useUpscale] 图片加载失败，使用原图URL:', loadErr);
-        useOriginalUrl = true;
-      }
-
-      // 如果无法加载文件，直接使用原图 URL
-      if (useOriginalUrl || !file) {
-        // 直接创建节点，使用原图
-        const projectId = getProjectId();
-        const currentAssetId = data.assetId || data.imageUrl;
-        const currentEx2 = currentAssetId ? (data.ex2 ? JSON.parse(data.ex2) : []) : [];
-
-        createResultNode(displayImageUrl, displayImageUrl, {
-          resourceName: `${data.label || '图片'}-高清放大`,
-          resourceContent: displayImageUrl,
-          projectId,
-          currentAssetId: Number(currentAssetId) || 0,
-          sourceNodeId: nodeId,
-          label: data.label || '图片',
-          displayImageUrl,
-          currentEx2,
-        });
-
-        updateData('status', 'completed');
-        updateData('processInfo', '高清放大');
-        setIsUpscaling(false);
-        return;
-      }
-
-      // 2. 获取 RunningHub 配置
+      // 1. 获取 RunningHub 配置
       const upscaleFunc = DEFAULT_FUNCTIONS.find(f => f.id === 'ai_image_upscale');
       if (!upscaleFunc) throw new Error('未找到图片放大功能');
 
-      // 3. 获取节点信息
-      const { nodeInfoList } = await runningHubApi.getNodeInfo(upscaleFunc.webappId!);
+      console.log('[useUpscale] 开始放大, imageUrl:', displayImageUrl);
 
-      // 4. 通过后端上传文件到 RunningHub
+      // 2. 检测图片来源并处理
+      let file: File | null = null;
+      
+      // 检查是否是 data URL（本地文件）
+      if (displayImageUrl.startsWith('data:')) {
+        // 本地文件，转换为 File
+        const response = await fetch(displayImageUrl);
+        const blob = await response.blob();
+        file = new File([blob], `image-${Date.now()}.png`, { type: blob.type || 'image/png' });
+      } else {
+        // OSS 图片，尝试使用 img + canvas
+        try {
+          file = await loadImageAsFile(displayImageUrl);
+        } catch (loadErr) {
+          console.error('[useUpscale] 图片加载失败:', loadErr);
+          throw new Error('图片加载失败，请确保图片可以访问');
+        }
+      }
+
+      if (!file) {
+        throw new Error('无法获取图片文件');
+      }
+
+      // 3. 上传文件到 RunningHub
       const uploadResult = await runningHubApi.uploadFileViaBackend(file);
       if (!uploadResult.success || !uploadResult.fileName) {
         throw new Error(uploadResult.error || '图片上传失败');
@@ -245,7 +232,10 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
 
       console.log('[useUpscale] 文件上传成功, fileName:', uploadResult.fileName);
 
-      // 5. 通过后端提交任务（后端同步等待，最多30分钟）
+      // 4. 获取节点信息并提交任务
+      const { nodeInfoList } = await runningHubApi.getNodeInfo(upscaleFunc.webappId!);
+
+      // 5. 提交任务并等待结果
       const taskResult = await runningHubApi.submitTaskViaBackend(upscaleFunc.webappId!, [
         {
           nodeId: nodeInfoList[0].nodeId,
@@ -260,18 +250,14 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
 
       console.log('[useUpscale] 任务完成, result:', taskResult);
 
-      // 后端同步返回结果
-      const resultImage = taskResult.fileUrl || '';
-      const savedImageUrl = resultImage;
-
       // 6. 创建结果节点
       const projectId = getProjectId();
       const currentAssetId = data.assetId || data.imageUrl;
       const currentEx2 = currentAssetId ? (data.ex2 ? JSON.parse(data.ex2) : []) : [];
 
-      createResultNode(resultImage, savedImageUrl, {
+      createResultNode(taskResult.fileUrl, taskResult.fileUrl, {
         resourceName: `${data.label || '图片'}-高清放大`,
-        resourceContent: savedImageUrl,
+        resourceContent: taskResult.fileUrl,
         projectId,
         currentAssetId: Number(currentAssetId) || 0,
         sourceNodeId: nodeId,

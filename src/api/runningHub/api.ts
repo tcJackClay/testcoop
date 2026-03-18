@@ -563,7 +563,8 @@ class RunningHubApiService {
       const data = await response.json();
       console.log('[RunningHub] 上传响应:', data);
       
-      if (data.code === 0 && data.data) {
+      // 后端返回结构: { code: 0, data: { code: 0, fileName: "...", download_url: "..." } }
+      if (data.code === 0 && data.data && data.data.fileName) {
         return {
           success: true,
           url: data.data.download_url || '',

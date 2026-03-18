@@ -1,11 +1,10 @@
 /**
  * useUpscale - 高清放大逻辑
  */
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { imageApi } from '@/api/image';
 import { runningHubApi, DEFAULT_FUNCTIONS } from '@/api/runningHub';
-import { uploadToOSS } from '@/api/oss';
 import type { UpscaleOptions, ProcessChainItem } from '../ImageNode.types';
 
 /**
@@ -55,7 +54,6 @@ interface UseUpscaleOptions {
 
 export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUpscaleOptions) {
   const [isUpscaling, setIsUpscaling] = useState(false);
-  const pollTaskRef = useRef<() => void>();
 
   // 获取项目 ID
   const getProjectId = (): number => {
@@ -208,7 +206,7 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
         useOriginalUrl = true;
       }
 
-      // 如果无法加载文件，直接使用原图 URL（模拟 mock 模式行为）
+      // 如果无法加载文件，直接使用原图 URL
       if (useOriginalUrl || !file) {
         // 直接创建节点，使用原图
         const projectId = getProjectId();
@@ -239,14 +237,16 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
       // 3. 获取节点信息
       const { nodeInfoList } = await runningHubApi.getNodeInfo(upscaleFunc.webappId!);
 
-      // 4. 上传图片
-      const uploadResult = await runningHubApi.uploadFileDirect(file);
+      // 4. 通过后端上传文件到 RunningHub
+      const uploadResult = await runningHubApi.uploadFileViaBackend(file);
       if (!uploadResult.success || !uploadResult.fileName) {
         throw new Error(uploadResult.error || '图片上传失败');
       }
 
-      // 5. 提交任务
-      const taskSubmitResult = await runningHubApi.submitTaskDirect(upscaleFunc.webappId!, [
+      console.log('[useUpscale] 文件上传成功, fileName:', uploadResult.fileName);
+
+      // 5. 通过后端提交任务（后端同步等待，最多30分钟）
+      const taskResult = await runningHubApi.submitTaskViaBackend(upscaleFunc.webappId!, [
         {
           nodeId: nodeInfoList[0].nodeId,
           fieldName: nodeInfoList[0].fieldName,
@@ -254,49 +254,46 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
         }
       ]);
 
-      if (!taskSubmitResult.success || !taskSubmitResult.taskId) {
-        throw new Error('任务提交失败');
+      if (!taskResult.success || !taskResult.fileUrl) {
+        throw new Error(taskResult.error || '任务执行失败');
       }
 
-      const taskId = taskSubmitResult.taskId;
-      console.log('[useUpscale] 任务ID:', taskId);
+      console.log('[useUpscale] 任务完成, result:', taskResult);
 
-      // 6. 轮询任务状态
-      let resultImage = '';
-      let savedImageUrl = '';
-      let uploadSuccess = false;
-      let newAssetEx2: ProcessChainItem[] = [];
-      const maxRetries = 3;
-      let retryCount = 0;
+      // 后端同步返回结果
+      const resultImage = taskResult.fileUrl || '';
+      const savedImageUrl = resultImage;
 
-      const pollTask = async () => {
-        const taskResult = await runningHubApi.queryTaskDirect(taskId);
-        const { status, imageUrl, error } = taskResult;
+      // 6. 创建结果节点
+      const projectId = getProjectId();
+      const currentAssetId = data.assetId || data.imageUrl;
+      const currentEx2 = currentAssetId ? (data.ex2 ? JSON.parse(data.ex2) : []) : [];
 
-        console.log('[useUpscale] 任务状态:', status, imageUrl);
+      createResultNode(resultImage, savedImageUrl, {
+        resourceName: `${data.label || '图片'}-高清放大`,
+        resourceContent: savedImageUrl,
+        projectId,
+        currentAssetId: Number(currentAssetId) || 0,
+        sourceNodeId: nodeId,
+        label: data.label || '图片',
+        displayImageUrl,
+        currentEx2,
+      });
 
-        if (status === 'success' && imageUrl) {
-          resultImage = imageUrl;
+      // 更新当前节点状态
+      updateData('status', 'completed');
+      updateData('processInfo', '高清放大');
 
-          if (resultImage) {
-            // 7. 下载处理后的图片（使用 img + canvas 绕过 CORS）
-            const imgFile = await loadImageAsFile(resultImage);
+    } catch (err) {
+      console.error('[useUpscale] 高清放大失败:', err);
+      updateData('status', 'failed');
+      updateData('error', err instanceof Error ? err.message : '高清放大失败');
+    } finally {
+      setIsUpscaling(false);
+    }
+  };
 
-            // 8. 上传到 OSS
-            const projectId = getProjectId();
-            while (retryCount < maxRetries && !uploadSuccess) {
-              try {
-                // ========== 使用 OSS 上传 ==========
-                savedImageUrl = await uploadToOSS(imgFile, projectId);
-                console.log('[useUpscale] OSS 上传成功:', savedImageUrl);
-                uploadSuccess = true;
-                // =================================
-              } catch (err) {
-                console.error('[useUpscale] OSS 上传失败:', err);
-                retryCount++;
-                if (retryCount < maxRetries) await new Promise(r => setTimeout(r, 1000));
-              }
-            }
+  // 测试模式
 
             // 9. 创建结果节点（先显示，后台保存）
             const currentAssetId = data.assetId || data.imageUrl;
@@ -319,15 +316,7 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
             updateData('status', 'completed');
             updateData('processInfo', '高清放大');
           }
-        } else if (status === 'failed') {
-          updateData('status', 'failed');
-          updateData('error', error || '任务执行失败');
-        } else {
-          setTimeout(pollTask, 2000);
         }
-      };
-
-      pollTask();
     } catch (err) {
       console.error('[useUpscale] 高清放大失败:', err);
       updateData('status', 'failed');

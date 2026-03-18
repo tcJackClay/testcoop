@@ -537,6 +537,115 @@ class RunningHubApiService {
     this.nodeInfoCache.clear();
     localStorage.removeItem(CACHE_STORAGE_KEY);
   }
+
+  // ============================================
+  // 后端代理方法
+  // ============================================
+
+  // 通过后端上传文件到 RunningHub
+  async uploadFileViaBackend(file: File): Promise<{ success: boolean; url?: string; fileName?: string; error?: string }> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileType', 'image');
+
+      const response = await fetch('/api/runninghub/upload-file', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      
+      if (data.code === 0 && data.data) {
+        return {
+          success: true,
+          url: data.data.download_url || '',
+          fileName: data.data.fileName || '',
+        };
+      }
+
+      return {
+        success: false,
+        error: data.message || '上传失败',
+      };
+    } catch (error) {
+      console.error('[RunningHub] 后端代理上传失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '上传失败',
+      };
+    }
+  }
+
+  // 通过后端提交任务
+  async submitTaskViaBackend(
+    webappId: string,
+    nodeInfoList: { nodeId: string; fieldName: string; fieldValue: string; description?: string }[]
+  ): Promise<{ success: boolean; taskId?: string; fileUrl?: string; error?: string }> {
+    try {
+      const response = await fetch('/api/runninghub/save-nodes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          webappId,
+          nodeInfoList,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.code === 0 && data.data) {
+        return {
+          success: true,
+          taskId: data.data.taskId,
+          fileUrl: data.data.fileUrl,
+        };
+      }
+
+      return {
+        success: false,
+        error: data.message || '提交失败',
+      };
+    } catch (error) {
+      console.error('[RunningHub] 后端代理提交任务失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '提交失败',
+      };
+    }
+  }
+
+  // 通过后端查询任务状态
+  async queryTaskViaBackend(taskId: string): Promise<{ success: boolean; status?: string; fileUrl?: string; error?: string }> {
+    try {
+      const response = await fetch(`/api/runninghub/query-task?taskId=${encodeURIComponent(taskId)}`, {
+        method: 'GET',
+      });
+
+      const data = await response.json();
+      
+      if (data.code === 0 && data.data) {
+        return {
+          success: true,
+          status: data.data.status,
+          fileUrl: data.data.fileUrl,
+        };
+      }
+
+      return {
+        success: false,
+        error: data.message || '查询失败',
+      };
+    } catch (error) {
+      console.error('[RunningHub] 后端代理查询任务失败:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '查询失败',
+      };
+    }
+  }
 }
 
 // ============================================

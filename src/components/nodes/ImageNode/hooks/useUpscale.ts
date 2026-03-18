@@ -294,39 +294,6 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
   };
 
   // 测试模式
-
-            // 9. 创建结果节点（先显示，后台保存）
-            const currentAssetId = data.assetId || data.imageUrl;
-            const currentEx2 = currentAssetId 
-              ? (data.ex2 ? JSON.parse(data.ex2) : [])
-              : [];
-
-            createResultNode(resultImage, savedImageUrl, {
-              resourceName: `${data.label || '图片'}-高清放大`,
-              resourceContent: savedImageUrl,
-              projectId,
-              currentAssetId: Number(currentAssetId) || 0,
-              sourceNodeId: nodeId,
-              label: data.label || '图片',
-              displayImageUrl,
-              currentEx2,
-            });
-
-            // 更新当前节点状态
-            updateData('status', 'completed');
-            updateData('processInfo', '高清放大');
-          }
-        }
-    } catch (err) {
-      console.error('[useUpscale] 高清放大失败:', err);
-      updateData('status', 'failed');
-      updateData('error', err instanceof Error ? err.message : '高清放大失败');
-    } finally {
-      setIsUpscaling(false);
-    }
-  };
-
-  // 测试模式
   const upscaleMock = async () => {
     setIsUpscaling(true);
     updateData('status', 'processing');

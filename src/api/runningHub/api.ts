@@ -549,8 +549,14 @@ class RunningHubApiService {
       formData.append('file', file);
       formData.append('fileType', 'image');
 
+      // 获取认证 token
+      const token = localStorage.getItem('auth_token');
+
       const response = await fetch('/api/runninghub/upload-file', {
         method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
         body: formData,
       });
 
@@ -583,10 +589,14 @@ class RunningHubApiService {
     nodeInfoList: { nodeId: string; fieldName: string; fieldValue: string; description?: string }[]
   ): Promise<{ success: boolean; taskId?: string; fileUrl?: string; error?: string }> {
     try {
+      // 获取认证 token
+      const token = localStorage.getItem('auth_token');
+
       const response = await fetch('/api/runninghub/save-nodes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : '',
         },
         body: JSON.stringify({
           webappId,
@@ -620,8 +630,14 @@ class RunningHubApiService {
   // 通过后端查询任务状态
   async queryTaskViaBackend(taskId: string): Promise<{ success: boolean; status?: string; fileUrl?: string; error?: string }> {
     try {
+      // 获取认证 token
+      const token = localStorage.getItem('auth_token');
+
       const response = await fetch(`/api/runninghub/query-task?taskId=${encodeURIComponent(taskId)}`, {
         method: 'GET',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+        },
       });
 
       const data = await response.json();

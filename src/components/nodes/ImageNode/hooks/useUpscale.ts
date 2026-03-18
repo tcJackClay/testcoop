@@ -197,10 +197,8 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
     updateData('status', 'processing');
 
     try {
-      // 1. 获取当前图片
-      const response = await fetch(displayImageUrl);
-      const blob = await response.blob();
-      const file = new File([blob], `upscale-${Date.now()}.png`, { type: 'image/png' });
+      // 1. 获取当前图片（使用 img + canvas 绕过 CORS）
+      const file = await loadImageAsFile(displayImageUrl);
 
       // 2. 获取 RunningHub 配置
       const upscaleFunc = DEFAULT_FUNCTIONS.find(f => f.id === 'ai_image_upscale');

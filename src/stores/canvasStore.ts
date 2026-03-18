@@ -5,6 +5,7 @@ import { createCanvasNodesSlice, type CanvasNodesSlice } from './canvasNodes';
 import { createCanvasConnectionsSlice, type CanvasConnectionsSlice } from './canvasConnections';
 import { createCanvasHistorySlice, type CanvasHistorySlice } from './canvasHistory';
 import { createCanvasViewportSlice, type CanvasViewportSlice } from './canvasViewport';
+import { setNodeIdCounter, getNodeIdCounter } from './canvasNodeDefaults';
 
 export type CanvasStore = CanvasState & CanvasNodesSlice & CanvasConnectionsSlice & CanvasHistorySlice & CanvasViewportSlice;
 
@@ -71,6 +72,17 @@ const initCanvasState = () => {
   if (projectId) {
     const saved = loadCanvasState(projectId);
     if (saved) {
+      // 更新节点 ID 计数器，避免 ID 冲突
+      if (saved.nodes && saved.nodes.length > 0) {
+        const maxId = saved.nodes.reduce((max: number, node: any) => {
+          const match = node.id?.match(/node_(\d+)/);
+          const num = match ? parseInt(match[1], 10) : 0;
+          return num > max ? num : max;
+        }, 0);
+        setNodeIdCounter(maxId);
+        console.log('[CanvasStore] 已恢复节点计数器到:', maxId);
+      }
+      
       baseStore.setState({
         nodes: saved.nodes || [],
         connections: saved.connections || [],
@@ -92,6 +104,16 @@ setInterval(() => {
     if (currentProjectId) {
       const saved = loadCanvasState(currentProjectId);
       if (saved) {
+        // 更新节点 ID 计数器
+        if (saved.nodes && saved.nodes.length > 0) {
+          const maxId = saved.nodes.reduce((max: number, node: any) => {
+            const match = node.id?.match(/node_(\d+)/);
+            const num = match ? parseInt(match[1], 10) : 0;
+            return num > max ? num : max;
+          }, 0);
+          setNodeIdCounter(maxId);
+        }
+        
         baseStore.setState({
           nodes: saved.nodes || [],
           connections: saved.connections || [],

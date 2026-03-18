@@ -129,15 +129,17 @@ export default function Canvas() {
     const x = e.clientX - (rect?.left || 0);
     const y = e.clientY - (rect?.top || 0);
 
+    // 框选模式
     if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      clearSelection();
+      // 不清除选中，让用户可以在已有选中基础上添加
       setIsSelecting(true);
       setSelectionStart({ x, y });
       setSelectionBox({ x, y, width: 0, height: 0 });
       return;
     }
 
+    // 平移模式
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       e.preventDefault();
       setIsPanning(true);
@@ -303,9 +305,6 @@ export default function Canvas() {
         onDragOver={handleDragOver}
         onContextMenu={handleContextMenu}
         onDoubleClick={handleDoubleClick}
-        onClick={() => {
-          clearSelection(); // 点击空白区域取消节点选中
-        }}
       >
         <div
           className="absolute inset-0 origin-top-left canvas-content"

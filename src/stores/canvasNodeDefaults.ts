@@ -60,3 +60,11 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
 
 let nodeIdCounter = 0;
 export const generateNodeId = () => `node_${++nodeIdCounter}`;
+
+// 设置节点 ID 计数器（用于从存储恢复时避免 ID 冲突）
+export const setNodeIdCounter = (maxId: number) => {
+  nodeIdCounter = maxId;
+};
+
+// 获取当前节点 ID 计数器
+export const getNodeIdCounter = () => nodeIdCounter;

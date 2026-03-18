@@ -50,7 +50,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     syncVariants,
   } = useAssetStore();
   
-  const { addNode, nodes } = useCanvasStore();
+  const { addNode, nodes, viewPort } = useCanvasStore();
   
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -189,14 +189,17 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   //   });
   // }, []);
   
-  // Calculate canvas center position
+  // 计算画布可视区域中心偏右的位置
   const getCanvasCenterPosition = () => {
-    if (nodes.length === 0) {
-      return { x: 100, y: 100 };
-    }
-    const maxX = Math.max(...nodes.map(n => n.position.x + (n.width || 200)));
-    const maxY = Math.max(...nodes.map(n => n.position.y + (n.height || 100)));
-    return { x: maxX + 50, y: maxY };
+    // 假设画布容器大约 800x600，可视区域中心
+    const canvasWidth = 800;
+    const canvasHeight = 600;
+    
+    // 计算可视区域中心（考虑 viewPort 的偏移和缩放）
+    const centerX = (-viewPort.x + canvasWidth / 2) / viewPort.zoom + 200; // 偏右 200px
+    const centerY = (-viewPort.y + canvasHeight / 2) / viewPort.zoom;
+    
+    return { x: centerX, y: centerY };
   };
   
   // Add new asset node to canvas

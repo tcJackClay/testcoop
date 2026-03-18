@@ -1,4 +1,4 @@
-import { Image, Video, FileText, BookOpen, Wand2, Film, Eye, HardDrive, GitCompare, Sparkles, Clapperboard, Users, Mountain } from 'lucide-react';
+import { Image, Video, FileText, Wand2, Film, HardDrive, Sparkles, Clapperboard, BookOpen, Users, Mountain, GitCompare } from 'lucide-react';
 import { type NodeType } from '../../stores/canvasStore';
 
 interface ContextMenuProps {
@@ -12,17 +12,11 @@ interface ContextMenuProps {
 }
 
 const nodeTypeItems: Array<{ type: NodeType; label: string; icon: React.ReactNode }> = [
-  { type: 'novelInput', label: '小说输入', icon: <BookOpen className="w-4 h-4" /> },
-  { type: 'promptNode', label: '文字节点', icon: <Wand2 className="w-4 h-4" /> },
-  { type: 'imageNode', label: '图片节点', icon: <Image className="w-4 h-4" /> },
-  { type: 'videoNode', label: '视频节点', icon: <Film className="w-4 h-4" /> },
-  { type: 'createAsset', label: '创建资产', icon: <Image className="w-4 h-4" /> },
-  { type: 'runninghub', label: 'RunningHub', icon: <Sparkles className="w-4 h-4" /> },
-  { type: 'storyboardNode', label: '智能分镜', icon: <Clapperboard className="w-4 h-4" /> },
-  { type: 'videoAnalyze', label: '视频拆解', icon: <Sparkles className="w-4 h-4" /> },
-  { type: 'characterDescription', label: '角色描述', icon: <Users className="w-4 h-4" /> },
-  { type: 'sceneDescription', label: '场景描述', icon: <Mountain className="w-4 h-4" /> },
-  { type: 'imageCompare', label: '图像对比', icon: <GitCompare className="w-4 h-4" /> },
+  { type: 'promptNode', label: '文本', icon: <Wand2 className="w-4 h-4" /> },
+  { type: 'imageNode', label: '图片', icon: <Image className="w-4 h-4" /> },
+  { type: 'videoNode', label: '视频', icon: <Film className="w-4 h-4" /> },
+  { type: 'createAsset', label: '资产', icon: <Image className="w-4 h-4" /> },
+  { type: 'storyboardNode', label: '分镜', icon: <Clapperboard className="w-4 h-4" /> },
 ];
 
 export default function CanvasContextMenu({ visible, x, y, onAddNode, onClose }: ContextMenuProps) {
@@ -30,7 +24,7 @@ export default function CanvasContextMenu({ visible, x, y, onAddNode, onClose }:
 
   return (
     <div
-      className="fixed z-50 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1"
+      className="fixed z-50 w-32 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1"
       style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}
     >

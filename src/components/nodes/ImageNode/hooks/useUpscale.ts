@@ -123,14 +123,28 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
     saveToAssetLibrary(nodeData, options);
   };
 
+  // 获取当前用户 ID
+  const getCurrentUserId = (): number => {
+    try {
+      const userStr = localStorage.getItem('auth_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user?.id || 1;
+      }
+    } catch {}
+    return 1;
+  };
+
   // 后台异步保存到资产库
   const saveToAssetLibrary = async (nodeData: any, options: UpscaleOptions) => {
     try {
+      const userId = getCurrentUserId();
       const newImage = await imageApi.create({
         resourceName: nodeData.pendingSync.resourceName,
         resourceType: 'image',
         resourceContent: nodeData.pendingSync.resourceContent,
         projectId: nodeData.pendingSync.projectId,
+        userId: userId,
       });
 
       if (newImage && newImage.id) {
@@ -251,13 +265,14 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
       console.log('[useUpscale] 任务完成, result:', taskResult);
 
       // 6. 创建结果节点
+      const resultImageUrl = Array.isArray(taskResult.fileUrl) ? taskResult.fileUrl[0]?.fileUrl : taskResult.fileUrl;
       const projectId = getProjectId();
       const currentAssetId = data.assetId || data.imageUrl;
       const currentEx2 = currentAssetId ? (data.ex2 ? JSON.parse(data.ex2) : []) : [];
 
-      createResultNode(taskResult.fileUrl, taskResult.fileUrl, {
+      createResultNode(resultImageUrl, resultImageUrl, {
         resourceName: `${data.label || '图片'}-高清放大`,
-        resourceContent: taskResult.fileUrl,
+        resourceContent: resultImageUrl,
         projectId,
         currentAssetId: Number(currentAssetId) || 0,
         sourceNodeId: nodeId,

@@ -561,6 +561,7 @@ class RunningHubApiService {
       });
 
       const data = await response.json();
+      console.log('[RunningHub] 上传响应:', data);
       
       if (data.code === 0 && data.data) {
         return {
@@ -572,7 +573,7 @@ class RunningHubApiService {
 
       return {
         success: false,
-        error: data.message || '上传失败',
+        error: data.message || data.msg || '上传失败',
       };
     } catch (error) {
       console.error('[RunningHub] 后端代理上传失败:', error);

@@ -66,6 +66,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   const [selectedPrimaryAsset, setSelectedPrimaryAsset] = useState<Image | null>(null);
   
   // Helper functions - 从 ext1 获取变体信息
+  // 变体：有 parent 字段的资产，属于某个主要资产的子资产
   const isSecondaryAsset = (asset: Image): boolean => {
     if (asset.ext1) {
       try {
@@ -76,20 +77,18 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
     return false;
   };
   
+  // 主要资产：type 字段包含 "primary"
   const isPrimaryAsset = (asset: Image): boolean => {
     if (isSecondaryAsset(asset)) return false;
-    // 主要资产：其他资产以它为 parent
-    const assetName = asset.name || asset.resourceName;
-    return assets.some(a => {
-      if (a.id === asset.id) return false;
-      if (a.ext1) {
-        try {
-          const ext1Data = JSON.parse(a.ext1);
-          return ext1Data.parent === assetName;
-        } catch {}
-      }
-      return false;
-    });
+    // 检查 type 字段是否包含 "primary"
+    if (asset.ext1) {
+      try {
+        const ext1Data = JSON.parse(asset.ext1);
+        const type = ext1Data.type?.toLowerCase() || '';
+        return type.includes('primary');
+      } catch {}
+    }
+    return false;
   };
   
   const getVariantsForPrimary = (primaryAsset: Image): Image[] => {

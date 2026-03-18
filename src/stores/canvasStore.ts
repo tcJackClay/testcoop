@@ -8,7 +8,45 @@ import { createCanvasViewportSlice, type CanvasViewportSlice } from './canvasVie
 
 export type CanvasStore = CanvasState & CanvasNodesSlice & CanvasConnectionsSlice & CanvasHistorySlice & CanvasViewportSlice;
 
-export const useCanvasStore = create<CanvasStore>()((...args) => ({
+// 获取当前项目 ID
+const getCurrentProjectId = (): number | undefined => {
+  try {
+    const projectStorage = localStorage.getItem('project-storage');
+    if (projectStorage) {
+      const projectId = JSON.parse(projectStorage).state?.currentProjectId;
+      return projectId;
+    }
+  } catch {}
+  return undefined;
+};
+
+// 存储键名前缀
+const STORAGE_PREFIX = 'canvas_';
+
+// 加载指定项目的画布数据
+const loadCanvasState = (projectId: number) => {
+  try {
+    const key = `${STORAGE_PREFIX}${projectId}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {}
+  return null;
+};
+
+// 保存指定项目的画布数据
+const saveCanvasState = (projectId: number, state: { nodes: any[]; connections: any[]; viewPort: any }) => {
+  try {
+    const key = `${STORAGE_PREFIX}${projectId}`;
+    localStorage.setItem(key, JSON.stringify(state));
+  } catch (e) {
+    console.error('保存画布状态失败:', e);
+  }
+};
+
+// 创建基础 store
+const baseStore = create<CanvasStore>()((...args) => ({
   // Core State
   nodes: [],
   connections: [],
@@ -26,6 +64,65 @@ export const useCanvasStore = create<CanvasStore>()((...args) => ({
   // Viewport Operations
   ...createCanvasViewportSlice(...args),
 }));
+
+// 初始化：加载当前项目的画布数据
+const initCanvasState = () => {
+  const projectId = getCurrentProjectId();
+  if (projectId) {
+    const saved = loadCanvasState(projectId);
+    if (saved) {
+      baseStore.setState({
+        nodes: saved.nodes || [],
+        connections: saved.connections || [],
+        viewPort: saved.viewPort || { x: 0, y: 0, zoom: 1 },
+      });
+    }
+  }
+};
+
+// 立即初始化
+initCanvasState();
+
+// 监听项目变化，重新加载数据
+let lastProjectId: number | undefined = getCurrentProjectId();
+setInterval(() => {
+  const currentProjectId = getCurrentProjectId();
+  if (currentProjectId !== lastProjectId) {
+    lastProjectId = currentProjectId;
+    if (currentProjectId) {
+      const saved = loadCanvasState(currentProjectId);
+      if (saved) {
+        baseStore.setState({
+          nodes: saved.nodes || [],
+          connections: saved.connections || [],
+          viewPort: saved.viewPort || { x: 0, y: 0, zoom: 1 },
+        });
+      } else {
+        // 新项目
+        baseStore.setState({
+          nodes: [],
+          connections: [],
+          viewPort: { x: 0, y: 0, zoom: 1 },
+        });
+      }
+    }
+  }
+}, 1000);
+
+// 每次状态变化时自动保存
+baseStore.subscribe((state) => {
+  const projectId = getCurrentProjectId();
+  if (projectId) {
+    saveCanvasState(projectId, {
+      nodes: state.nodes,
+      connections: state.connections,
+      viewPort: state.viewPort,
+    });
+  }
+});
+
+// 导出 store
+export const useCanvasStore = baseStore;
 
 // Re-export types for convenience
 export type { CanvasNode, Connection, ViewPort, NodeType } from './canvasTypes';

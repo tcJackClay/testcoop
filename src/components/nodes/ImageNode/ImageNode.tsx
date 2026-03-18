@@ -239,7 +239,9 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
               setActiveTool(showSettings ? null : 'generate');
             }}
             onUpscale={() => {
-              handleUpscale();
+              handleUpscale().catch(err => {
+                console.error('[ImageNode] 放大失败:', err);
+              });
               setActiveTool('upscale');
               setShowSettings(false);
             }}

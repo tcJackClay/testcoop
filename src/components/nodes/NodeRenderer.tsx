@@ -360,7 +360,7 @@ export default function NodeRenderer({
         <X size={12} />
       </button>
 
-      {/* Execute Button - Only for generation nodes except imageNode */}
+      {/* 执行按钮已禁用 - 如需启用可取消注释
       {generationNodeTypes.includes(node.type) && node.type !== 'imageNode' && (
         <button
           className="absolute -top-2.5 -right-8 z-[60] p-1 rounded-full shadow border opacity-0 group-hover:opacity-100 transition-opacity scale-90 hover:scale-100 bg-gray-800 text-green-400 hover:text-green-300 border-gray-700 hover:bg-gray-700"
@@ -377,6 +377,7 @@ export default function NodeRenderer({
           )}
         </button>
       )}
+      */}
 
       {/* Body */}
       <div className="p-3">{renderNodeBody(node, isSelected)}</div>

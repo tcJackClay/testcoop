@@ -15,14 +15,8 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Runtime stage
-FROM hub.1panel.dev/library/nginx:alpine
-
-# Copy built files from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
-
 # Expose port
-EXPOSE 80
+EXPOSE 5173
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start vite
+CMD ["npm", "run", "dev"]

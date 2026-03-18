@@ -13,6 +13,7 @@ import {
   Gem,
   Package,
   Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { useAssetStore } from '@/stores';
 import { useCanvasStore } from '@/stores/canvasStore';
@@ -177,15 +178,16 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   // Component mount: fetch assets and sync variants only once
   const hasSyncedRef = useRef(false);
   
-  useEffect(() => {
-    if (hasSyncedRef.current) return;
-    hasSyncedRef.current = true;
-    
-    // 先同步变体，再获取最新资产列表
-    syncVariants().then(() => {
-      fetchAssets();
-    });
-  }, []);
+  // 取消自动刷新 - 用户手动点击刷新按钮时才获取数据
+  // useEffect(() => {
+  //   if (hasSyncedRef.current) return;
+  //   hasSyncedRef.current = true;
+  //   
+  //   // 先同步变体，再获取最新资产列表
+  //   syncVariants().then(() => {
+  //     fetchAssets();
+  //   });
+  // }, []);
   
   // Calculate canvas center position
   const getCanvasCenterPosition = () => {
@@ -279,9 +281,21 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
             </button>
           </div>
           
-          {/* Loading indicator */}
-          {isLoading && (
+          {/* Loading indicator / Refresh button */}
+          {isLoading ? (
             <Loader2 size={14} className="text-blue-400 animate-spin" />
+          ) : (
+            <button 
+              onClick={() => {
+                syncVariants().then(() => {
+                  fetchAssets();
+                });
+              }}
+              className="p-1 text-gray-400 hover:text-white rounded"
+              title="刷新资产列表"
+            >
+              <RefreshCw size={14} />
+            </button>
           )}
         </div>
 

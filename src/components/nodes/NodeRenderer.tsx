@@ -280,6 +280,11 @@ export default function NodeRenderer({
   const label = (node.data.label as string) || node.type;
   const colorClass = nodeColors[node.type] || 'border-gray-500 bg-gray-500/10';
 
+  // 节点层级：选中的在最上层，其他按渲染顺序（后来居上）
+  const allNodes = useCanvasStore.getState().nodes;
+  const nodeIndex = allNodes.findIndex(n => n.id === node.id);
+  const baseZIndex = isSelected ? 100 : (50 + nodeIndex);
+
   // 连接点样式 - TapNow-Studio 风格
   const sourceHandleStyle: React.CSSProperties = {
     position: 'absolute',
@@ -291,7 +296,7 @@ export default function NodeRenderer({
     border: '1px solid #71717a',
     borderRadius: '50%',
     cursor: 'crosshair',
-    zIndex: 30,
+    zIndex: baseZIndex + 10, // 连接点比节点高一点
     opacity: connectingSource === node.id ? 1 : 0.5,
     pointerEvents: 'auto',
     transform: 'translateY(-50%)',
@@ -305,7 +310,7 @@ export default function NodeRenderer({
     height: '0.5rem',
     backgroundColor: hasInputConnection ? '#60a5fa' : '#52525b',
     borderRadius: '50%',
-    zIndex: 20,
+    zIndex: baseZIndex + 10, // 连接点比节点高一点
     pointerEvents: 'auto',
     transform: 'translateY(-50%)',
   };
@@ -330,6 +335,7 @@ export default function NodeRenderer({
       style={{
         left: node.position.x,
         top: node.position.y,
+        zIndex: baseZIndex,
       }}
 
       onMouseDown={handleMouseDown}
@@ -395,7 +401,8 @@ export default function NodeRenderer({
       />
       {/* 可视圆点 */}
       <div
-        className={`absolute -left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all pointer-events-none z-[60] ${targetHandleClass}`}
+        className={`absolute -left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all pointer-events-none ${targetHandleClass}`}
+        style={{ zIndex: baseZIndex + 10 }}
         title={connectingSource && connectingSource !== node.id ? "点击连接" : (hasInputConnection ? "已连接" : "点击选择输入节点")}
       />
 
@@ -422,7 +429,8 @@ export default function NodeRenderer({
       />
       {/* 可视圆点 */}
       <div
-        className={`absolute -right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all pointer-events-none z-[60] ${sourceHandleClass}`}
+        className={`absolute -right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 transition-all pointer-events-none ${sourceHandleClass}`}
+        style={{ zIndex: baseZIndex + 10 }}
         title={isConnectingSource ? "点击取消连接" : "点击选择输出节点"}
       />
     </div>

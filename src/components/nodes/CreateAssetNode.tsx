@@ -133,11 +133,20 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
       const existingAsset = await imageApi.getByName(projectId, name);
       const existingAssetId = existingAsset?.id;
       
-      // 如果是更新，合并已有 ext1
-      if (existingAssetId && existingAsset?.ext1) {
-        try {
-          ext1Json = JSON.parse(existingAsset.ext1);
-        } catch {}
+      // 如果存在同名资产，提示用户
+      if (existingAssetId) {
+        const confirmUpdate = window.confirm(`已存在同名资产 "${name}"，是否更新？`);
+        if (!confirmUpdate) {
+          updateData('status', 'idle');
+          return;
+        }
+        
+        // 如果是更新，合并已有 ext1
+        if (existingAsset?.ext1) {
+          try {
+            ext1Json = JSON.parse(existingAsset.ext1);
+          } catch {}
+        }
       }
       
       // 更新 ext1 字段
@@ -145,22 +154,26 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
       ext1Json.parent = parentAssetName;
       ext1Json.type = finalAssetType;
 
-      // Get image URL from input node
+      // ======== 图片上传逻辑 ========
       let uploadedUrl = inputImageUrl;
-
-      // If the image is a local blob/base64, upload to OSS
+      
+      // 如果是 base64 或 blob，需要先转换为 File 再上传到 OSS
       if (inputImageUrl.startsWith('data:') || inputImageUrl.startsWith('blob:')) {
         try {
-          // 清理文件名中的特殊字符（/ \ : * ? " < > |）
+          // 清理文件名中的特殊字符
           const safeName = name.replace(/[\\/:*?"<>|]/g, '_');
           
-          // ========== 使用 OSS 上传 ==========
-          uploadedUrl = await uploadToOSS(inputImageUrl, projectId, `${safeName}.png`);
+          // 将 base64/blob 转换为 File
+          const blob = await fetch(inputImageUrl).then(r => r.blob());
+          const extMatch = inputImageUrl.match(/data:image\/(\w+);base64/);
+          const ext = extMatch?.[1] || 'png';
+          const file = new File([blob], `${safeName}.${ext}`, { type: `image/${ext}` });
+          
+          // 上传到 OSS，返回完整 URL
+          uploadedUrl = await uploadToOSS(file, projectId);
           console.log('[CreateAssetNode] OSS 上传成功:', uploadedUrl);
-          // ==================================
           
           if (!uploadedUrl) {
-            console.error('上传结果为空');
             alert('图片上传失败');
             updateData('status', 'idle');
             return;
@@ -172,6 +185,7 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
           return;
         }
       }
+      // ======== 上传结束 ========
 
       // Create or Update asset via API
       let result;

@@ -5,6 +5,7 @@
  */
 
 import { apiClient, ApiResponse } from './client'
+import { useAuthStore } from '../stores/authStore'
 
 // ========== 多人协同缓存机制 ==========
 // 缓存配置：30秒过期
@@ -266,6 +267,11 @@ export const imageApi = {
     if (data.ext1 !== undefined) payload.ext1 = data.ext1;
     if (data.ext2 !== undefined) payload.ext2 = data.ext2;
     payload.status = 1;  // 状态 1 表示正常
+    
+    // 设置更新人和更新时间
+    const currentUser = useAuthStore.getState().user;
+    payload.updatedBy = currentUser?.username || 'unknown';
+    payload.updatedTime = new Date().toISOString();
     
     const response = await apiClient.put<ApiResponse<Image>>(`/image/${id}`, payload)
     

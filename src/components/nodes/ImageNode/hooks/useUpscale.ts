@@ -8,6 +8,37 @@ import { runningHubApi, DEFAULT_FUNCTIONS } from '@/api/runningHub';
 import { uploadToOSS } from '@/api/oss';
 import type { UpscaleOptions, ProcessChainItem } from '../ImageNode.types';
 
+/**
+ * 使用 img + canvas 加载跨域图片（绕过 CORS）
+ */
+const loadImageAsFile = (imageUrl: string): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('无法创建 canvas context'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], `upscale-${Date.now()}.png`, { type: 'image/png' });
+          resolve(file);
+        } else {
+          reject(new Error('无法转换图片'));
+        }
+      }, 'image/png');
+    };
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = imageUrl;
+  });
+};
+
 interface UseUpscaleOptions {
   nodeId: string;
   data: {
@@ -218,10 +249,8 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
           resultImage = imageUrl;
 
           if (resultImage) {
-            // 7. 下载处理后的图片
-            const imgResponse = await fetch(resultImage);
-            const imgBlob = await imgResponse.blob();
-            const imgFile = new File([imgBlob], `upscale-${Date.now()}.png`, { type: 'image/png' });
+            // 7. 下载处理后的图片（使用 img + canvas 绕过 CORS）
+            const imgFile = await loadImageAsFile(resultImage);
 
             // 8. 上传到 OSS
             const projectId = getProjectId();

@@ -563,12 +563,14 @@ class RunningHubApiService {
       const data = await response.json();
       console.log('[RunningHub] 上传响应:', data);
       
-      // 后端返回结构: { code: 0, data: { code: 0, fileName: "...", download_url: "..." } }
-      if (data.code === 0 && data.data && data.data.fileName) {
+      // 后端返回结构: { code: 0, data: { code: 0, data: { fileName, download_url } } }
+      // 或者: { code: 0, data: { code: 0, fileName, download_url } }
+      const innerData = data.data?.data || data.data;
+      if (data.code === 0 && innerData?.fileName) {
         return {
           success: true,
-          url: data.data.download_url || '',
-          fileName: data.data.fileName || '',
+          url: innerData.download_url || '',
+          fileName: innerData.fileName || '',
         };
       }
 

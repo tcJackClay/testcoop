@@ -208,6 +208,7 @@ export const imageApi = {
       userId: data.userId,
       ext1: data.ext1,
       ext2: data.ext2,
+      status: 1,
     }
     const response = await apiClient.post<ApiResponse<Image>>('/image', payload)
     

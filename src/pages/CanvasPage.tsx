@@ -124,59 +124,6 @@ export default function CanvasPage() {
 
       <LoginModal />
       
-      {/* 测试按钮 */}
-      {process.env.NODE_ENV === 'development' && (
-        <button
-          onClick={async () => {
-            try {
-              const { imageApi } = await import('../api/image');
-              const images = await imageApi.getAll(1024);
-              
-              const targetImage = images.find(img => 
-                img.name === '叶枭' || img.resourceName === '叶枭'
-              );
-              
-              if (!targetImage) {
-                alert('未找到 "叶枭"\n可用: ' + images.slice(0, 3).map(i => i.name).join(', '));
-                return;
-              }
-              
-              const imageId = targetImage.id!;
-              
-              // 设置分支结构: A → B1/B2 → C1/C2/C3
-              // A (1031) → B1(1032), B2(1034)
-              const ext2_A = JSON.stringify([
-                { type: '高清放大', sourceId: imageId, targetId: imageId + 1 },
-                { type: '风格转换', sourceId: imageId, targetId: imageId + 3 }
-              ]);
-              await imageApi.put(imageId, { ext2: ext2_A });
-              
-              // B1 (1032) → C1(1033)
-              const ext2_B1 = JSON.stringify([
-                { type: '去水印', sourceId: imageId + 1, targetId: imageId + 2 }
-              ]);
-              await imageApi.put(imageId + 1, { ext2: ext2_B1 });
-              
-              // B2 (1034) → C2(1035)
-              const ext2_B2 = JSON.stringify([
-                { type: '滤镜', sourceId: imageId + 3, targetId: imageId + 4 }
-              ]);
-              await imageApi.put(imageId + 3, { ext2: ext2_B2 });
-              
-              alert(`✅ 已设置分支结构！\n\n` + 
-                `A(1031) → B1(1032), B2(1034)\n` +
-                `B1(1032) → C1(1033)\n` +
-                `B2(1034) → C2(1035)\n\n` +
-                `请刷新页面后拖拽 A 测试`);
-            } catch (err) {
-              alert('❌ ' + err);
-            }
-          }}
-          className="fixed bottom-4 right-4 bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-50"
-        >
-          🧪 分支
-        </button>
-      )}
     </div>
   );
 }

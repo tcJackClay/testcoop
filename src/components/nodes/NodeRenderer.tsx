@@ -333,6 +333,7 @@ export default function NodeRenderer({
       }}
 
       onMouseDown={handleMouseDown}
+      onClick={(e) => e.stopPropagation()}
     >
 
 

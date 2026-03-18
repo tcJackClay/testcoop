@@ -25,6 +25,7 @@ const MOCK_MODE = false;
 export default function ImageNode({ nodeId, data, updateData, selected = false }: ImageNodeProps) {
   // ========== State ==========
   const [showSettings, setShowSettings] = useState(false);
+  const [activeTool, setActiveTool] = useState<'generate' | 'multiAngle' | 'lighting' | 'upscale' | 'removeWatermark' | 'download' | null>(null);
   
   // ========== Hooks ==========
   const { displayImageUrl, processChainImages } = useImageFetch({
@@ -224,38 +225,68 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
         </div>
       )}
 
-      {/* 工具栏 */}
+      {/* 工具栏 - 显示在上方 */}
       {selected && (
-        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 z-10">
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-10">
           <ImageToolbar
             isProcessing={isProcessing}
             hasImage={hasImage}
             isUpscaling={isUpscaling}
             showSettings={showSettings}
-            onUpload={triggerUpload}
-            onGenerate={handleGenerate}
-            onUpscale={handleUpscale}
-            onRemoveWatermark={() => console.log('去水印')}
-            onDownload={handleDownload}
-            onToggleSettings={() => setShowSettings(!showSettings)}
+            activeTool={activeTool}
+            onGenerate={() => {
+              setShowSettings(!showSettings);
+              setActiveTool(showSettings ? null : 'generate');
+            }}
+            onUpscale={() => {
+              handleUpscale();
+              setActiveTool('upscale');
+              setShowSettings(false);
+            }}
+            onRemoveWatermark={() => {
+              console.log('去水印');
+              setActiveTool('removeWatermark');
+              setShowSettings(false);
+            }}
+            onDownload={() => {
+              handleDownload();
+              setActiveTool('download');
+              setShowSettings(false);
+            }}
+            onMultiAngle={() => {
+              console.log('多角度');
+              setActiveTool('multiAngle');
+              setShowSettings(false);
+            }}
+            onLighting={() => {
+              console.log('打光');
+              setActiveTool('lighting');
+              setShowSettings(false);
+            }}
+            onToggleSettings={() => {
+              setShowSettings(!showSettings);
+              setActiveTool(showSettings ? null : 'generate');
+            }}
           />
-          
-          {/* 生成设置 */}
-          {showSettings && (
-            <GenerationSettings
-              prompt={data.prompt || ''}
-              aspectRatio={data.aspectRatio || '1:1'}
-              resolution={data.resolution || '1K'}
-              isProcessing={isProcessing}
-              onPromptChange={(v) => updateData('prompt', v)}
-              onAspectRatioChange={(v) => updateData('aspectRatio', v)}
-              onResolutionChange={(v) => updateData('resolution', v)}
-              onGenerate={() => {
-                setShowSettings(false);
-                handleGenerate();
-              }}
-            />
-          )}
+        </div>
+      )}
+
+      {/* 生成设置 - 紧挨着图片下方 */}
+      {selected && showSettings && (
+        <div className="absolute -bottom-1 left-0 right-0 z-10">
+          <GenerationSettings
+            prompt={data.prompt || ''}
+            aspectRatio={data.aspectRatio || '1:1'}
+            resolution={data.resolution || '1K'}
+            isProcessing={isProcessing}
+            onPromptChange={(v) => updateData('prompt', v)}
+            onAspectRatioChange={(v) => updateData('aspectRatio', v)}
+            onResolutionChange={(v) => updateData('resolution', v)}
+            onGenerate={() => {
+              setShowSettings(false);
+              handleGenerate();
+            }}
+          />
         </div>
       )}
     </div>

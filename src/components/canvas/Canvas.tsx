@@ -303,7 +303,9 @@ export default function Canvas() {
         onDragOver={handleDragOver}
         onContextMenu={handleContextMenu}
         onDoubleClick={handleDoubleClick}
-        onClick={onCanvasClick}
+        onClick={() => {
+          clearSelection(); // 点击空白区域取消节点选中
+        }}
       >
         <div
           className="absolute inset-0 origin-top-left canvas-content"

@@ -16,3 +16,5 @@ export * from './user';
 export * from './approval';
 export * from './systemPrompt';
 export * from './runningHub/api';
+export * from './vod';
+export * from './promptGen';

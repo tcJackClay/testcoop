@@ -200,6 +200,36 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
         onRetry={handleSaveToAsset}
       />
 
+      {/* 生成标签 - 左下角 */}
+      {(() => {
+        const ext2 = data.ex2 || data.ext2;
+        if (!ext2) return null;
+        
+        let processChain: Array<{ type: string; prompt?: string; timestamp: number }> = [];
+        try {
+          processChain = JSON.parse(ext2);
+        } catch {
+          return null;
+        }
+        
+        const generationInfo = processChain.find((item: { type: string }) => item.type === '生成');
+        if (!generationInfo) return null;
+        
+        return (
+          <div className="absolute bottom-2 left-2 z-10 group">
+            <div className="bg-pink-500/80 text-white text-[10px] px-2 py-0.5 rounded-full">
+              生成
+            </div>
+            {/* 悬浮显示 prompt */}
+            {generationInfo.prompt && (
+              <div className="absolute bottom-full left-0 mb-1 bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity max-w-[200px] truncate">
+                {generationInfo.prompt}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* 处理链图片 */}
       {processChainImages.length > 0 && (
         <div className="absolute bottom-2 right-2 z-10 flex gap-1">

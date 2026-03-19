@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { aspectRatioOptions, resolutionOptions } from './nodeConstants';
+import { useCanvasStore } from '../../stores/canvasStore';
+import { generateImage } from '../../api/promptGen';
 
 interface PromptNodeProps {
   nodeId: string;
@@ -20,10 +22,52 @@ export default function PromptNode({ nodeId, data, updateData }: PromptNodeProps
   const aspectRatio = data.aspectRatio as string || '1:1';
   const resolution = data.resolution as string || '1K';
 
-  const handleGenerate = () => {
-    if (status !== 'processing') {
-      updateData('status', 'processing');
-      // TODO: 调用实际的生成API
+  const handleGenerate = async () => {
+    if (!prompt.trim() || status === 'processing') return;
+    
+    updateData('status', 'processing');
+    
+    try {
+      const result = await generateImage(prompt, {
+        aspectRatio,
+        resolution,
+      });
+      
+      console.log('[PromptNode] 生成成功:', result);
+      
+      // 创建 ImageNode
+      const { nodes, addNode, addConnection } = useCanvasStore.getState();
+      const promptNode = nodes.find(n => n.id === nodeId);
+      
+      if (promptNode) {
+        // 计算新节点位置（在当前节点右侧 350px）
+        const newNodeX = promptNode.position.x + 350;
+        const newNodeY = promptNode.position.y;
+        
+        // 创建 ImageNode
+        const imageNodeId = `image-${Date.now()}`;
+        addNode('imageNode', { x: newNodeX, y: newNodeY }, {
+          data: {
+            imageUrl: result.imageUrl,
+            assetId: result.imageId,
+            label: '生成结果',
+            processInfo: '生成',
+            ext2: JSON.stringify([{
+              type: '生成',
+              prompt: prompt,
+              timestamp: Date.now()
+            }])
+          }
+        });
+        
+        // 创建连线
+        addConnection(nodeId, imageNodeId, 'default');
+        
+        updateData('status', 'completed');
+      }
+    } catch (error) {
+      console.error('[PromptNode] 生成失败:', error);
+      updateData('status', 'failed');
     }
   };
 

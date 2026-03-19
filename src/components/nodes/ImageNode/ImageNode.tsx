@@ -10,6 +10,9 @@ import { ImageToolbar } from './ImageToolbar';
 import { GenerationSettings } from './GenerationSettings';
 import { ImagePreview } from './ImagePreview';
 import { ProcessInfo } from './ProcessInfo';
+import { generateImage } from '@/api/promptGen';
+import { getInputAssetId, appendToAssetChain } from '@/utils/assetChain';
+import { useCanvasStore } from '@/stores/canvasStore';
 import type { ImageNodeData } from './ImageNode.types';
 
 interface ImageNodeProps {
@@ -69,45 +72,56 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
     updateData('status', 'processing');
 
     try {
-      const generateFunc = DEFAULT_FUNCTIONS.find(f => f.id === 'ai_image_generate');
-      if (!generateFunc) {
-        throw new Error('未找到图片生成功能');
+      // 如果已有图片，需要先上传到 OSS 获取 URL
+      let imageURL: string | undefined;
+      if (displayImageUrl && !displayImageUrl.startsWith('data:') && !displayImageUrl.startsWith('blob:')) {
+        // 已有图片 URL，直接使用
+        imageURL = displayImageUrl;
+      } else if (displayImageUrl && (displayImageUrl.startsWith('data:') || displayImageUrl.startsWith('blob:'))) {
+        // base64 或 blob，需要上传到 OSS
+        const { uploadToOSS } = await import('@/api/oss');
+        const projectId = useCanvasStore.getState().currentProjectId || 1;
+        // 将 base64 转为 File 上传
+        const base64Data = displayImageUrl.split(',')[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const file = new File([bytes], 'input.png', { type: 'image/png' });
+        imageURL = await uploadToOSS(file, projectId);
+      }
+      
+      console.log('[ImageNode] 生成图片, imageURL:', imageURL);
+
+      // 调用生成 API（与 PromptNode 相同）
+      const result = await generateImage(data.prompt, {
+        aspectRatio: data.aspectRatio || '1:1',
+        resolution: data.resolution || '1K',
+      });
+
+      console.log('[ImageNode] 生成成功:', result);
+
+      // 更新当前节点
+      updateData('imageUrl', result.imageUrl);
+      updateData('assetId', result.imageId);
+      updateData('status', 'completed');
+      updateData('processInfo', '生成');
+
+      // 记录流程线：检查上游是否有资产
+      const inputAssetId = getInputAssetId(nodeId);
+      if (inputAssetId) {
+        console.log('[ImageNode] 上游有资产，记录流程线:', inputAssetId);
+        await appendToAssetChain(inputAssetId, {
+          type: '生成',
+          targetId: result.imageId,
+          prompt: data.prompt,
+          timestamp: Date.now()
+        });
+      } else {
+        console.log('[ImageNode] 上游无资产，不需要记录流程线');
       }
 
-      const { nodeInfoList } = await runningHubApi.getNodeInfo(generateFunc.webappId!);
-
-      const taskResult = await runningHubApi.submitTaskDirect(generateFunc.webappId!, [
-        {
-          nodeId: nodeInfoList[0].nodeId,
-          fieldName: nodeInfoList[0].fieldName,
-          fieldValue: JSON.stringify({
-            prompt: data.prompt,
-            aspect_ratio: data.aspectRatio || '1:1',
-            resolution: data.resolution || '1K',
-          })
-        }
-      ]);
-
-      if (!taskResult.success) {
-        throw new Error('任务提交失败');
-      }
-
-      // 轮询获取结果...
-      const pollTask = async () => {
-        const result = await runningHubApi.queryTaskDirect(taskResult.taskId!);
-        
-        if (result.status === 'success' && result.imageUrl) {
-          updateData('imageUrl', result.imageUrl);
-          updateData('status', 'completed');
-        } else if (result.status === 'failed') {
-          updateData('status', 'failed');
-          updateData('error', result.error || '生成失败');
-        } else {
-          setTimeout(pollTask, 2000);
-        }
-      };
-
-      pollTask();
     } catch (err) {
       console.error('[ImageNode] 生成失败:', err);
       updateData('status', 'failed');

@@ -1,4 +1,4 @@
-import { Settings, Zap, MessageSquare, Layers, LogIn, LogOut, User } from 'lucide-react';
+import { Settings, Layers, LogIn, LogOut, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ViewMode } from '../../App';
 import { useAuthStore } from '../../stores/authStore';
@@ -8,25 +8,19 @@ interface HeaderProps {
   viewMode: ViewMode;
   onViewChange: (mode: ViewMode) => void;
   onSettingsClick: () => void;
-  onChatClick?: () => void;
-  chatOpen?: boolean;
   onProjectClick?: () => void;
   onLogout?: () => void;
 }
 
 const navItems: { key: ViewMode; labelKey: string }[] = [
   { key: 'canvas', labelKey: 'nav.canvas' },
-  { key: 'storyboard', labelKey: 'nav.storyboard' },
   { key: 'history', labelKey: 'nav.history' },
-  { key: 'models', labelKey: 'nav.models' },
 ];
 
 export default function Header({ 
   viewMode, 
   onViewChange, 
   onSettingsClick, 
-  onChatClick, 
-  chatOpen,
   onProjectClick,
   onLogout
 }: HeaderProps) {
@@ -67,8 +61,8 @@ export default function Header({
         {/* Project Name (clickable to open projects) */}
         <span
           onClick={onProjectClick}
-          className={`ml-2 text-xs cursor-pointer hover:underline ${
-            currentProject ? 'text-white' : 'text-yellow-400'
+          className={`ml-2 px-2 py-0.5 rounded text-xs cursor-pointer hover:underline ${
+            currentProject ? 'bg-blue-600/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'
           }`}
           title={currentProject ? '点击管理项目' : '请先选择项目'}
         >
@@ -97,35 +91,8 @@ export default function Header({
         ))}
       </div>
 
-      {/* Right Section: Performance + Chat + Settings + Auth */}
+      {/* Right Section: Settings + Auth */}
       <div className="flex items-center gap-2">
-        {/* Performance Mode */}
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
-          title="性能模式"
-        >
-          <Zap size={12} />
-          <span>正常</span>
-        </button>
-
-        {/* Chat Button */}
-        {onChatClick && (
-          <button
-            onClick={onChatClick}
-            disabled={!canNavigate}
-            className={`p-2 rounded-md transition-colors ${
-              chatOpen
-                ? 'bg-blue-600 text-white'
-                : canNavigate
-                  ? 'text-gray-400 hover:text-white hover:bg-gray-800'
-                  : 'text-gray-600 cursor-not-allowed'
-            }`}
-            title={!canNavigate ? '请先选择项目' : 'AI 对话'}
-          >
-            <MessageSquare size={16} />
-          </button>
-        )}
-        
         {/* Settings Button */}
         <button
           onClick={onSettingsClick}

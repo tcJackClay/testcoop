@@ -72,8 +72,6 @@ export default function CanvasPage() {
         viewMode={viewMode}
         onViewChange={handleViewChange}
         onSettingsClick={() => setShowSettings(true)}
-        onChatClick={() => handleRightPanelChange('chat')}
-        chatOpen={rightPanel === 'chat'}
         onProjectClick={handleProjectClick}
         onLogout={handleLogout}
       />

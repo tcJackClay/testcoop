@@ -27,6 +27,7 @@ export default function History() {
     performanceMode,
     filterType,
     filterStatus,
+    filterTemp,
     page,
     pageSize,
     total,
@@ -35,6 +36,7 @@ export default function History() {
     clearAll,
     setFilterType,
     setFilterStatus,
+    setFilterTemp,
     setPerformanceMode,
     getFilteredItems,
   } = useHistoryStore();
@@ -175,6 +177,19 @@ export default function History() {
               <option value="success">{t('history.success')}</option>
               <option value="failed">{t('history.failed')}</option>
               <option value="pending">{t('history.pending')}</option>
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-400">资产:</span>
+            <select
+              value={filterTemp}
+              onChange={(e) => setFilterTemp(e.target.value as any)}
+              className="select w-32"
+            >
+              <option value="all">全部</option>
+              <option value="temp">临时资产</option>
+              <option value="permanent">正式资产</option>
             </select>
           </div>
         </div>

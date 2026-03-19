@@ -20,6 +20,7 @@ interface HistoryState {
   // Filters
   filterType: HistoryItemType | 'all';
   filterStatus: HistoryItemStatus | 'all';
+  filterTemp: 'all' | 'temp' | 'permanent';
   
   // Actions
   addItem: (item: Omit<HistoryItem, 'id' | 'createTime'>) => void;
@@ -31,6 +32,7 @@ interface HistoryState {
   // Filters
   setFilterType: (type: HistoryItemType | 'all') => void;
   setFilterStatus: (status: HistoryItemStatus | 'all') => void;
+  setFilterTemp: (filter: 'all' | 'temp' | 'permanent') => void;
   setPage: (page: number) => void;
   
   // Performance
@@ -66,6 +68,7 @@ export const useHistoryStore = create<HistoryState>()(
       total: 0,
       filterType: 'all',
       filterStatus: 'all',
+      filterTemp: 'all',
 
       addItem: (item) => {
         const newItem: HistoryItem = {
@@ -111,6 +114,10 @@ export const useHistoryStore = create<HistoryState>()(
         set({ filterStatus: status, page: 1 });
       },
 
+      setFilterTemp: (filter) => {
+        set({ filterTemp: filter, page: 1 });
+      },
+
       setPage: (page) => {
         set({ page });
       },
@@ -124,10 +131,20 @@ export const useHistoryStore = create<HistoryState>()(
       },
 
       getFilteredItems: () => {
-        const { items, filterType, filterStatus } = get();
+        const { items, filterType, filterStatus, filterTemp } = get();
         return items.filter((item) => {
           if (filterType !== 'all' && item.type !== filterType) return false;
           if (filterStatus !== 'all' && item.status !== filterStatus) return false;
+          
+          // 按临时/永久筛选
+          if (filterTemp !== 'all') {
+            const isTemp = item.imageUrls?.some((url: string) => url.includes('temp/')) || 
+                          item.videoUrl?.includes('temp/') ||
+                          item.thumbnailUrl?.includes('temp/');
+            if (filterTemp === 'temp' && !isTemp) return false;
+            if (filterTemp === 'permanent' && isTemp) return false;
+          }
+          
           return true;
         });
       },

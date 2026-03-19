@@ -4,6 +4,7 @@ import { Sparkles } from 'lucide-react';
 import { aspectRatioOptions, resolutionOptions } from './nodeConstants';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { generateImage } from '../../api/promptGen';
+import { getInputAssetId, appendToAssetChain } from '../../utils/assetChain';
 
 interface PromptNodeProps {
   nodeId: string;
@@ -62,6 +63,20 @@ export default function PromptNode({ nodeId, data, updateData }: PromptNodeProps
         
         // 创建连线
         addConnection(nodeId, imageNodeId, 'default');
+        
+        // 检查上游是否有资产，如果有则更新上游的 ext2
+        const inputAssetId = getInputAssetId(nodeId);
+        if (inputAssetId) {
+          console.log('[PromptNode] 上游有资产，记录流程线:', inputAssetId);
+          await appendToAssetChain(inputAssetId, {
+            type: '生成',
+            targetId: result.imageId,
+            prompt: prompt,
+            timestamp: Date.now()
+          });
+        } else {
+          console.log('[PromptNode] 上游无资产，不需要记录流程线');
+        }
         
         updateData('status', 'completed');
       }

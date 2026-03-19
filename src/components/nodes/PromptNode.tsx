@@ -90,7 +90,10 @@ export default function PromptNode({ nodeId, data, updateData }: PromptNodeProps
         <select
           className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
           value={aspectRatio}
-          onChange={(e) => updateData('aspectRatio', e.target.value)}
+          onChange={(e) => {
+            e.preventDefault();
+            updateData('aspectRatio', e.target.value)
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {aspectRatioOptions.map((opt) => (
@@ -100,7 +103,10 @@ export default function PromptNode({ nodeId, data, updateData }: PromptNodeProps
         <select
           className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white"
           value={resolution}
-          onChange={(e) => updateData('resolution', e.target.value)}
+          onChange={(e) => {
+            e.preventDefault();
+            updateData('resolution', e.target.value)
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           {resolutionOptions.map((opt) => (
@@ -108,10 +114,15 @@ export default function PromptNode({ nodeId, data, updateData }: PromptNodeProps
           ))}
         </select>
         <button
+          type="button"
           className={`flex-1 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 ${
             status === 'processing' ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600 text-white'
           }`}
-          onClick={handleGenerate}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleGenerate();
+          }}
           disabled={status === 'processing'}
         >
           {status === 'processing' ? (

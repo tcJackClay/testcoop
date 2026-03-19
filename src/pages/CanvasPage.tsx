@@ -103,7 +103,7 @@ export default function CanvasPage() {
           {viewMode === 'canvas' && (
             <div className="flex-1 flex">
               <div className="flex-1">
-                <Canvas />
+                <Canvas leftPanelOpen={!!leftPanel} />
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, Undo2, Redo2 } from 'lucide-react';
+import { Trash2, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Home } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useAssetStore } from '../../stores';
 
@@ -153,6 +153,90 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
             <Trash2 className="w-4 h-4" />
           </button>
         )}
+        
+        {/* 缩放控制 */}
+        <div className="flex items-center gap-1 ml-2 border-l border-gray-700 pl-2">
+          <button
+            onClick={() => {
+              const rect = document.body.getBoundingClientRect();
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+              const worldX = (centerX - viewPort.x) / viewPort.zoom;
+              const worldY = (centerY - viewPort.y) / viewPort.zoom;
+              const newZoom = Math.max(viewPort.zoom / 1.2, 0.1);
+              const x = centerX - worldX * newZoom;
+              const y = centerY - worldY * newZoom;
+              useCanvasStore.getState().updateViewPort({ x, y, zoom: newZoom });
+            }}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            title="缩小"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          
+          <span className="text-xs text-gray-400 min-w-[40px] text-center">
+            {Math.round(viewPort.zoom * 100)}%
+          </span>
+          
+          <button
+            onClick={() => {
+              const rect = document.body.getBoundingClientRect();
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+              const worldX = (centerX - viewPort.x) / viewPort.zoom;
+              const worldY = (centerY - viewPort.y) / viewPort.zoom;
+              const newZoom = Math.min(viewPort.zoom * 1.2, 3);
+              const x = centerX - worldX * newZoom;
+              const y = centerY - worldY * newZoom;
+              useCanvasStore.getState().updateViewPort({ x, y, zoom: newZoom });
+            }}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            title="放大"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={() => {
+              const nodes = useCanvasStore.getState().nodes;
+              if (nodes.length === 0) {
+                useCanvasStore.getState().updateViewPort({ x: 0, y: 0, zoom: 1 });
+                return;
+              }
+              const rect = document.body.getBoundingClientRect();
+              const padding = 50;
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              nodes.forEach(node => {
+                minX = Math.min(minX, node.position.x);
+                minY = Math.min(minY, node.position.y);
+                maxX = Math.max(maxX, node.position.x + (node.width || 200));
+                maxY = Math.max(maxY, node.position.y + (node.height || 120));
+              });
+              const contentWidth = maxX - minX;
+              const contentHeight = maxY - minY;
+              const canvasWidth = rect.width - padding * 2;
+              const canvasHeight = rect.height - padding * 2;
+              const zoom = Math.min(canvasWidth / contentWidth, canvasHeight / contentHeight, 1.5);
+              const centerX = (minX + maxX) / 2;
+              const centerY = (minY + maxY) / 2;
+              const x = rect.width / 2 - centerX * zoom;
+              const y = rect.height / 2 - centerY * zoom;
+              useCanvasStore.getState().updateViewPort({ x, y, zoom });
+            }}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            title="适应窗口"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+          
+          <button
+            onClick={() => useCanvasStore.getState().updateViewPort({ x: 0, y: 0, zoom: 1 })}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            title="回到原点"
+          >
+            <Home className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

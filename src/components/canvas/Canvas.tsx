@@ -8,6 +8,10 @@ import CanvasContextMenu from './CanvasContextMenu';
 import { useCanvasConnections } from './useCanvasConnections';
 import FlowLinesManager from './FlowLinesManager';
 
+interface CanvasProps {
+  leftPanelOpen?: boolean;
+}
+
 interface ContextMenuState {
   visible: boolean;
   x: number;
@@ -16,7 +20,7 @@ interface ContextMenuState {
   worldY: number;
 }
 
-export default function Canvas() {
+export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -26,6 +30,8 @@ export default function Canvas() {
   const [selectionStart, setSelectionStart] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, worldX: 0, worldY: 0 });
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+  const [showHelp, setShowHelp] = useState(true);
   
   const { 
     nodes, viewPort, addNode, updateViewPort,
@@ -71,13 +77,36 @@ export default function Canvas() {
     }
   }, [flowLineCount]);
 
-  // 滚轮缩放
+  // 缩放状态提示
+  const [zoomTip, setZoomTip] = useState<string | null>(null);
+
+  // 滚轮缩放 - 以鼠标为中心
   const handleWheelNative = useCallback((e: WheelEvent) => {
     e.preventDefault();
+    if (!containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // 缩放前鼠标在世界坐标的位置
+    const worldX = (mouseX - viewPort.x) / viewPort.zoom;
+    const worldY = (mouseY - viewPort.y) / viewPort.zoom;
+    
+    // 计算新缩放
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
-    updateViewPort({ zoom: newZoom });
-  }, [viewPort.zoom, updateViewPort]);
+    
+    // 缩放后保持鼠标位置不变
+    const newX = mouseX - worldX * newZoom;
+    const newY = mouseY - worldY * newZoom;
+    
+    updateViewPort({ x: newX, y: newY, zoom: newZoom });
+    
+    // 显示缩放提示
+    setZoomTip(`${Math.round(newZoom * 100)}%`);
+    setTimeout(() => setZoomTip(null), 800);
+  }, [viewPort.zoom, viewPort.x, viewPort.y, updateViewPort]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -86,16 +115,106 @@ export default function Canvas() {
     return () => element.removeEventListener('wheel', handleWheelNative);
   }, [handleWheelNative]);
 
-  // 缩放控制
-  const handleZoomIn = useCallback(() => updateViewPort({ zoom: Math.min(viewPort.zoom * 1.2, 3) }), [viewPort.zoom, updateViewPort]);
-  const handleZoomOut = useCallback(() => updateViewPort({ zoom: Math.max(viewPort.zoom / 1.2, 0.1) }), [viewPort.zoom, updateViewPort]);
-  const handleFitView = useCallback(() => updateViewPort({ x: 0, y: 0, zoom: 1 }), [updateViewPort]);
+  // 缩放控制 - 以画布中心为中心
+  const handleZoomIn = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const worldX = (centerX - viewPort.x) / viewPort.zoom;
+    const worldY = (centerY - viewPort.y) / viewPort.zoom;
+    
+    const newZoom = Math.min(viewPort.zoom * 1.2, 3);
+    const newX = centerX - worldX * newZoom;
+    const newY = centerY - worldY * newZoom;
+    
+    updateViewPort({ x: newX, y: newY, zoom: newZoom });
+    setZoomTip(`${Math.round(newZoom * 100)}%`);
+    setTimeout(() => setZoomTip(null), 800);
+  }, [viewPort, updateViewPort]);
+
+  const handleZoomOut = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const worldX = (centerX - viewPort.x) / viewPort.zoom;
+    const worldY = (centerY - viewPort.y) / viewPort.zoom;
+    
+    const newZoom = Math.max(viewPort.zoom / 1.2, 0.1);
+    const newX = centerX - worldX * newZoom;
+    const newY = centerY - worldY * newZoom;
+    
+    updateViewPort({ x: newX, y: newY, zoom: newZoom });
+    setZoomTip(`${Math.round(newZoom * 100)}%`);
+    setTimeout(() => setZoomTip(null), 800);
+  }, [viewPort, updateViewPort]);
+
+  // 适应窗口 - 让所有节点适应画布
+  const handleFitView = useCallback(() => {
+    if (nodes.length === 0) {
+      updateViewPort({ x: 0, y: 0, zoom: 1 });
+      return;
+    }
+    
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const padding = 50;
+    
+    // 计算所有节点的边界
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(node => {
+      minX = Math.min(minX, node.position.x);
+      minY = Math.min(minY, node.position.y);
+      maxX = Math.max(maxX, node.position.x + (node.width || 200));
+      maxY = Math.max(maxY, node.position.y + (node.height || 120));
+    });
+    
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    const canvasWidth = rect.width - padding * 2;
+    const canvasHeight = rect.height - padding * 2;
+    
+    const zoom = Math.min(canvasWidth / contentWidth, canvasHeight / contentHeight, 1.5);
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    
+    const x = rect.width / 2 - centerX * zoom;
+    const y = rect.height / 2 - centerY * zoom;
+    
+    updateViewPort({ x, y, zoom });
+    setZoomTip(`${Math.round(zoom * 100)}%`);
+    setTimeout(() => setZoomTip(null), 800);
+  }, [nodes, updateViewPort]);
+
+  // 回到原点
+  const handleResetView = useCallback(() => {
+    updateViewPort({ x: 0, y: 0, zoom: 1 });
+    setZoomTip('100%');
+    setTimeout(() => setZoomTip(null), 800);
+  }, [updateViewPort]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    // React 事件处理同上
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const worldX = (mouseX - viewPort.x) / viewPort.zoom;
+    const worldY = (mouseY - viewPort.y) / viewPort.zoom;
+    
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
-    updateViewPort({ zoom: newZoom });
-  }, [viewPort.zoom, updateViewPort]);
+    const newX = mouseX - worldX * newZoom;
+    const newY = mouseY - worldY * newZoom;
+    
+    updateViewPort({ x: newX, y: newY, zoom: newZoom });
+    setZoomTip(`${Math.round(newZoom * 100)}%`);
+    setTimeout(() => setZoomTip(null), 800);
+  }, [viewPort, updateViewPort]);
 
   // 右键菜单
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -109,15 +228,20 @@ export default function Canvas() {
   }, [viewPort.x, viewPort.y, viewPort.zoom]);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains('canvas-content')) return;
-    e.preventDefault();
+    // 双击空白处复位视图
+    if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('canvas-content')) {
+      e.preventDefault();
+      handleResetView();
+      return;
+    }
+    // 双击节点显示上下文菜单（保留原有功能）
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const worldX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
       const worldY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
       setContextMenu({ visible: true, x: e.clientX, y: e.clientY, worldX, worldY });
     }
-  }, [viewPort.x, viewPort.y, viewPort.zoom]);
+  }, [viewPort.x, viewPort.y, viewPort.zoom, handleResetView]);
 
   const closeContextMenu = useCallback(() => setContextMenu(prev => ({ ...prev, visible: false })), []);
   
@@ -145,8 +269,8 @@ export default function Canvas() {
       return;
     }
 
-    // 平移模式
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // 平移模式：鼠标中键 或 Alt+左键 或 空格+左键
+    if (e.button === 1 || (e.button === 0 && (e.altKey || e.shiftKey)) || (e.button === 0 && isSpacePressed)) {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX - viewPort.x, y: e.clientY - viewPort.y });
@@ -370,6 +494,11 @@ export default function Canvas() {
   // 键盘事件
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 空格键按下 - 用于平移画布
+      if (e.key === ' ' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        setIsSpacePressed(true);
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') { e.preventDefault(); copyNodes(); }
@@ -384,8 +513,19 @@ export default function Canvas() {
         onCanvasClick(); // 取消连线
       }
     };
+    
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        setIsSpacePressed(false);
+      }
+    };
+    
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection, copyNodes, pasteNodes, onCanvasClick]);
 
   useEffect(() => {
@@ -431,10 +571,39 @@ export default function Canvas() {
 
       <CanvasToolbar viewPort={viewPort} />
 
+      {/* 操作提示 - 左下角，左侧边栏展开时隐藏 */}
+      {!leftPanelOpen && (
+        <button
+          onClick={() => setShowHelp(!showHelp)}
+          className="absolute bottom-4 left-4 z-40 w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 shadow-lg border border-gray-700 transition-transform hover:scale-110"
+          title={showHelp ? "隐藏操作提示" : "显示操作提示"}
+        >
+          ?
+        </button>
+      )}
+      
+      {/* 提示内容 - 展开时显示在 ? 按钮右侧，左侧边栏展开时也隐藏 */}
+      {showHelp && !leftPanelOpen && (
+        <div className="absolute bottom-4 left-14 z-40 bg-gray-900/95 text-gray-300 text-xs px-3 py-2 rounded-lg shadow-lg border border-gray-700">
+          <div className="flex items-center gap-4">
+            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">滚轮</kbd> 缩放</p>
+            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">中键</kbd> / <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">Alt</kbd> 平移</p>
+            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">双击</kbd> 复位</p>
+            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">Del</kbd> 删除</p>
+          </div>
+        </div>
+      )}
+
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden canvas-grid"
-        style={{ cursor: isPanning ? 'grabbing' : isSelecting ? 'crosshair' : connectingSource ? 'crosshair' : 'default' }}
+        style={{ 
+          cursor: isPanning ? 'grabbing' 
+            : isSelecting ? 'crosshair' 
+            : connectingSource ? 'crosshair' 
+            : isSpacePressed ? 'grab' 
+            : 'default' 
+        }}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

@@ -116,16 +116,24 @@ async function saveToAssetLibrary(
 // 向量引擎生成图片
 async function generateByVector(
   prompt: string,
-  options: GenerateOptions
+  options: GenerateOptions,
+  imageURL?: string
 ): Promise<VodGenerateImageResponse> {
+  const requestBody: Record<string, unknown> = {
+    prompt,
+    aspectRatio: options.aspectRatio,
+    width: parseResolution(options.resolution).width,
+    height: parseResolution(options.resolution).height,
+  }
+  
+  // 如果有输入图片，添加 imageURL
+  if (imageURL) {
+    requestBody.imageURL = imageURL
+  }
+  
   const response = await apiClient.post<ApiResponse<VodGenerateImageResponse>>(
     '/vector/generate-image',
-    {
-      prompt,
-      aspectRatio: options.aspectRatio,
-      width: parseResolution(options.resolution).width,
-      height: parseResolution(options.resolution).height,
-    }
+    requestBody
   )
   
   if (response.data.code !== 0 || !response.data.data) {
@@ -138,15 +146,21 @@ async function generateByVector(
 // 腾讯云 VOD 生成图片
 async function generateByTencent(
   prompt: string,
-  options: GenerateOptions
+  options: GenerateOptions,
+  imageURL?: string
 ): Promise<VodGenerateImageResponse> {
   // 直接用 fetch 发送请求
   const token = localStorage.getItem('auth_token')
-  const requestBody = {
+  const requestBody: Record<string, unknown> = {
     prompt,
     aspectRatio: options.aspectRatio,
     imageSize: options.resolution,
     subAppId: 1254529958,
+  }
+  
+  // 如果有输入图片，添加 imageURL
+  if (imageURL) {
+    requestBody.imageURL = imageURL
   }
   
   console.log('[PromptGen] ===== 腾讯云 VOD 请求 =====')
@@ -196,7 +210,8 @@ function parseResolution(resolution: string): { width: number; height: number } 
 // 主生成函数
 export async function generateImage(
   prompt: string,
-  options: GenerateOptions
+  options: GenerateOptions,
+  imageURL?: string  // 可选的输入图片 URL
 ): Promise<GenerateResult> {
   const projectId = useProjectStore.getState().currentProjectId
   if (!projectId) {
@@ -210,14 +225,14 @@ export async function generateImage(
   let imageUrl: string
   
   if (engine === 'tencent') {
-    const result = await generateByTencent(prompt, options)
+    const result = await generateByTencent(prompt, options, imageURL)
     console.log('[PromptGen] 腾讯云返回结果:', result)
     imageUrl = result.imageUrl
     if (!imageUrl) {
       throw new Error('生成图片返回 URL 为空')
     }
   } else {
-    const result = await generateByVector(prompt, options)
+    const result = await generateByVector(prompt, options, imageURL)
     // 向量引擎可能返回 base64
     if (result.imageUrl.startsWith('data:')) {
       // 转为 File 上传

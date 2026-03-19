@@ -78,8 +78,7 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
         // 已有图片 URL，直接使用
         imageURL = displayImageUrl;
       } else if (displayImageUrl && (displayImageUrl.startsWith('data:') || displayImageUrl.startsWith('blob:'))) {
-        // base64 或 blob，需要上传到 OSS
-        const { uploadToOSS } = await import('@/api/oss');
+        // base64 或 blob，需要上传到 OSS（临时路径）
         const projectId = useCanvasStore.getState().currentProjectId || 1;
         // 将 base64 转为 File 上传
         const base64Data = displayImageUrl.split(',')[1];
@@ -89,37 +88,74 @@ export default function ImageNode({ nodeId, data, updateData, selected = false }
           bytes[i] = binaryString.charCodeAt(i);
         }
         const file = new File([bytes], 'input.png', { type: 'image/png' });
-        imageURL = await uploadToOSS(file, projectId);
+        // 使用临时路径上传
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substr(2, 9);
+        const ossKey = `temp/${projectId}/${timestamp}_${random}.png`;
+        const { default: OSS } = await import('ali-oss');
+        const { default: apiClient } = await import('@/api/client');
+        const stsResponse = await apiClient.get('/oss/sts-credentials');
+        const credentials = stsResponse.data.data;
+        const client = new OSS({
+          bucket: 'huanu',
+          endpoint: 'https://oss-cn-hangzhou.aliyuncs.com',
+          accessKeyId: credentials.accessKeyId,
+          accessKeySecret: credentials.accessKeySecret,
+          stsToken: credentials.securityToken,
+        });
+        const result = await client.put(ossKey, file);
+        imageURL = result.url;
       }
       
       console.log('[ImageNode] 生成图片, imageURL:', imageURL);
 
-      // 调用生成 API（与 PromptNode 相同）
+      // 调用生成 API（与 PromptNode 相同），传递 imageURL
       const result = await generateImage(data.prompt, {
         aspectRatio: data.aspectRatio || '1:1',
         resolution: data.resolution || '1K',
-      });
+      }, imageURL);
 
       console.log('[ImageNode] 生成成功:', result);
 
-      // 更新当前节点
-      updateData('imageUrl', result.imageUrl);
-      updateData('assetId', result.imageId);
-      updateData('status', 'completed');
-      updateData('processInfo', '生成');
-
-      // 记录流程线：检查上游是否有资产
-      const inputAssetId = getInputAssetId(nodeId);
-      if (inputAssetId) {
-        console.log('[ImageNode] 上游有资产，记录流程线:', inputAssetId);
-        await appendToAssetChain(inputAssetId, {
-          type: '生成',
-          targetId: result.imageId,
-          prompt: data.prompt,
-          timestamp: Date.now()
+      // 创建新 ImageNode（新节点在当前节点右侧 350px）
+      const { nodes, addNode, addConnection } = useCanvasStore.getState();
+      const currentNode = nodes.find(n => n.id === nodeId);
+      
+      if (currentNode) {
+        const newNodeX = currentNode.position.x + 350;
+        const newNodeY = currentNode.position.y;
+        
+        const newImageNodeId = `image-${Date.now()}`;
+        addNode('imageNode', { x: newNodeX, y: newNodeY }, {
+          data: {
+            imageUrl: result.imageUrl,
+            assetId: result.imageId,
+            label: '生成结果',
+            processInfo: '生成',
+            ext2: JSON.stringify([{
+              type: '生成',
+              prompt: data.prompt,
+              timestamp: Date.now()
+            }])
+          }
         });
-      } else {
-        console.log('[ImageNode] 上游无资产，不需要记录流程线');
+        
+        // 创建连线
+        addConnection(nodeId, newImageNodeId, 'default');
+        
+        // 记录流程线：检查上游是否有资产
+        const inputAssetId = getInputAssetId(nodeId);
+        if (inputAssetId) {
+          console.log('[ImageNode] 上游有资产，记录流程线:', inputAssetId);
+          await appendToAssetChain(inputAssetId, {
+            type: '生成',
+            targetId: result.imageId,
+            prompt: data.prompt,
+            timestamp: Date.now()
+          });
+        } else {
+          console.log('[ImageNode] 上游无资产，不需要记录流程线');
+        }
       }
 
     } catch (err) {

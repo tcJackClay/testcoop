@@ -2,8 +2,7 @@
  * useImageUpload - 图片上传逻辑
  */
 import { useRef, useCallback } from 'react';
-import { imageApi } from '@/api/image';
-import { uploadToOSS } from '@/api/oss';
+import { apiClient } from '@/api/client';
 
 interface UseImageUploadOptions {
   nodeId: string;
@@ -26,18 +25,44 @@ export function useImageUpload({ nodeId, data, updateData, onImageLoaded }: UseI
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 读取文件为 base64（用于即时预览）
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
+    const projectId = getProjectId();
+
+    try {
+      // 直接上传到 OSS（临时路径）
+      const timestamp = Date.now();
+      const random = Math.random().toString(36).substr(2, 9);
+      const ossKey = `temp/${projectId}/${timestamp}_${random}.${file.name.split('.').pop() || 'png'}`;
       
-      // ========== 只显示预览，不上传 ==========
-      updateData('imageUrl', base64);
+      console.log('[useImageUpload] 开始上传, projectId:', projectId, 'ossKey:', ossKey);
+      
+      // @ts-ignore
+      const OSS = (await import('ali-oss')).default;
+      const stsResponse = await apiClient.get('/oss/sts-credentials');
+      console.log('[useImageUpload] STS 响应:', stsResponse.data);
+      
+      const credentials = stsResponse.data.data;
+      if (!credentials) {
+        throw new Error('获取 STS 凭证失败: ' + JSON.stringify(stsResponse.data));
+      }
+      
+      const client = new OSS({
+        bucket: 'huanu',
+        endpoint: 'https://oss-cn-hangzhou.aliyuncs.com',
+        accessKeyId: credentials.accessKeyId,
+        accessKeySecret: credentials.accessKeySecret,
+        stsToken: credentials.securityToken,
+      });
+      
+      const result = await client.put(ossKey, file);
+      console.log('[useImageUpload] 上传结果:', result);
+      const ossUrl = result.url;
+      
+      // 存储 OSS URL 而不是 base64
+      updateData('imageUrl', ossUrl);
       updateData('status', 'idle');
-      // 上传由用户主动触发（如点击"保存"按钮）
-      // ========================================
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('[useImageUpload] 上传失败:', error);
+    }
 
     // 清空 input，允许重复选择同一文件
     e.target.value = '';

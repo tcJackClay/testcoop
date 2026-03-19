@@ -7,6 +7,7 @@ import CanvasToolbar from './CanvasToolbar';
 import CanvasContextMenu from './CanvasContextMenu';
 import { useCanvasConnections } from './useCanvasConnections';
 import FlowLinesManager from './FlowLinesManager';
+import FlowLines from './FlowLines';
 
 interface CanvasProps {
   leftPanelOpen?: boolean;
@@ -620,6 +621,9 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
         >
           {/* 连线渲染器 */}
           <ConnectionRenderer />
+
+          {/* 流程线（自动检测连线中的资产关系） */}
+          <FlowLines />
 
           {/* 流程线管理 */}
           <FlowLinesManager assetInfo={assetInfo} onComplete={() => setFlowLineCount(c => c + 1)} />

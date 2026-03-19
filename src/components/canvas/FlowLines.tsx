@@ -1,5 +1,5 @@
 // FlowLines.tsx - SVG 流程线组件
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useCanvasStore } from '../../stores/canvasStore';
 
 interface FlowLine {
@@ -11,23 +11,51 @@ interface FlowLine {
 }
 
 interface FlowLinesProps {
-  lines: FlowLine[];
+  lines?: FlowLine[];
 }
 
-export default function FlowLines({ lines }: FlowLinesProps) {
-  const { viewPort, nodes } = useCanvasStore();
-  const [animatedLines, setAnimatedLines] = useState<FlowLine[]>([]);
+export default function FlowLines({ lines = [] }: FlowLinesProps) {
+  const { viewPort, nodes, connections } = useCanvasStore();
 
-  // 监听节点变化，更新连线位置并过滤已删除的节点
-  useEffect(() => {
-    if (lines.length === 0) {
-      setAnimatedLines([]);
-      return;
+  // 使用 useMemo 计算流程线，避免无限循环
+  const animatedLines = useMemo(() => {
+    const allLines: FlowLine[] = [...lines];
+    
+    // 从普通连线上检测是否有 assetId 关联
+    const nodeAssetMap = new Map<string, number>();  // nodeId -> assetId
+    nodes.forEach(node => {
+      if (node.data?.assetId) {
+        nodeAssetMap.set(node.id, node.data.assetId as number);
+      }
+    });
+    
+    // 检查普通连线，如果两端都有 assetId，则添加为流程线
+    connections.forEach(conn => {
+      const sourceAssetId = nodeAssetMap.get(conn.sourceId);
+      const targetAssetId = nodeAssetMap.get(conn.targetId);
+      
+      if (sourceAssetId && targetAssetId) {
+        // 检查是否已经存在
+        const exists = allLines.some(l => 
+          l.sourceId === sourceAssetId && l.targetId === targetAssetId
+        );
+        if (!exists) {
+          allLines.push({
+            sourceId: sourceAssetId,
+            targetId: targetAssetId,
+            type: '流程'
+          });
+        }
+      }
+    });
+    
+    if (allLines.length === 0) {
+      return [];
     }
 
     const nodeAssetIds = new Set(nodes.map(n => n.data?.assetId));
 
-    const updated = lines
+    return allLines
       .filter(link => nodeAssetIds.has(link.sourceId) && nodeAssetIds.has(link.targetId))
       .map(link => {
         const sourceNode = nodes.find(n => n.data?.assetId === link.sourceId);
@@ -42,9 +70,7 @@ export default function FlowLines({ lines }: FlowLinesProps) {
         }
         return link;
       });
-
-    setAnimatedLines(updated);
-  }, [lines, nodes]);
+  }, [lines, nodes, connections]);
 
   if (animatedLines.length === 0) return null;
 

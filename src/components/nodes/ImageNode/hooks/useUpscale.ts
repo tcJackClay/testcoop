@@ -285,6 +285,17 @@ export function useUpscale({ nodeId, data, updateData, displayImageUrl }: UseUps
       updateData('status', 'completed');
       updateData('processInfo', '高清放大');
 
+      // 触发浏览器下载
+      if (resultImageUrl) {
+        const link = document.createElement('a');
+        link.href = resultImageUrl;
+        link.download = `${data.label || '图片'}-高清放大-${Date.now()}.png`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
     } catch (err) {
       console.error('[useUpscale] 高清放大失败:', err);
       updateData('status', 'failed');

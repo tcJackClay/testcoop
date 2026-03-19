@@ -56,6 +56,12 @@ export default function Canvas() {
   const [assetInfo, setAssetInfo] = useState<{ x: number; y: number; id: number; name: string; ext2?: string; assetData?: any } | null>(null);
   const [flowLineCount, setFlowLineCount] = useState(0);
   
+  // 重复资产确认对话框状态
+  const [duplicateAsset, setDuplicateAsset] = useState<{
+    x: number; y: number; id: number; name: string; ext2?: string; assetData?: any;
+    existingNodeId: string;
+  } | null>(null);
+  
   // 监听流程线数量变化后清空 assetInfo
   useEffect(() => {
     if (assetInfo && flowLineCount > 0) {
@@ -201,6 +207,23 @@ export default function Canvas() {
         
         console.log('[Canvas] 拖放资产:', asset.name, 'ext2:', assetExt2, 'processChain:', processChain);
         
+        // ========== 检查画布是否已有该资产 ==========
+        const existingNode = nodes.find(n => n.data?.assetId === asset.id);
+        if (existingNode) {
+          console.log('[Canvas] 画布已有该资产:', asset.name, 'existing node:', existingNode.id);
+          // 弹出确认对话框
+          setDuplicateAsset({
+            x,
+            y,
+            id: asset.id,
+            name: asset.name,
+            ext2: assetExt2,
+            assetData: asset,
+            existingNodeId: existingNode.id,
+          });
+          return;
+        }
+        
         // 如果有生成历史，触发 FlowLinesManager 处理
         if (processChain.length > 0) {
           console.log('[Canvas] 触发流程线渲染, asset:', asset.name);
@@ -252,11 +275,96 @@ export default function Canvas() {
       const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
       addNode(nodeType as NodeType, { x, y });
     }
-  }, [addNode, viewPort.x, viewPort.y, viewPort.zoom]);
+  }, [addNode, viewPort.x, viewPort.y, viewPort.zoom, nodes]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // 处理重复资产的确认 - 移动画布到原有资产位置
+  const handleMoveToExisting = useCallback(() => {
+    if (!duplicateAsset) return;
+    
+    const { existingNodeId } = duplicateAsset;
+    const { nodes, updateViewPort } = useCanvasStore.getState();
+    
+    // 找到原有节点的位置
+    const existingNode = nodes.find(n => n.id === existingNodeId);
+    if (existingNode) {
+      // 计算合适的缩放比例，使节点能完整显示
+      const canvasWidth = containerRef.current?.clientWidth || 800;
+      const canvasHeight = containerRef.current?.clientHeight || 600;
+      const nodeWidth = existingNode.width || 200;
+      const nodeHeight = existingNode.height || 120;
+      
+      // 计算缩放比例（留出边距）
+      const zoomX = (canvasWidth * 0.8) / nodeWidth;
+      const zoomY = (canvasHeight * 0.8) / nodeHeight;
+      const zoom = Math.min(Math.min(zoomX, zoomY), 1.5);  // 最大1.5倍
+      
+      // 计算居中位置
+      const x = -existingNode.position.x * zoom + canvasWidth / 2 - (nodeWidth * zoom) / 2;
+      const y = -existingNode.position.y * zoom + canvasHeight / 2 - (nodeHeight * zoom) / 2;
+      updateViewPort({ x, y, zoom });
+      
+      // 选中该节点
+      useCanvasStore.getState().selectNode(existingNodeId);
+    }
+    
+    console.log('[Canvas] 已移动画布到原有资产位置');
+    setDuplicateAsset(null);
+  }, [duplicateAsset]);
+
+  // 处理重复资产的确认 - 删除原有节点并重新创建
+  const handleCreateNew = useCallback(() => {
+    if (!duplicateAsset) return;
+    
+    const { x, y, id, name, ext2, assetData, existingNodeId } = duplicateAsset;
+    const { nodes, deleteNode } = useCanvasStore.getState();
+    const processChain = ext2 ? JSON.parse(ext2) : [];
+    
+    // 收集需要删除的节点ID（包括原有节点和其流程下的所有子节点）
+    const nodesToDelete = new Set<string>([existingNodeId]);
+    
+    if (processChain.length > 0) {
+      // 找出流程下的所有子节点（根据 assetId 匹配）
+      processChain.forEach((item: { targetId: number }) => {
+        const childNode = nodes.find(n => n.data?.assetId === item.targetId);
+        if (childNode) {
+          nodesToDelete.add(childNode.id);
+        }
+      });
+    }
+    
+    // 删除所有相关节点
+    nodesToDelete.forEach(nodeId => deleteNode(nodeId));
+    
+    console.log('[Canvas] 已删除节点:', Array.from(nodesToDelete));
+    
+    // 然后创建新节点
+    if (processChain.length > 0) {
+      // 触发流程线渲染
+      setAssetInfo({ x, y, id, name, ext2, assetData });
+    } else {
+      // 立即创建节点
+      addNode('imageNode', { x, y }, {
+        data: {
+          imageUrl: id?.toString() || '',
+          assetId: id,
+          label: name || assetData?.resourceName || 'Asset',
+          assetData: assetData,
+        }
+      });
+    }
+    
+    console.log('[Canvas] 已删除原有节点及其流程并在新位置创建');
+    setDuplicateAsset(null);
+  }, [duplicateAsset, addNode]);
+
+  // 取消重复资产确认
+  const handleCancelDuplicate = useCallback(() => {
+    setDuplicateAsset(null);
   }, []);
 
   // 键盘事件
@@ -290,6 +398,37 @@ export default function Canvas() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* 重复资产确认对话框 */}
+      {duplicateAsset && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-gray-800 rounded-lg p-4 shadow-xl border border-gray-700">
+            <p className="text-white text-sm mb-3">
+              资产 <span className="text-pink-400 font-medium">{duplicateAsset.name}</span> 已在画布中
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleMoveToExisting}
+                className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors"
+              >
+                移动到资产
+              </button>
+              <button
+                onClick={handleCreateNew}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                重新创建
+              </button>
+              <button
+                onClick={handleCancelDuplicate}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <CanvasToolbar viewPort={viewPort} />
 
       <div

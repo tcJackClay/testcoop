@@ -174,7 +174,13 @@ async function generateByTencent(
     throw new Error(`腾讯云 VOD 生成失败: ${JSON.stringify(result)}`)
   }
   
-  return result.data
+  // 兼容 imageUrl 和 url 两种返回格式
+  return {
+    imageUrl: result.data.imageUrl || result.data.url || result.data.base64,
+    imageId: result.data.imageId || '',
+    width: result.data.width,
+    height: result.data.height,
+  }
 }
 
 // 解析分辨率
@@ -205,7 +211,11 @@ export async function generateImage(
   
   if (engine === 'tencent') {
     const result = await generateByTencent(prompt, options)
+    console.log('[PromptGen] 腾讯云返回结果:', result)
     imageUrl = result.imageUrl
+    if (!imageUrl) {
+      throw new Error('生成图片返回 URL 为空')
+    }
   } else {
     const result = await generateByVector(prompt, options)
     // 向量引擎可能返回 base64

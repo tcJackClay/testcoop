@@ -62,9 +62,11 @@ export default function LoginPage() {
         <div className="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <LogIn className="w-8 h-8 text-blue-400" />
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              className="w-20 h-20 object-contain mx-auto mb-4"
+            />
             <h1 className="text-2xl font-bold text-white">AIGC 协作平台</h1>
             <p className="text-gray-400 mt-2">
               登录您的账户

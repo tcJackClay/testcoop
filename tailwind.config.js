@@ -7,17 +7,18 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Brand Primary - From Logo (#0090FF)
         primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
+          50: '#e6f4ff',
+          100: '#cce8ff',
+          200: '#99d1ff',
+          300: '#66baff',
+          400: '#33a3ff',
+          500: '#0090ff',
+          600: '#0073cc',
+          700: '#005599',
+          800: '#003866',
+          900: '#001b33',
         },
         // Custom dark theme colors (OKLCH-inspired)
         dark: {
@@ -73,13 +74,13 @@ export default {
         'slow': '300ms',
         'slower': '500ms',
       },
-      // Custom ring colors for focus states
+      // Custom ring colors for focus states - Brand #0090FF
       ringColor: {
-        'brand': '#60a5fa',
-        'brand-hover': '#93c5fd',
+        'brand': '#0090ff',
+        'brand-hover': '#33a3ff',
       },
       ringOffsetColor: {
-        'brand': '#1e3a5f',
+        'brand': '#004080',
       },
       // Spacing system - 4px base grid
       spacing: {

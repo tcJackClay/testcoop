@@ -51,9 +51,11 @@ export default function Header({
       {/* Left Section: Logo + Project Name */}
       <div className="flex items-center gap-3">
         {/* Logo */}
-        <div className="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-md flex items-center justify-center">
-          <Layers size={16} className="text-white" />
-        </div>
+        <img 
+          src="/logo.png" 
+          alt="Logo" 
+          className="h-7 w-auto object-contain"
+        />
         <span className="font-bold text-sm text-gray-200 tracking-wide">
           Huanu Canvas
         </span>

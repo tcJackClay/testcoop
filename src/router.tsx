@@ -1,12 +1,33 @@
 // src/router.tsx - 路由配置
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
-import { useEffect, useState, ReactNode, useRef } from 'react';
+import { useEffect, useState, ReactNode, useRef, lazy, Suspense } from 'react';
 
-// 页面组件（直接导入）
-import LoginPage from './pages/LoginPage';
-import ProjectsPage from './pages/ProjectsPage';
-import CanvasPage from './pages/CanvasPage';
+// 页面组件（懒加载 - 代码分割）
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const CanvasPage = lazy(() => import('./pages/CanvasPage'));
+
+// 懒加载加载组件
+function PageLoader() {
+  return (
+    <div className="h-screen flex items-center justify-center bg-dark-bg">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+        <span className="text-gray-400 text-sm">加载中...</span>
+      </div>
+    </div>
+  );
+}
+
+// 懒加载包装组件
+function LazyWrapper({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {children}
+    </Suspense>
+  );
+}
 
 // 检查是否有 token（直接从 localStorage）
 const hasToken = (): boolean => {
@@ -65,7 +86,9 @@ export const router = createBrowserRouter([
     path: '/login',
     element: (
       <PublicRoute>
-        <LoginPage />
+        <LazyWrapper>
+          <LoginPage />
+        </LazyWrapper>
       </PublicRoute>
     ),
   },
@@ -73,7 +96,9 @@ export const router = createBrowserRouter([
     path: '/projects',
     element: (
       <ProtectedRoute>
-        <ProjectsPage />
+        <LazyWrapper>
+          <ProjectsPage />
+        </LazyWrapper>
       </ProtectedRoute>
     )
   },
@@ -81,7 +106,9 @@ export const router = createBrowserRouter([
     path: '/canvas',
     element: (
       <ProtectedRoute>
-        <CanvasPage />
+        <LazyWrapper>
+          <CanvasPage />
+        </LazyWrapper>
       </ProtectedRoute>
     )
   },

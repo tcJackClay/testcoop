@@ -67,7 +67,7 @@ export default function CanvasPage() {
   const showSidebar = viewMode === 'canvas';
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden">
+    <div className="h-screen flex flex-col bg-dark-bg text-white overflow-hidden">
       <Header
         viewMode={viewMode}
         onViewChange={handleViewChange}

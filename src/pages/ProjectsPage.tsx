@@ -141,7 +141,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    <div className="h-screen flex flex-col bg-dark-bg">
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">

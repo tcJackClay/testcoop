@@ -9,6 +9,7 @@ export interface CanvasNodesSlice {
   deleteNode: (id: string) => void;
   deleteSelectedNodes: () => void;
   moveNode: (id: string, position: { x: number; y: number }) => void;
+  moveSelectedNodes: (deltaX: number, deltaY: number) => void;
   selectNode: (id: string, multi?: boolean) => void;
   clearSelection: () => void;
   selectNodesInBox: (box: { x: number; y: number; width: number; height: number }) => void;
@@ -69,7 +70,28 @@ export const createCanvasNodesSlice: StateCreator<CanvasState, [], [], CanvasNod
     }));
   },
 
-  // Select a node (single or multi-select with Ctrl/Cmd)
+  // Move all selected nodes by delta
+  moveSelectedNodes: (deltaX, deltaY) => {
+    const { selectedNodeIds, nodes } = get();
+    if (selectedNodeIds.length === 0) return;
+    
+    set((state) => ({
+      nodes: state.nodes.map((n) => {
+        if (selectedNodeIds.includes(n.id)) {
+          return {
+            ...n,
+            position: {
+              x: n.position.x + deltaX,
+              y: n.position.y + deltaY,
+            },
+          };
+        }
+        return n;
+      }),
+    }));
+  },
+
+  // Select a node (single or multi-select with Shift)
   selectNode: (id, multi = false) => {
     set((state) => {
       if (multi) {

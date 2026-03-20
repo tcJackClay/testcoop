@@ -144,11 +144,14 @@ export default function NodeRenderer({
   onDeleteConnection
 }: NodeRendererProps) {
 
-  const { selectNode, moveNode, selectedNodeIds, viewPort, deleteNode, executeNode, updateNode } = useCanvasStore();
+  const { selectNode, moveNode, moveSelectedNodes, selectedNodeIds, viewPort, deleteNode, executeNode, updateNode } = useCanvasStore();
   const [isDragging, setIsDragging] = useState(false);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(node.data.label as string || '');
   const dragOffset = useRef({ x: 0, y: 0 });
+  const lastMousePos = useRef({ x: 0, y: 0 });
+  // 记录拖动开始时选中的节点ID列表，用于批量移动判断
+  const draggedNodeIds = useRef<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const isSelected = selectedNodeIds.includes(node.id);
 
@@ -207,6 +210,19 @@ export default function NodeRenderer({
       e.stopPropagation();
       setIsDragging(true);
 
+      // 获取当前选中的节点
+      const currentSelected = [...selectedNodeIds];
+      
+      // 检查点击的节点是否已经在选中列表中
+      const isAlreadySelected = currentSelected.includes(node.id);
+      
+      // 如果节点不在选中列表中，才需要处理选择
+      // 如果节点已选中，直接开始拖动，不重复调用 selectNode
+      if (!isAlreadySelected) {
+        // 新选择：Shift 则多选，否则单选
+        selectNode(node.id, e.shiftKey);
+      }
+
       const canvasContainer = document.querySelector('.canvas-content') as HTMLElement;
       if (canvasContainer) {
         const rect = canvasContainer.getBoundingClientRect();
@@ -216,10 +232,11 @@ export default function NodeRenderer({
           x: mouseX - node.position.x,
           y: mouseY - node.position.y,
         };
+        // 初始化最后鼠标位置
+        lastMousePos.current = { x: mouseX, y: mouseY };
       }
-      selectNode(node.id, e.shiftKey);
     },
-    [node.position, node.id, selectNode, viewPort.zoom, connectingSource]
+    [node.position, node.id, selectNode, selectedNodeIds, viewPort.zoom, connectingSource]
   );
 
   const handleMouseMove = useCallback(
@@ -230,16 +247,37 @@ export default function NodeRenderer({
         const rect = canvasContainer.getBoundingClientRect();
         const mouseX = (e.clientX - rect.left) / viewPort.zoom;
         const mouseY = (e.clientY - rect.top) / viewPort.zoom;
-        const newX = mouseX - dragOffset.current.x;
-        const newY = mouseY - dragOffset.current.y;
-        moveNode(node.id, { x: newX, y: newY });
+        
+        // 计算移动增量
+        const deltaX = mouseX - lastMousePos.current.x;
+        const deltaY = mouseY - lastMousePos.current.y;
+        
+        // 更新最后位置
+        lastMousePos.current = { x: mouseX, y: mouseY };
+        
+        // 实时从 store 获取选中的节点
+        const currentSelectedIds = useCanvasStore.getState().selectedNodeIds;
+        
+        // 如果当前节点在选中列表中且有多个选中
+        const isInSelection = currentSelectedIds.includes(node.id);
+        const shouldMultiMove = isInSelection && currentSelectedIds.length > 1;
+        
+        if (shouldMultiMove) {
+          moveSelectedNodes(deltaX, deltaY);
+        } else {
+          // 单节点移动
+          const newX = mouseX - dragOffset.current.x;
+          const newY = mouseY - dragOffset.current.y;
+          moveNode(node.id, { x: newX, y: newY });
+        }
       }
     },
-    [isDragging, node.id, moveNode, viewPort.zoom]
+    [isDragging, node.id, moveNode, moveSelectedNodes, viewPort.zoom]
   );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    draggedNodeIds.current = [];
   }, []);
 
   useEffect(() => {

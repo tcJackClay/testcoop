@@ -3,6 +3,7 @@ import { Sparkles, ArrowDown } from 'lucide-react';
 import { useAssetStore, useProjectStore, useCanvasStore } from '../../stores';
 import { imageApi } from '../../api/image';
 import { uploadToOSS } from '../../api/oss';
+import { projectApi } from '../../api/project';
 import { assetTypeOptions } from './nodeConstants';
 import { useMemo } from 'react';
 
@@ -169,8 +170,14 @@ export default function CreateAssetNode({ nodeId, data, updateData }: CreateAsse
           const ext = extMatch?.[1] || 'png';
           const file = new File([blob], `${safeName}.${ext}`, { type: `image/${ext}` });
           
-          // 上传到 OSS，返回完整 URL
-          uploadedUrl = await uploadToOSS(file, projectId);
+          // 上传到 OSS，返回完整 URL，成功后记录到历史
+          uploadedUrl = await uploadToOSS(file, projectId, async (key, url) => {
+            await projectApi.addHistoryRecord(projectId, {
+              name: key,
+              url: url,
+              type: 'image'
+            })
+          });
           console.log('[CreateAssetNode] OSS 上传成功:', uploadedUrl);
           
           if (!uploadedUrl) {

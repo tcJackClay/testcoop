@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Image, Video, Grid3X3, List, Loader2, Layout, Check, FolderOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { listProjectImages, listProjectVideos, type OSSFile } from '../../api/oss';
+import { projectApi, type HistoryRecord } from '../../api/project';
 import { useProjectStore } from '../../stores/projectStore';
 
 type ViewMode = 'grid' | 'list';
@@ -11,32 +11,33 @@ export default function GenerationHistory() {
   const { t } = useTranslation();
   const [mediaType, setMediaType] = useState<MediaType>('image');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [files, setFiles] = useState<OSSFile[]>([]);
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
   const { currentProject } = useProjectStore();
   const projectId = currentProject?.id || 1;
 
-  // 加载文件列表
+  // 加载历史记录（从 project.ext2）
   useEffect(() => {
-    const loadFiles = async () => {
+    const loadHistory = async () => {
       setLoading(true);
       try {
-        const data = mediaType === 'image' 
-          ? await listProjectImages(projectId, 100)
-          : await listProjectVideos(projectId, 100);
-        setFiles(data);
+        const data = await projectApi.getHistory(projectId);
+        setHistory(data);
       } catch (error) {
-        console.error('加载文件列表失败:', error);
-        setFiles([]);
+        console.error('加载历史记录失败:', error);
+        setHistory([]);
       } finally {
         setLoading(false);
       }
     };
     
-    loadFiles();
-  }, [mediaType, projectId]);
+    loadHistory();
+  }, [projectId]);
+
+  // 根据媒体类型过滤
+  const files = history.filter(item => item.type === mediaType);
 
   // 切换单个选择
   const toggleSelect = (fileName: string) => {
@@ -59,7 +60,7 @@ export default function GenerationHistory() {
   };
 
   // 拖拽开始
-  const handleDragStart = (e: React.DragEvent, file: OSSFile) => {
+  const handleDragStart = (e: React.DragEvent, file: HistoryRecord) => {
     const dragData = {
       id: file.url,
       name: file.name.split('/').pop() || 'image',
@@ -207,7 +208,7 @@ export default function GenerationHistory() {
                 
                 {/* 时间标签 */}
                 <div className="absolute bottom-0 left-0 right-0 text-[10px] text-white/80 bg-black/50 px-2 py-1 truncate">
-                  {formatTime(file.lastModified)}
+                  {formatTime(file.createdAt)}
                 </div>
               </div>
             ))}
@@ -246,7 +247,7 @@ export default function GenerationHistory() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-300 truncate">{file.name.split('/').pop()}</p>
                   <p className="text-xs text-gray-500">
-                    {formatTime(file.lastModified)} · {formatSize(file.size)}
+                    {formatTime(file.createdAt)}{file.size ? ` · ${formatSize(file.size)}` : ''}
                   </p>
                 </div>
 

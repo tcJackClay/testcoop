@@ -78,6 +78,15 @@ const convertToViewModel = (project: any): ProjectView => {
   };
 };
 
+// 历史记录项类型
+export interface HistoryRecord {
+  name: string
+  url: string
+  createdAt: string
+  type: 'image' | 'video'
+  size?: number
+}
+
 export const projectApi = {
   /**
    * 获取所有项目
@@ -93,6 +102,70 @@ export const projectApi = {
   getById: async (id: number): Promise<ApiResponse<Project>> => {
     const response = await apiClient.get(`/project/${id}`)
     return response.data
+  },
+
+  /**
+   * 获取项目历史记录（从 ext2 解析）
+   */
+  getHistory: async (projectId: number): Promise<HistoryRecord[]> => {
+    const response = await apiClient.get(`/project/${projectId}`)
+    const res = response.data
+    
+    if (res.code === 0 && res.data?.ext2) {
+      try {
+        const history = JSON.parse(res.data.ext2)
+        return Array.isArray(history) ? history : []
+      } catch (e) {
+        console.error('[projectApi.getHistory] 解析 ext2 失败:', e)
+        return []
+      }
+    }
+    return []
+  },
+
+  /**
+   * 添加历史记录到项目 ext2
+   */
+  addHistoryRecord: async (
+    projectId: number, 
+    record: Omit<HistoryRecord, 'createdAt'>
+  ): Promise<boolean> => {
+    try {
+      // 先获取当前 ext2
+      const response = await apiClient.get(`/project/${projectId}`)
+      const res = response.data
+      
+      let history: HistoryRecord[] = []
+      if (res.code === 0 && res.data?.ext2) {
+        try {
+          history = JSON.parse(res.data.ext2)
+        } catch (e) {
+          history = []
+        }
+      }
+      
+      // 添加新记录
+      const newRecord: HistoryRecord = {
+        ...record,
+        createdAt: new Date().toISOString()
+      }
+      history.unshift(newRecord)
+      
+      // 限制最多 100 条
+      if (history.length > 100) {
+        history = history.slice(0, 100)
+      }
+      
+      // 更新 ext2
+      const updateResponse = await apiClient.put(`/project/${projectId}`, {
+        ext2: JSON.stringify(history)
+      })
+      
+      return updateResponse.data.code === 0
+    } catch (e) {
+      console.error('[projectApi.addHistoryRecord] 更新失败:', e)
+      return false
+    }
   },
 
   /**

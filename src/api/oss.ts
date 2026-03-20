@@ -71,10 +71,14 @@ function generateOSSKey(fileName: string, projectId: number): string {
 
 /**
  * 使用 ali-oss SDK 上传文件
+ * @param file 要上传的文件
+ * @param projectId 项目 ID
+ * @param onSuccess 上传成功后的回调（异步），参数为 OSS key
  */
 export async function uploadToOSS(
   file: File,
-  projectId: number
+  projectId: number,
+  onSuccess?: (key: string, url: string) => Promise<void>
 ): Promise<string> {
   console.log('[OSS] ====== 开始上传流程 ======');
   
@@ -119,6 +123,13 @@ export async function uploadToOSS(
   console.log('[OSS Step 5] 上传成功, url:', url);
   console.log('[OSS] ====== 上传流程结束 ======');
   
+  // 5. 上传成功后异步执行回调
+  if (onSuccess) {
+    onSuccess(key, url).catch(err => {
+      console.error('[OSS] 上传成功回调执行失败:', err);
+    });
+  }
+  
   return url;
 }
 
@@ -160,13 +171,24 @@ export async function listProjectFiles(projectId: number, limit: number = 100): 
   // 获取 STS 凭证
   const credentials = await getSTSCredentials();
   
-  // 创建 OSS 客户端
+  // 创建 OSS 客户端（带自动刷新凭证）
   const client = new OSS({
     bucket: OSS_CONFIG.bucket,
     endpoint: OSS_CONFIG.endpoint,
     accessKeyId: credentials.accessKeyId,
     accessKeySecret: credentials.accessKeySecret,
     stsToken: credentials.securityToken,
+    // 自动刷新凭证
+    refreshSTSToken: async () => {
+      console.log('[OSS] 凭证即将过期，自动刷新...');
+      const newCredentials = await getSTSCredentials();
+      return {
+        accessKeyId: newCredentials.accessKeyId,
+        accessKeySecret: newCredentials.accessKeySecret,
+        stsToken: newCredentials.securityToken,
+      };
+    },
+    refreshSTSTokenInterval: 30 * 60 * 1000, // 每30分钟检查刷新
   });
   
   const allFiles: OSSFile[] = [];

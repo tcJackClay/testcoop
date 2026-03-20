@@ -7,6 +7,7 @@ import { apiClient, ApiResponse } from './client'
 import { vodApi, type VodGenerateImageResponse } from './vod'
 import { uploadToOSS } from './oss'
 import { imageApi, type Image } from './image'
+import { projectApi } from './project'
 import { useProjectStore } from '../stores/projectStore'
 import { useAuthStore } from '../stores/authStore'
 
@@ -237,7 +238,14 @@ export async function generateImage(
     if (result.imageUrl.startsWith('data:')) {
       // 转为 File 上传
       const file = base64ToFile(result.imageUrl, 'generated.png')
-      const uploadResult = await uploadToOSS(file, projectId)
+      // 上传成功后异步记录到历史记录
+      const uploadResult = await uploadToOSS(file, projectId, async (key, url) => {
+        await projectApi.addHistoryRecord(projectId, {
+          name: key,
+          url: url,
+          type: 'image'
+        })
+      })
       imageUrl = uploadResult
     } else {
       imageUrl = result.imageUrl
@@ -246,9 +254,16 @@ export async function generateImage(
   
   console.log('[PromptGen] 原始图片 URL:', imageUrl)
   
-  // 2. 上传到 OSS 临时目录
+  // 2. 上传到 OSS 临时目录（也记录到历史）
   const tempUrl = await uploadToTempOSS(imageUrl, projectId)
   console.log('[PromptGen] OSS 临时 URL:', tempUrl)
+  
+  // 记录到历史记录
+  await projectApi.addHistoryRecord(projectId, {
+    name: tempUrl.split('/').pop() || '',
+    url: tempUrl,
+    type: 'image'
+  })
   
   // 3. 保存到资产库
   const asset = await saveToAssetLibrary(tempUrl, prompt, projectId)

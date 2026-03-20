@@ -47,7 +47,7 @@ export default function Header({
   };
 
   return (
-    <header className="h-12 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 z-50 shrink-0">
+    <header className="h-12 bg-dark-bg/95 border-b border-gray-800/50 flex items-center justify-between px-4 z-50 shrink-0 backdrop-blur-sm">
       {/* Left Section: Logo + Project Name */}
       <div className="flex items-center gap-3">
         {/* Logo */}
@@ -63,8 +63,8 @@ export default function Header({
         {/* Project Name (clickable to open projects) */}
         <span
           onClick={onProjectClick}
-          className={`ml-2 px-2 py-0.5 rounded text-xs cursor-pointer hover:underline ${
-            currentProject ? 'bg-blue-600/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'
+          className={`ml-2 px-2 py-0.5 rounded text-xs cursor-pointer hover:underline transition-all duration-150 ${
+            currentProject ? 'bg-primary-500/20 text-primary-400' : 'bg-yellow-500/20 text-yellow-400'
           }`}
           title={currentProject ? '点击管理项目' : '请先选择项目'}
         >
@@ -79,11 +79,11 @@ export default function Header({
             key={item.key}
             onClick={() => handleNavClick(item.key)}
             disabled={!canNavigate && item.key !== 'projects'}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
               viewMode === item.key
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25'
                 : canNavigate || item.key === 'projects'
-                  ? 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  ? 'text-gray-400 hover:text-primary-300 hover:bg-dark-surface'
                   : 'text-gray-600 cursor-not-allowed'
             }`}
             title={!canNavigate && item.key !== 'projects' ? '请先选择项目' : ''}
@@ -98,7 +98,7 @@ export default function Header({
         {/* Settings Button */}
         <button
           onClick={onSettingsClick}
-          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+          className="p-2 text-gray-400 hover:text-primary-300 hover:bg-dark-surface rounded-lg transition-all duration-150"
           title="设置"
         >
           <Settings size={16} />
@@ -108,7 +108,7 @@ export default function Header({
         {token && user ? (
           <div className="flex items-center gap-1">
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-dark-surface border border-gray-700 text-gray-300 hover:bg-dark-elevated transition-all duration-150"
               title={`当前用户: ${user.username}`}
             >
               <User size={12} />
@@ -116,7 +116,7 @@ export default function Header({
             </button>
             <button
               onClick={handleLogout}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
+              className="p-2 text-gray-400 hover:text-primary-300 hover:bg-dark-surface rounded-lg transition-all duration-150"
               title="登出"
             >
               <LogOut size={16} />
@@ -125,7 +125,7 @@ export default function Header({
         ) : (
           <button
             onClick={openLoginModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-500 hover:bg-primary-600 text-white transition-all duration-150 shadow-lg shadow-primary-500/25"
             title="登录"
           >
             <LogIn size={12} />

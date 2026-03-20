@@ -131,7 +131,7 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2">
                     <button
                       onClick={(e) => { e.stopPropagation(); sendToCanvas(item); }}
-                      className="p-2 bg-blue-600 hover:bg-blue-500 rounded-full"
+                      className="p-2 bg-primary-600 hover:bg-primary-500 rounded-full"
                       title="发送到画布"
                     >
                       <Layout size={16} />
@@ -204,7 +204,7 @@ export default function HistoryPanel({ onClose }: { onClose: () => void }) {
                   <div className="flex gap-1 shrink-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); sendToCanvas(item); }}
-                      className="p-1.5 bg-blue-600 hover:bg-blue-500 rounded"
+                      className="p-1.5 bg-primary-600 hover:bg-primary-500 rounded"
                       title="发送到画布"
                     >
                       <Layout size={14} />

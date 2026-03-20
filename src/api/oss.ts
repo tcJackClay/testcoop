@@ -61,12 +61,16 @@ async function getSTSCredentials() {
 
 /**
  * 生成 OSS 上传路径
+ * @param fileName 文件名
+ * @param projectId 项目 ID
+ * @param pathPrefix 路径前缀，默认 projects/{id}/assets/
  */
-function generateOSSKey(fileName: string, projectId: number): string {
+function generateOSSKey(fileName: string, projectId: number, pathPrefix?: string): string {
   const timestamp = Date.now();
   const ext = fileName.split('.').pop() || 'png';
   const random = Math.random().toString(36).substr(2, 9);
-  return `projects/${projectId}/assets/${timestamp}_${random}.${ext}`;
+  const prefix = pathPrefix || `projects/${projectId}/assets/`;
+  return `${prefix}${timestamp}_${random}.${ext}`;
 }
 
 /**
@@ -74,11 +78,13 @@ function generateOSSKey(fileName: string, projectId: number): string {
  * @param file 要上传的文件
  * @param projectId 项目 ID
  * @param onSuccess 上传成功后的回调（异步），参数为 OSS key
+ * @param pathPrefix 自定义路径前缀，如 temp/{id}/（可选）
  */
 export async function uploadToOSS(
   file: File,
   projectId: number,
-  onSuccess?: (key: string, url: string) => Promise<void>
+  onSuccess?: (key: string, url: string) => Promise<void>,
+  pathPrefix?: string
 ): Promise<string> {
   console.log('[OSS] ====== 开始上传流程 ======');
   
@@ -111,7 +117,7 @@ export async function uploadToOSS(
   console.log('[OSS Step 2] OSS 客户端创建成功');
   
   // 3. 生成 key 并上传
-  const key = generateOSSKey(file.name, projectId);
+  const key = generateOSSKey(file.name, projectId, pathPrefix);
   console.log('[OSS Step 3] 生成 key:', key);
   
   console.log('[OSS Step 4] 上传到 OSS...');

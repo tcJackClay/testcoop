@@ -2,7 +2,8 @@
  * useImageUpload - 图片上传逻辑
  */
 import { useRef, useCallback } from 'react';
-import { apiClient } from '@/api/client';
+import { uploadToOSS } from '@/api/oss';
+import { projectApi } from '@/api/project';
 
 interface UseImageUploadOptions {
   nodeId: string;
@@ -28,34 +29,25 @@ export function useImageUpload({ nodeId, data, updateData, onImageLoaded }: UseI
     const projectId = getProjectId();
 
     try {
-      // 直接上传到 OSS（临时路径）
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substr(2, 9);
-      const ossKey = `temp/${projectId}/${timestamp}_${random}.${file.name.split('.').pop() || 'png'}`;
+      console.log('[useImageUpload] 开始上传, projectId:', projectId);
       
-      console.log('[useImageUpload] 开始上传, projectId:', projectId, 'ossKey:', ossKey);
+      // 使用 uploadToOSS，上传成功后自动记录到历史
+      // temp/ 路径用于临时草稿图片
+      const ossUrl = await uploadToOSS(
+        file, 
+        projectId, 
+        async (key, url) => {
+          await projectApi.addHistoryRecord(projectId, {
+            name: key,
+            url: url,
+            type: 'image'
+          });
+          console.log('[useImageUpload] 已记录到历史记录:', key);
+        },
+        `temp/${projectId}/`
+      );
       
-      // @ts-ignore
-      const OSS = (await import('ali-oss')).default;
-      const stsResponse = await apiClient.get('/oss/sts-credentials');
-      console.log('[useImageUpload] STS 响应:', stsResponse.data);
-      
-      const credentials = stsResponse.data.data;
-      if (!credentials) {
-        throw new Error('获取 STS 凭证失败: ' + JSON.stringify(stsResponse.data));
-      }
-      
-      const client = new OSS({
-        bucket: 'huanu',
-        endpoint: 'https://oss-cn-hangzhou.aliyuncs.com',
-        accessKeyId: credentials.accessKeyId,
-        accessKeySecret: credentials.accessKeySecret,
-        stsToken: credentials.securityToken,
-      });
-      
-      const result = await client.put(ossKey, file);
-      console.log('[useImageUpload] 上传结果:', result);
-      const ossUrl = result.url;
+      console.log('[useImageUpload] 上传结果:', ossUrl);
       
       // 存储 OSS URL 而不是 base64
       updateData('imageUrl', ossUrl);

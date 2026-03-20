@@ -105,9 +105,9 @@ export default function CanvasPage() {
               </div>
             </div>
           )}
-          {viewMode === 'storyboard' && <Storyboard />}
-          {viewMode === 'history' && <History />}
-          {viewMode === 'models' && <Models />}
+          {viewMode === 'storyboard' && <div className="flex-1"><Storyboard /></div>}
+          {viewMode === 'history' && <div className="flex-1"><History /></div>}
+          {viewMode === 'models' && <div className="flex-1"><Models /></div>}
         </main>
 
         {/* Right Panel */}

@@ -45,10 +45,11 @@
   "nav": {
     "canvas": "Canvas",
     "storyboard": "Storyboard",
-    "history": "History",
+    "history": "Generation History",
     "models": "Models",
     "settings": "Settings"
   },
+  "files": "Load Queue",
   "canvas": {
     "addNode": "Add Node",
     "deleteNode": "Delete Node",

@@ -322,6 +322,20 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
         const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
         const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
         
+        // ========== 处理历史记录中的 OSS 文件（直接使用 URL）==========
+        if (asset.isHistoryFile && asset.imageUrl) {
+          console.log('[Canvas] 拖放历史文件:', asset.name, 'url:', asset.imageUrl);
+          
+          // 直接创建 ImageNode，使用 OSS URL
+          addNode('imageNode', { x, y }, {
+            data: {
+              imageUrl: asset.imageUrl,
+              label: asset.name || 'OSS Image',
+            }
+          });
+          return;
+        }
+        
         // ========== 优化：先用资产卡携带的数据立即响应，后台异步获取最新 ==========
         
         // 优先使用资产卡携带的 ext2（不阻塞拖拽）

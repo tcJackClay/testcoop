@@ -1,5 +1,5 @@
 import ChatPanel from '../../features/chat/ChatPanel';
-import HistoryPanel from '../../features/history/HistoryPanel';
+import FilesPanel from '../../features/history/FilesPanel';
 
 export type RightPanelType = 'chat' | 'history' | null;
 
@@ -14,7 +14,7 @@ export default function RightPanel({ type, onClose }: RightPanelProps) {
   return (
     <div className="w-80 border-l border-gray-700 bg-dark-surface shrink-0">
       {type === 'chat' && <ChatPanel onClose={onClose} />}
-      {type === 'history' && <HistoryPanel onClose={onClose} />}
+      {type === 'history' && <FilesPanel onClose={onClose} />}
     </div>
   );
 }

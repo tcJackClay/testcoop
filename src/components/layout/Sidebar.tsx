@@ -61,7 +61,7 @@ export default function Sidebar({
 
       {/* ===== 右侧面板按钮（下方）=====*/}
 
-      {/* 历史 - History (右侧) */}
+      {/* 文件 - Files (右侧) */}
       <button
         onClick={() => onRightPanelChange(rightPanel === 'history' ? null : 'history')}
         className={`p-2.5 rounded-xl transition-all duration-150 ease-out-expo ${
@@ -69,7 +69,7 @@ export default function Sidebar({
             ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' 
             : 'text-gray-400 hover:text-primary-300 hover:bg-dark-elevated'
         }`}
-        title={t('历史')}
+        title={t('files')}
       >
         <History size={18} />
       </button>

@@ -1,260 +1,257 @@
-import { useState, useMemo } from 'react';
-import { 
-  Image, 
-  Video, 
-  Trash2, 
-  Download, 
-  RefreshCw,
-  Filter,
-  Zap,
-  Grid3X3,
-  List
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Image, Video, Grid3X3, List, Loader2, Layout, Check, FolderOpen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useHistoryStore, type PerformanceMode } from '../../stores/historyStore';
-import HistoryCard from './HistoryCard';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import { listProjectImages, listProjectVideos, type OSSFile } from '../../api/oss';
+import { useProjectStore } from '../../stores/projectStore';
 
-export default function History() {
+type ViewMode = 'grid' | 'list';
+type MediaType = 'image' | 'video';
+
+export default function GenerationHistory() {
   const { t } = useTranslation();
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
+  const [mediaType, setMediaType] = useState<MediaType>('image');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [files, setFiles] = useState<OSSFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
-  const {
-    items,
-    selectedItemId,
-    performanceMode,
-    filterType,
-    filterStatus,
-    filterTemp,
-    page,
-    pageSize,
-    total,
-    selectItem,
-    deleteItem,
-    clearAll,
-    setFilterType,
-    setFilterStatus,
-    setFilterTemp,
-    setPerformanceMode,
-    getFilteredItems,
-  } = useHistoryStore();
+  const { currentProject } = useProjectStore();
+  const projectId = currentProject?.id || 1;
 
-  const filteredItems = useMemo(() => {
-    return getFilteredItems().slice((page - 1) * pageSize, page * pageSize * page);
-  }, [getFilteredItems, page, pageSize]);
-
-  const handleBatchDownload = async () => {
-    const zip = new JSZip();
-    const imageItems = filteredItems.filter((item) => item.type === 'image' && item.imageUrls);
-    
-    for (const item of imageItems) {
-      if (item.imageUrls) {
-        for (let i = 0; i < item.imageUrls.length; i++) {
-          try {
-            const response = await fetch(item.imageUrls![i]);
-            const blob = await response.blob();
-            zip.file(`${item.id}_${i}.png`, blob);
-          } catch (e) {
-            console.error('Failed to download image:', e);
-          }
-        }
+  // 加载文件列表
+  useEffect(() => {
+    const loadFiles = async () => {
+      setLoading(true);
+      try {
+        const data = mediaType === 'image' 
+          ? await listProjectImages(projectId, 100)
+          : await listProjectVideos(projectId, 100);
+        setFiles(data);
+      } catch (error) {
+        console.error('加载文件列表失败:', error);
+        setFiles([]);
+      } finally {
+        setLoading(false);
       }
-    }
+    };
     
-    const content = await zip.generateAsync({ type: 'blob' });
-    saveAs(content, `history_${Date.now()}.zip`);
+    loadFiles();
+  }, [mediaType, projectId]);
+
+  // 切换单个选择
+  const toggleSelect = (fileName: string) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(fileName)) {
+      newSelected.delete(fileName);
+    } else {
+      newSelected.add(fileName);
+    }
+    setSelectedItems(newSelected);
   };
 
-  const performanceModes: { value: PerformanceMode; label: string; icon: React.ReactNode }[] = [
-    { value: 'fast', label: t('history.performanceFast'), icon: <Zap className="w-4 h-4" /> },
-    { value: 'normal', label: t('history.performanceNormal'), icon: <Grid3X3 className="w-4 h-4" /> },
-    { value: 'off', label: t('history.performanceOff'), icon: <List className="w-4 h-4" /> },
-  ];
+  // 切换全选
+  const toggleSelectAll = () => {
+    if (selectedItems.size === files.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(files.map(f => f.name)));
+    }
+  };
+
+  // 拖拽开始
+  const handleDragStart = (e: React.DragEvent, file: OSSFile) => {
+    const dragData = {
+      id: file.url,
+      name: file.name.split('/').pop() || 'image',
+      resourceName: file.name.split('/').pop() || 'image',
+      imageUrl: file.url,
+      type: file.type,
+      url: file.url,
+      isHistoryFile: true,
+    };
+    
+    e.dataTransfer.setData('application/json', JSON.stringify(dragData));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  // 格式化时间
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('zh-CN', { 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // 格式化大小
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-dark-bg">
       {/* Toolbar */}
-      <div className="h-12 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
+      <div className="h-12 bg-dark-surface border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm ${
-              showFilters ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-            {t('history.filter')}
-          </button>
+          {/* 媒体类型切换 - 更小更简洁 */}
+          <div className="flex bg-gray-700/50 rounded-lg p-0.5">
+            <button
+              onClick={() => setMediaType('image')}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-150 ${
+                mediaType === 'image' 
+                  ? 'bg-primary-500 text-white shadow-sm' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-600'
+              }`}
+            >
+              <Image size={12} />
+              {t('history.image')}
+            </button>
+            <button
+              onClick={() => setMediaType('video')}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-150 ${
+                mediaType === 'video' 
+                  ? 'bg-primary-500 text-white shadow-sm' 
+                  : 'text-gray-400 hover:text-white hover:bg-gray-600'
+              }`}
+            >
+              <Video size={12} />
+              {t('history.video')}
+            </button>
+          </div>
           
-          {filterType !== 'all' && (
-            <span className="text-xs text-gray-500">
-              {filteredItems.length} {t('history.results')}
-            </span>
-          )}
+          <span className="text-xs text-gray-500">
+            {files.length}/100
+          </span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Performance Mode */}
-          <div className="flex bg-gray-700 rounded p-0.5">
-            {performanceModes.map((mode) => (
-              <button
-                key={mode.value}
-                onClick={() => setPerformanceMode(mode.value)}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                  performanceMode === mode.value ? 'bg-gray-600' : ''
-                }`}
-                title={mode.label}
-              >
-                {mode.icon}
-              </button>
-            ))}
-          </div>
+          {/* 全选 */}
+          {files.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white transition-colors rounded hover:bg-gray-600/50"
+            >
+              <Check size={12} className={selectedItems.size === files.length ? 'text-primary-400' : ''} />
+              {selectedItems.size === files.length ? '取消' : '全选'}
+            </button>
+          )}
 
           {/* View Mode */}
-          <div className="flex bg-gray-700 rounded p-0.5">
+          <div className="flex bg-gray-700/50 rounded-lg p-0.5">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-gray-600' : ''}`}
+              className={`p-1 rounded transition-all duration-150 ${
+                viewMode === 'grid' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-600'
+              }`}
             >
-              <Grid3X3 className="w-4 h-4" />
+              <Grid3X3 size={14} />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-gray-600' : ''}`}
+              className={`p-1 rounded transition-all duration-150 ${
+                viewMode === 'list' ? 'bg-gray-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-600'
+              }`}
             >
-              <List className="w-4 h-4" />
+              <List size={14} />
             </button>
           </div>
-
-          {/* Actions */}
-          {filteredItems.length > 0 && (
-            <>
-              <button
-                onClick={handleBatchDownload}
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-                title={t('history.downloadAll')}
-              >
-                <Download className="w-4 h-4" />
-              </button>
-              <button
-                onClick={clearAll}
-                className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded"
-                title={t('history.clearAll')}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </>
-          )}
         </div>
       </div>
 
-      {/* Filters */}
-      {showFilters && (
-        <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex gap-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">{t('history.type')}:</span>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value as any)}
-              className="select w-32"
-            >
-              <option value="all">{t('history.all')}</option>
-              <option value="image">{t('history.image')}</option>
-              <option value="video">{t('history.video')}</option>
-            </select>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">{t('history.status')}:</span>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as any)}
-              className="select w-32"
-            >
-              <option value="all">{t('history.all')}</option>
-              <option value="success">{t('history.success')}</option>
-              <option value="failed">{t('history.failed')}</option>
-              <option value="pending">{t('history.pending')}</option>
-            </select>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">资产:</span>
-            <select
-              value={filterTemp}
-              onChange={(e) => setFilterTemp(e.target.value as any)}
-              className="select w-32"
-            >
-              <option value="all">全部</option>
-              <option value="temp">临时资产</option>
-              <option value="permanent">正式资产</option>
-            </select>
-          </div>
-        </div>
-      )}
-
       {/* Content */}
       <div className="flex-1 overflow-auto p-4">
-        {filteredItems.length === 0 ? (
+        {loading ? (
+          <div className="h-full flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+          </div>
+        ) : files.length === 0 ? (
           <div className="h-full flex items-center justify-center text-gray-500">
             <div className="text-center">
-              <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <FolderOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{t('history.empty')}</p>
             </div>
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {filteredItems.map((item) => (
-              <HistoryCard
-                key={item.id}
-                item={item}
-                isSelected={item.id === selectedItemId}
-                onClick={() => selectItem(item.id)}
-                onDelete={() => deleteItem(item.id)}
-              />
+            {files.map((file) => (
+              <div
+                key={file.name}
+                className={`aspect-square bg-dark-elevated rounded-lg overflow-hidden cursor-pointer relative group transition-all duration-150 ${
+                  selectedItems.has(file.name) ? 'ring-2 ring-primary-500' : 'hover:ring-2 hover:ring-primary-400'
+                }`}
+                onClick={() => toggleSelect(file.name)}
+                draggable
+                onDragStart={(e) => handleDragStart(e, file)}
+              >
+                {/* 选择标记 */}
+                {selectedItems.has(file.name) && (
+                  <div className="absolute top-2 left-2 z-10 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                    <Check size={14} className="text-white" />
+                  </div>
+                )}
+
+                {file.type === 'image' ? (
+                  <img src={file.url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <video src={file.url} className="w-full h-full object-cover" />
+                )}
+                
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Layout size={24} className="text-white" />
+                </div>
+                
+                {/* 时间标签 */}
+                <div className="absolute bottom-0 left-0 right-0 text-[10px] text-white/80 bg-black/50 px-2 py-1 truncate">
+                  {formatTime(file.lastModified)}
+                </div>
+              </div>
             ))}
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredItems.map((item) => (
+            {files.map((file) => (
               <div
-                key={item.id}
-                onClick={() => selectItem(item.id)}
-                className={`flex items-center gap-4 p-3 bg-gray-800 rounded-lg cursor-pointer ${
-                  item.id === selectedItemId ? 'ring-2 ring-blue-500' : 'hover:bg-gray-750'
+                key={file.name}
+                className={`flex items-center gap-3 p-3 bg-dark-elevated rounded-lg cursor-pointer transition-all ${
+                  selectedItems.has(file.name) ? 'ring-1 ring-primary-500' : 'hover:bg-dark-surface'
                 }`}
+                onClick={() => toggleSelect(file.name)}
+                draggable
+                onDragStart={(e) => handleDragStart(e, file)}
               >
-                <div className="w-16 h-16 bg-gray-700 rounded overflow-hidden shrink-0">
-                  {item.thumbnailUrl ? (
-                    <img src={item.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                {/* 选择框 */}
+                <div className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  selectedItems.has(file.name) 
+                    ? 'bg-primary-500 border-primary-500' 
+                    : 'border-gray-500 hover:border-gray-400'
+                }`}>
+                  {selectedItems.has(file.name) && <Check size={14} className="text-white" />}
+                </div>
+
+                {/* 缩略图 */}
+                <div className="w-14 h-14 bg-gray-700 rounded-lg overflow-hidden shrink-0">
+                  {file.type === 'image' ? (
+                    <img src={file.url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      {item.type === 'image' ? (
-                        <Image className="w-6 h-6 text-gray-500" />
-                      ) : (
-                        <Video className="w-6 h-6 text-gray-500" />
-                      )}
-                    </div>
+                    <video src={file.url} className="w-full h-full object-cover" />
                   )}
                 </div>
+                
+                {/* 信息 */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{item.prompt || 'No prompt'}</p>
-                  <p className="text-xs text-gray-500">{item.modelName}</p>
+                  <p className="text-sm text-gray-300 truncate">{file.name.split('/').pop()}</p>
+                  <p className="text-xs text-gray-500">
+                    {formatTime(file.lastModified)} · {formatSize(file.size)}
+                  </p>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {new Date(item.createTime).toLocaleString()}
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteItem(item.id);
-                  }}
-                  className="p-1 text-red-400 hover:text-red-300"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+
+                {/* 拖拽提示 */}
+                <Layout size={18} className="text-gray-500 shrink-0" />
               </div>
             ))}
           </div>

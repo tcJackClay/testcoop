@@ -1,4 +1,4 @@
-import HistoryPanel from '../../features/history/HistoryPanel';
+import FilesPanel from '../../features/history/FilesPanel';
 import CharactersPanel from '../../features/characters/CharactersPanel';
 import ScriptPanel from './script/ScriptPanel';
 import AssetLibraryPanel from '../../features/assets/AssetLibraryPanel';
@@ -19,7 +19,7 @@ export default function LeftPanel({ type, onClose }: LeftPanelProps) {
     case 'history':
       return (
         <div className={`${panelClasses} bg-dark-surface`}>
-          <HistoryPanel onClose={onClose} />
+          <FilesPanel onClose={onClose} />
         </div>
       );
     case 'characters':

@@ -139,3 +139,104 @@ export function clearOSSCredentials(): void {
   cachedCredentials = null;
   credentialsExpireTime = 0;
 }
+
+/**
+ * OSS 文件信息
+ */
+export interface OSSFile {
+  name: string;      // 文件名（含路径）
+  url: string;       // 完整访问 URL
+  lastModified: string;  // 最后修改时间
+  size: number;      // 文件大小 (bytes)
+  type: 'image' | 'video' | 'other';
+}
+
+/**
+ * 获取项目在 OSS 的所有文件（临时文件 + 已保存资产）
+ * @param projectId 项目 ID
+ * @param limit 限制数量
+ */
+export async function listProjectFiles(projectId: number, limit: number = 100): Promise<OSSFile[]> {
+  // 获取 STS 凭证
+  const credentials = await getSTSCredentials();
+  
+  // 创建 OSS 客户端
+  const client = new OSS({
+    bucket: OSS_CONFIG.bucket,
+    endpoint: OSS_CONFIG.endpoint,
+    accessKeyId: credentials.accessKeyId,
+    accessKeySecret: credentials.accessKeySecret,
+    stsToken: credentials.securityToken,
+  });
+  
+  const allFiles: OSSFile[] = [];
+  const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'];
+  const videoExts = ['.mp4', '.webm', '.mov', '.avi', '.mkv'];
+  
+  // 需要检查的目录
+  const prefixes = [
+    `temp/${projectId}/`,
+    `projects/${projectId}/assets/`,
+  ];
+  
+  for (const prefix of prefixes) {
+    let continuationToken: string | undefined;
+    
+    do {
+      const result = await client.listV2({
+        prefix,
+        'max-keys': 100,
+        continuationToken,
+      });
+      
+      const files = result.objects || [];
+      
+      for (const file of files) {
+        const ext = file.name?.toLowerCase().substring(file.name.lastIndexOf('.')) || '';
+        
+        let type: 'image' | 'video' | 'other' = 'other';
+        if (imageExts.includes(ext)) {
+          type = 'image';
+        } else if (videoExts.includes(ext)) {
+          type = 'video';
+        } else {
+          continue; // 跳过非图片/视频文件
+        }
+        
+        allFiles.push({
+          name: file.name,
+          url: file.url || `${OSS_CONFIG.endpoint}/${file.name}`,
+          lastModified: file.lastModified,
+          size: file.size,
+          type,
+        });
+      }
+      
+      continuationToken = result.nextContinuationToken;
+    } while (continuationToken && allFiles.length < limit * 2);
+  }
+  
+  // 按最后修改时间倒序排列
+  allFiles.sort((a, b) => 
+    new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+  );
+  
+  // 分别返回图片和视频（各限制 limit 个）
+  return allFiles.slice(0, limit * 2);
+}
+
+/**
+ * 获取项目的图片列表
+ */
+export async function listProjectImages(projectId: number, limit: number = 100): Promise<OSSFile[]> {
+  const allFiles = await listProjectFiles(projectId, limit);
+  return allFiles.filter(f => f.type === 'image').slice(0, limit);
+}
+
+/**
+ * 获取项目的视频列表
+ */
+export async function listProjectVideos(projectId: number, limit: number = 100): Promise<OSSFile[]> {
+  const allFiles = await listProjectFiles(projectId, limit);
+  return allFiles.filter(f => f.type === 'video').slice(0, limit);
+}

@@ -44,10 +44,11 @@
   "nav": {
     "canvas": "画布",
     "storyboard": "智能分镜",
-    "history": "历史记录",
+    "history": "生成历史",
     "models": "模型库",
     "settings": "设置"
   },
+  "files": "加载队列",
   "canvas": {
     "addNode": "添加节点",
     "deleteNode": "删除节点",

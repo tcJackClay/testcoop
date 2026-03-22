@@ -9,7 +9,7 @@ export default function Models() {
   const [editingModel, setEditingModel] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    type: 'image',
+    type: 'image' as 'image' | 'video',
     provider: '',
     modelId: '',
     baseUrl: '',
@@ -46,7 +46,7 @@ export default function Models() {
     if (editingModel === 'new') {
       addModel(formData);
     } else {
-      updateModel(editingModel, formData);
+      updateModel(editingModel || '', formData);
     }
     setEditingModel(null);
   };
@@ -210,7 +210,7 @@ export default function Models() {
               <select
                 className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as 'image' | 'video' })}
               >
                 <option value="image">{t('models.typeImage')}</option>
                 <option value="video">{t('models.typeVideo')}</option>

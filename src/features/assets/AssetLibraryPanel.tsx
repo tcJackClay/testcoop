@@ -25,6 +25,8 @@ import ContextMenu from './ContextMenu';
 import { mapExt1TypeToCategory, type AssetLibraryPanelProps, type AssetStats, type AssetCategory } from './AssetLibraryPanel.types';
 import { imageApi } from '../../api/image';
 
+type Image = AssetImageType;
+
 const categories = [
   { key: 'all', label: '所有资产', icon: <Folder size={12} />, color: 'text-gray-400' },
   { key: '主要角色', label: '主要角色', icon: <Star size={12} />, color: 'text-blue-400' },
@@ -143,7 +145,7 @@ export default function AssetLibraryPanel({ onClose }: AssetLibraryPanelProps) {
   };
   
   // Handle right-click on asset
-  const handleContextMenu = (asset: Image, e: React.MouseEvent) => {
+  const handleContextMenu = (asset: any, e: React.MouseEvent) => {
     e.preventDefault();
     const category = getAssetCategory(asset);
     setContextMenu({

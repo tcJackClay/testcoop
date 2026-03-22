@@ -43,5 +43,4 @@ export interface StoryboardScript {
   projectId?: number;
   userId?: number;
   ext1?: string;
-  [key: string]: unknown;
 }

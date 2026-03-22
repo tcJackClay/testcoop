@@ -1,4 +1,5 @@
 import { HardDrive } from 'lucide-react';
+import type { AssetCategory } from './AssetLibraryPanel.types';
 
 interface Category {
   key: string;
@@ -9,8 +10,8 @@ interface Category {
 
 interface AssetSidebarProps {
   categories: Category[];
-  filterType: string;
-  setFilterType: (type: string) => void;
+  filterType: AssetCategory | 'all';
+  setFilterType: (type: AssetCategory | 'all') => void;
 }
 
 export default function AssetSidebar({ categories, filterType, setFilterType }: AssetSidebarProps) {
@@ -19,7 +20,7 @@ export default function AssetSidebar({ categories, filterType, setFilterType }: 
       {categories.map((cat) => (
         <button
           key={cat.key}
-          onClick={() => setFilterType(cat.key)}
+          onClick={() => setFilterType(cat.key as AssetCategory | 'all')}
           className={`w-full py-2 flex flex-col items-center gap-1 transition-colors ${
             filterType === cat.key 
               ? 'bg-blue-500/20' 

@@ -26,7 +26,7 @@ export interface UseCanvasConnectionsReturn {
   // Canvas 事件处理器
   onCanvasMouseMove: (e: React.MouseEvent) => void;
   onCanvasClick: () => void;
-  onCanvasMouseDown: () => void;
+  onCanvasMouseDown: (_e?: React.MouseEvent) => void;
   
   // 渲染组件
   ConnectionRenderer: () => React.ReactNode;

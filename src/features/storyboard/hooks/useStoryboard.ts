@@ -1,39 +1,32 @@
-// src/features/storyboard/hooks/useStoryboard.ts - 故事板业务逻辑
-import { useCallback, useEffect, useState } from 'react';
-import { useStoryboardStore, type Shot } from '../../../stores';
-import { vectorApi } from '../../../api';
+import { useCallback, useState } from 'react';
+import { useStoryboardStore } from '../../../stores';
 
 export const useStoryboardEditor = () => {
   const store = useStoryboardStore();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // AI 分析脚本
-  const analyzeScript = useCallback(async (scriptContent: string) => {
-    const projectId = store.currentProjectId;
-    if (!projectId || !scriptContent) return;
+  const analyzeScript = useCallback(
+    async (scriptContent: string) => {
+      if (!scriptContent) return;
 
-    setIsAnalyzing(true);
-    try {
-      const response = await vectorApi.analyzeScript(scriptContent, projectId, 1);
-      if (response.code === 0 && response.data) {
-        // 解析返回的分镜内容
-        const content = response.data;
-        // 解析为 shotGroups
-        // ... 解析逻辑
-        return content;
+      setIsAnalyzing(true);
+      try {
+        store.importFromScript(scriptContent);
+        return store.shots;
+      } finally {
+        setIsAnalyzing(false);
       }
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [store.currentProjectId]);
+    },
+    [store]
+  );
 
-  // 导出 JSON
   const exportToJson = useCallback(() => {
     const data = {
-      episodes: store.episodes,
-      shotGroups: store.shotGroups,
-      scriptContent: store.scriptContent,
+      shots: store.shots,
+      selectedShotId: store.selectedShotId,
+      storyboardMode: store.storyboardMode,
     };
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -41,7 +34,7 @@ export const useStoryboardEditor = () => {
     a.download = 'storyboard.json';
     a.click();
     URL.revokeObjectURL(url);
-  }, [store.episodes, store.shotGroups, store.scriptContent]);
+  }, [store.selectedShotId, store.shots, store.storyboardMode]);
 
   return {
     ...store,

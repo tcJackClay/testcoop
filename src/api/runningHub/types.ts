@@ -61,7 +61,7 @@ export interface RunningHubNodeData {
 }
 
 export interface RunningHubResult {
-  success: boolean;
+  success?: boolean;
   images?: string[];
   video?: string;
   files?: { name: string; url: string }[];

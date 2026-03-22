@@ -7,8 +7,14 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { LeftPanelType } from '../leftPanel/LeftPanel';
 import type { RightPanelType } from '../rightPanel/RightPanel';
+import type { NodeType } from '../../stores/canvasStore';
 
 interface SidebarProps {
+  viewMode?: string;
+  onViewChange?: (viewMode: 'canvas' | 'storyboard' | 'history' | 'models') => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  onAddNode?: (type: NodeType) => void;
   leftPanel: LeftPanelType;
   rightPanel: RightPanelType;
   onLeftPanelChange: (type: LeftPanelType) => void;

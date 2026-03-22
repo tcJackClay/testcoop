@@ -1,77 +1,84 @@
-// src/components/leftPanel/script/hooks/useScript.ts - 脚本操作逻辑
 import { useCallback, useState } from 'react';
 import { vectorApi } from '../../../../api';
-import { ScriptScene, ScriptData } from '../types';
+import type { ScriptData, ScriptScene } from '../types';
 
-// 解析脚本文本
+const isSceneHeader = (line: string): boolean => {
+  return /^#/.test(line) || /^scene\b/i.test(line) || /^\d+[.)]/.test(line);
+};
+
 export const parseScriptText = (text: string): ScriptData => {
   const scenes: ScriptScene[] = [];
   const lines = text.split('\n');
-  
+
   let currentScene: ScriptScene | null = null;
   let currentField: 'summary' | 'shots' | null = null;
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
     if (!trimmed) continue;
-    
-    // 检测场景标题
-    if (trimmed.startsWith('【场景') || trimmed.startsWith('【第') || trimmed.match(/^\d+[.、]/)) {
+
+    if (isSceneHeader(trimmed)) {
       if (currentScene) {
         scenes.push(currentScene);
       }
-      const name = trimmed.replace(/【|】/g, '').trim();
+
       currentScene = {
         id: `scene_${scenes.length + 1}`,
-        name,
+        name: trimmed.replace(/^#+\s*/, ''),
         summary: '',
-        shots: ''
+        shots: '',
       };
       currentField = 'summary';
       continue;
     }
-    
-    // 检测字段标题
-    if (trimmed.startsWith('【场次概述】') || trimmed.startsWith('【概述】')) {
+
+    if (/summary|overview/i.test(trimmed)) {
       currentField = 'summary';
       continue;
     }
-    
-    if (trimmed.startsWith('【分镜内容】') || trimmed.startsWith('【分镜】')) {
+
+    if (/shot|shots|storyboard/i.test(trimmed)) {
       currentField = 'shots';
       continue;
     }
-    
-    // 添加内容
-    if (currentScene && currentField) {
-      if (currentField === 'summary') {
-        currentScene.summary += trimmed + '\n';
-      } else {
-        currentScene.shots += trimmed + '\n';
-      }
+
+    if (!currentScene) {
+      currentScene = {
+        id: 'scene_1',
+        name: 'Scene 1',
+        summary: '',
+        shots: '',
+      };
+      currentField = 'summary';
+    }
+
+    if (currentField === 'shots') {
+      currentScene.shots += `${trimmed}\n`;
+    } else {
+      currentScene.summary += `${trimmed}\n`;
     }
   }
-  
+
   if (currentScene) {
     scenes.push(currentScene);
   }
-  
+
   return {
     scenes,
-    overview: ''
+    overview: '',
   };
 };
 
-// AI 分析脚本
 export const useScriptAnalysis = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const analyzeScript = useCallback(async (scriptContent: string, projectId: number, userId: number) => {
+  const analyzeScript = useCallback(async (scriptContent: string, _projectId: number, _userId: number) => {
     setIsAnalyzing(true);
     try {
-      const response = await vectorApi.analyzeScript(scriptContent, projectId, userId);
-      return response;
+      return await vectorApi.chatCompletion({
+        prompt: scriptContent,
+        type: 2,
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -80,5 +87,4 @@ export const useScriptAnalysis = () => {
   return { analyzeScript, isAnalyzing };
 };
 
-// 导入 hooks
 export { useCallback, useState };

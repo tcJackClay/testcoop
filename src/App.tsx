@@ -22,7 +22,6 @@ const getInitialUser = (): any => {
 
 export default function App() {
   const fetchCurrentUser = useAuthStore(state => state.fetchCurrentUser);
-  const token = useAuthStore(state => state.token);
   const user = useAuthStore(state => state.user);
   const [isReady, setIsReady] = useState(false);
   

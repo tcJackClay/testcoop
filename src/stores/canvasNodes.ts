@@ -4,7 +4,7 @@ import type { CanvasState, CanvasNode, NodeType } from './canvasTypes';
 import { nodeDefaults, generateNodeId } from './canvasNodeDefaults';
 
 export interface CanvasNodesSlice {
-  addNode: (type: NodeType, position: { x: number; y: number }, initialData?: Partial<CanvasNode>) => void;
+  addNode: (type: NodeType, position: { x: number; y: number }, initialData?: Partial<CanvasNode>) => string;
   updateNode: (id: string, data: Partial<CanvasNode>) => void;
   deleteNode: (id: string) => void;
   deleteSelectedNodes: () => void;
@@ -30,6 +30,7 @@ export const createCanvasNodesSlice: StateCreator<CanvasState, [], [], CanvasNod
     } as CanvasNode;
     get().saveToUndoStack();
     set((state) => ({ nodes: [...state.nodes, newNode] }));
+    return newNode.id;
   },
 
   // Update node data

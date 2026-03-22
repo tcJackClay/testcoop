@@ -89,6 +89,7 @@ apiClient.interceptors.response.use(
 export interface ApiResponse<T = unknown> {
   code: number
   message: string
+  msg?: string
   data: T
 }
 
@@ -101,3 +102,4 @@ export interface PageResult<T> {
 }
 
 export { apiClient }
+export default apiClient

@@ -3,7 +3,7 @@ import { Image } from '../../api/image';
 
 export type AssetCategory = 'all' | '主要角色' | '次要角色' | '主要场景' | '次要场景' | '主要道具' | '次要道具';
 
-export interface AssetWithVariants extends Image {
+export interface AssetWithVariants extends Omit<Image, 'variants'> {
   variants?: Image[];
   parentId?: string;
 }

@@ -24,8 +24,8 @@ export const isNodesConnected = (
 ): boolean => {
   return connections.some(
     conn => 
-      (conn.source === node1Id && conn.target === node2Id) ||
-      (conn.source === node2Id && conn.target === node1Id)
+      (conn.sourceId === node1Id && conn.targetId === node2Id) ||
+      (conn.sourceId === node2Id && conn.targetId === node1Id)
   );
 };
 
@@ -35,7 +35,7 @@ export const getNodeConnectionCount = (
   connections: Connection[]
 ): number => {
   return connections.filter(
-    conn => conn.source === nodeId || conn.target === nodeId
+    conn => conn.sourceId === nodeId || conn.targetId === nodeId
   ).length;
 };
 

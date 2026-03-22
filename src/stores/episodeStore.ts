@@ -5,6 +5,7 @@ export interface Episode {
   id: number;
   title?: string;
   name?: string;
+  order?: number;
   content?: string;
   episodeNumber?: number;
   resourceName?: string;

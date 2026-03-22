@@ -1,23 +1,19 @@
-// src/stores/assets/assetStore.ts - 资产 Store
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { imageApi, Image } from '@/api/image';
-import { AssetStore, AssetCategory } from './assetTypes';
-import { mapCategoryToExt1Type, getAssetCategory, filterAssets } from './assetHelpers';
+import { imageApi, type Image } from '@/api/image';
+import type { AssetCategory, AssetStore } from './assetTypes';
+import { filterAssets, mapCategoryToExt1Type } from './assetHelpers';
 
-// 获取当前项目 ID
 const getCurrentProjectId = (): number | undefined => {
-  // 从 projectStore 的 localStorage 获取
   try {
     const projectStr = localStorage.getItem('project-storage');
-    if (projectStr) {
-      const projectData = JSON.parse(projectStr);
-      if (projectData.state?.currentProjectId) {
-        return projectData.state.currentProjectId;
-      }
-    }
-  } catch {}
-  return undefined;
+    if (!projectStr) return undefined;
+
+    const projectData = JSON.parse(projectStr);
+    return projectData.state?.currentProjectId;
+  } catch {
+    return undefined;
+  }
 };
 
 const getInitialState = () => ({
@@ -42,63 +38,55 @@ export const useAssetStore = create<AssetStore>()(
           set({ assets: [], isLoading: false, error: null });
           return;
         }
-        
+
         set({ isLoading: true, error: null });
         try {
-          const response = await imageApi.getAll(projectId);
-          
-          // API 直接返回数组，不需要检查 code
-          if (Array.isArray(response)) {
-            set({ assets: response, isLoading: false });
-          } else if (response.code === 0 && response.data) {
-            set({ assets: response.data, isLoading: false });
-          } else {
-            set({ error: '获取资产列表失败', isLoading: false });
-          }
-        } catch (error) {
+          const assets = await imageApi.getAll(projectId);
+          set({ assets, isLoading: false });
+        } catch {
           set({ error: '获取资产列表失败', isLoading: false });
         }
       },
 
-      addAsset: (asset: Image) => {
-        set(state => ({ assets: [...state.assets, asset] }));
+      addAsset: (asset) => {
+        set((state) => ({ assets: [...state.assets, asset] }));
       },
 
-      updateAsset: (id: number, updates: Partial<Image>) => {
-        set(state => ({
-          assets: state.assets.map(a => a.id === id ? { ...a, ...updates } : a)
+      updateAsset: (id, updates) => {
+        set((state) => ({
+          assets: state.assets.map((asset) => (asset.id === id ? { ...asset, ...updates } : asset)),
         }));
       },
 
-      deleteAsset: async (id: number) => {
+      deleteAsset: async (id) => {
         try {
           await imageApi.delete(id);
-          set(state => ({
-            assets: state.assets.filter(a => a.id !== id),
-            selectedAssetId: state.selectedAssetId === id ? null : state.selectedAssetId
+          set((state) => ({
+            assets: state.assets.filter((asset) => asset.id !== id),
+            selectedAssetId: state.selectedAssetId === id ? null : state.selectedAssetId,
           }));
-        } catch (error) {
+        } catch {
           set({ error: '删除资产失败' });
         }
       },
 
-      selectAsset: (id: number | null) => {
-        set({ selectedAssetId: id });
+      selectAsset: (selectedAssetId) => {
+        set({ selectedAssetId });
       },
 
-      setFilterType: (filterType: AssetCategory) => {
+      setFilterType: (filterType) => {
         set({ filterType });
       },
 
-      setSearchTerm: (searchTerm: string) => {
+      setSearchTerm: (searchTerm) => {
         set({ searchTerm });
       },
 
-      setDraggedAsset: (draggedAsset: Image | null) => {
+      setDraggedAsset: (draggedAsset) => {
         set({ draggedAsset });
       },
 
-      setIsDragging: (isDragging: boolean) => {
+      setIsDragging: (isDragging) => {
         set({ isDragging });
       },
 
@@ -107,71 +95,79 @@ export const useAssetStore = create<AssetStore>()(
         return filterAssets(assets, filterType, searchTerm);
       },
 
-      // 更新资产分类 - 只更新 ext1 中的 type 字段
-      updateAssetCategory: async (id: number, category: string) => {
+      updateAssetCategory: async (id, category) => {
         const ext1Type = mapCategoryToExt1Type(category);
         const { assets } = get();
-        const asset = assets.find(a => a.id === id);
-        
+        const asset = assets.find((item) => item.id === id);
+
         let ext1Obj: Record<string, unknown> = {};
         if (asset?.ext1) {
-          try { ext1Obj = JSON.parse(asset.ext1); } catch {}
+          try {
+            ext1Obj = JSON.parse(asset.ext1);
+          } catch {
+            ext1Obj = {};
+          }
         }
+
         ext1Obj.type = ext1Type;
 
         try {
           await imageApi.put(id, { ext1: JSON.stringify(ext1Obj) });
-          set(state => ({
-            assets: state.assets.map(a =>
-              a.id === id ? { ...a, ext1: JSON.stringify(ext1Obj) } : a
+          set((state) => ({
+            assets: state.assets.map((item) =>
+              item.id === id ? { ...item, ext1: JSON.stringify(ext1Obj) } : item
             ),
           }));
-        } catch (error) {
+        } catch {
           set({ error: '更新分类失败，请重试' });
         }
       },
 
-      // 同步变体关系
       syncVariants: async () => {
         const { assets } = get();
+        const updatedAssets: Image[] = [];
         let count = 0;
-        const newAssets: Image[] = [];
 
         for (const asset of assets) {
           const resourceName = asset.name || asset.resourceName || '';
-          if (resourceName.includes(' - ')) {
-            const parentName = resourceName.split(' - ')[0].trim();
-            let ext1Obj: Record<string, unknown> = {};
-            try {
-              if (asset.ext1) ext1Obj = JSON.parse(asset.ext1);
-            } catch {}
-            ext1Obj.parent = parentName;
+          if (!resourceName.includes(' - ') || !asset.id) {
+            continue;
+          }
 
-            const parentAsset = assets.find(a => 
-              (a.name || a.resourceName) === parentName
-            );
-            if (parentAsset) {
-              let parentExt1: Record<string, unknown> = {};
-              try {
-                if (parentAsset.ext1) parentExt1 = JSON.parse(parentAsset.ext1);
-              } catch {}
-              ext1Obj.type = parentExt1.type || 'prop_secondary';
+          const parentName = resourceName.split(' - ')[0].trim();
+          let ext1Obj: Record<string, unknown> = {};
+          try {
+            if (asset.ext1) {
+              ext1Obj = JSON.parse(asset.ext1);
             }
+          } catch {
+            ext1Obj = {};
+          }
 
+          ext1Obj.parent = parentName;
+
+          const parentAsset = assets.find((item) => (item.name || item.resourceName) === parentName);
+          if (parentAsset?.ext1) {
             try {
-              await imageApi.put(asset.id, { ext1: JSON.stringify(ext1Obj) });
-              newAssets.push({ ...asset, ext1: JSON.stringify(ext1Obj) });
-              count++;
-            } catch {}
+              const parentExt1 = JSON.parse(parentAsset.ext1);
+              ext1Obj.type = parentExt1.type || 'prop_secondary';
+            } catch {
+              // Ignore malformed ext1 from parent assets.
+            }
+          }
+
+          try {
+            await imageApi.put(asset.id, { ext1: JSON.stringify(ext1Obj) });
+            updatedAssets.push({ ...asset, ext1: JSON.stringify(ext1Obj) });
+            count += 1;
+          } catch {
+            // Ignore individual variant sync failures.
           }
         }
 
-        if (newAssets.length > 0) {
-          set(state => ({
-            assets: state.assets.map(a => {
-              const updated = newAssets.find(n => n.id === a.id);
-              return updated || a;
-            }),
+        if (updatedAssets.length > 0) {
+          set((state) => ({
+            assets: state.assets.map((asset) => updatedAssets.find((item) => item.id === asset.id) || asset),
           }));
         }
 

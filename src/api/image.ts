@@ -74,6 +74,7 @@ export interface CreateImageRequest {
   resourceName: string
   resourceType?: string
   resourceContent?: string
+  resourceStatus?: string
   projectId: number
   userId?: number
   ext1?: string
@@ -200,7 +201,7 @@ export const imageApi = {
   /**
    * 创建图片
    */
-  create: async (data: CreateImageRequest): Promise<Image | null> => {
+  create: async (data: CreateImageRequest): Promise<any> => {
     const payload = {
       resourceName: data.resourceName,
       resourceType: data.resourceType || 'image',

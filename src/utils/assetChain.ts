@@ -19,7 +19,9 @@ export interface ProcessChainRecord {
  */
 export function getInputConnections(nodeId: string): Array<{ sourceId: string; targetId: string; inputType: string }> {
   const connections = useCanvasStore.getState().connections
-  return connections.filter(c => c.targetId === nodeId)
+  return connections
+    .filter(c => c.targetId === nodeId)
+    .map((c) => ({ ...c, inputType: c.inputType || 'default' }))
 }
 
 /**

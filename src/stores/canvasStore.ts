@@ -5,7 +5,7 @@ import { createCanvasNodesSlice, type CanvasNodesSlice } from './canvasNodes';
 import { createCanvasConnectionsSlice, type CanvasConnectionsSlice } from './canvasConnections';
 import { createCanvasHistorySlice, type CanvasHistorySlice } from './canvasHistory';
 import { createCanvasViewportSlice, type CanvasViewportSlice } from './canvasViewport';
-import { setNodeIdCounter, getNodeIdCounter } from './canvasNodeDefaults';
+import { setNodeIdCounter } from './canvasNodeDefaults';
 
 export type CanvasStore = CanvasState & CanvasNodesSlice & CanvasConnectionsSlice & CanvasHistorySlice & CanvasViewportSlice;
 

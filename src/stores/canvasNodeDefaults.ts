@@ -55,6 +55,7 @@ export const nodeDefaults: Record<NodeType, Partial<CanvasNode>> = {
   generateSceneImage: { type: 'generateSceneImage', width: 200, height: 120, data: { label: 'Generate Scene Image', prompt: '' } },
   saveLocal: { type: 'saveLocal', width: 180, height: 80, data: { label: 'Save Local' } },
   promptNode: { type: 'promptNode', width: 200, height: 100, data: { label: 'Prompt' } },
+  historyNode: { type: 'historyNode', width: 220, height: 140, data: { label: 'History', status: 'idle' } },
   runninghub: { type: 'runninghub', width: 200, height: 120, data: { label: 'RunningHub' } },
 };
 

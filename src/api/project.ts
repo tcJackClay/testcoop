@@ -31,6 +31,7 @@ export interface ProjectView {
   description: string
   status: number
   statusText: string
+  scriptCount?: number
   createTime?: string
   updateTime?: string
 }
@@ -108,12 +109,15 @@ export const projectApi = {
    * 获取项目历史记录（从 ext2 解析）
    */
   getHistory: async (projectId: number): Promise<HistoryRecord[]> => {
+    console.log('[getHistory] 获取历史, projectId:', projectId);
     const response = await apiClient.get(`/project/${projectId}`)
     const res = response.data
+    console.log('[getHistory] 响应:', res);
     
     if (res.code === 0 && res.data?.ext2) {
       try {
         const history = JSON.parse(res.data.ext2)
+        console.log('[getHistory] 解析后:', history);
         return Array.isArray(history) ? history : []
       } catch (e) {
         console.error('[projectApi.getHistory] 解析 ext2 失败:', e)
@@ -131,9 +135,12 @@ export const projectApi = {
     record: Omit<HistoryRecord, 'createdAt'>
   ): Promise<boolean> => {
     try {
+      console.log('[addHistoryRecord] 开始添加, projectId:', projectId, 'record:', record);
+      
       // 先获取当前 ext2
       const response = await apiClient.get(`/project/${projectId}`)
       const res = response.data
+      console.log('[addHistoryRecord] 获取项目响应:', res);
       
       let history: HistoryRecord[] = []
       if (res.code === 0 && res.data?.ext2) {
@@ -143,6 +150,7 @@ export const projectApi = {
           history = []
         }
       }
+      console.log('[addHistoryRecord] 当前历史记录:', history);
       
       // 添加新记录
       const newRecord: HistoryRecord = {
@@ -160,6 +168,7 @@ export const projectApi = {
       const updateResponse = await apiClient.put(`/project/${projectId}`, {
         ext2: JSON.stringify(history)
       })
+      console.log('[addHistoryRecord] 更新响应:', updateResponse.data);
       
       return updateResponse.data.code === 0
     } catch (e) {

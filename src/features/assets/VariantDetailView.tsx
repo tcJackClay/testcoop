@@ -3,14 +3,6 @@ import { ChevronLeft, Image as ImageIcon } from 'lucide-react';
 import type { Image } from '../../api/image';
 import { apiClient } from '../../api/client';
 
-interface Variant {
-  id: number;
-  name?: string;
-  resourceName?: string;
-  url?: string;
-  resourceContent?: string;
-}
-
 // 从 API 获取 base64 图片数据
 const fetchImageBase64 = async (imageId: number): Promise<string | null> => {
   try {
@@ -67,7 +59,7 @@ function VariantImage({ imageId, src, alt }: { imageId?: number; src?: string; a
 
 interface VariantDetailViewProps {
   selectedPrimaryAsset: Image;
-  variants: Variant[];
+  variants: Image[];
   onBack: () => void;
 }
 
@@ -105,7 +97,7 @@ export default function VariantDetailView({ selectedPrimaryAsset, variants, onBa
           <h4 className="text-[10px] text-gray-400 mb-2">变体 ({variants.length})</h4>
           <div className="grid grid-cols-2 gap-2">
             {variants.map((variant) => (
-              <div key={variant.id} className="flex flex-col gap-1">
+              <div key={variant.id ?? variant.resourceName ?? Math.random()} className="flex flex-col gap-1">
                 <div className="aspect-square rounded-lg overflow-hidden bg-gray-700 border border-gray-600">
                   <VariantImage 
                     imageId={variant.id}

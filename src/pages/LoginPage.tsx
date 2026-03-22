@@ -10,8 +10,7 @@ export default function LoginPage() {
     login,
     isLoading,
     error,
-    clearError,
-    user
+    clearError
   } = useAuthStore();
 
   const [username, setUsername] = useState('');

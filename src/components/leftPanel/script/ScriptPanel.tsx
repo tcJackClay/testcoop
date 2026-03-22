@@ -1,27 +1,40 @@
-// src/components/leftPanel/script/ScriptPanel.tsx - 脚本面板
 import { useEffect } from 'react';
-import { Upload, X, ChevronDown, Sparkles, Package, Users, Network, BookOpen, ScrollText, File, Check, Wand2, ListOrdered, FileText } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  FileText,
+  Network,
+  Package,
+  ScrollText,
+  Sparkles,
+  Upload,
+  Users,
+  Wand2,
+  ListOrdered,
+  X,
+} from 'lucide-react';
 import { useScriptPanel } from './hooks';
 
 interface ScriptPanelProps {
   onClose?: () => void;
 }
 
-// 操作选项 - 带图标
 const actionOptions = [
-  { key: 'extractAssets', label: '提取资产', icon: Package, desc: '提取角色、场景、道具' },
-  { key: 'analyzeScript', label: '剧本分析', icon: Wand2, desc: '生成大纲、人物小传' },
-  { key: 'splitEpisodes', label: '剧集分集', icon: ListOrdered, desc: '智能分集、剧情概要' },
-];
+  { key: 'extractAssets', label: '提取资产', icon: Package, desc: '抽取角色、场景和道具资产' },
+  { key: 'analyzeScript', label: '剧本分析', icon: Wand2, desc: '生成人物小传、关系和剧情大纲' },
+  { key: 'splitEpisodes', label: '智能分集', icon: ListOrdered, desc: '按内容结构拆分剧集与脚本' },
+] as const;
 
-// 5个选项卡：资产、人物、关系、大纲、剧本
 const resultTabs = [
   { key: 'assets', label: '资产', icon: Package },
   { key: 'bios', label: '人物', icon: Users },
   { key: 'relationships', label: '关系', icon: Network },
   { key: 'outline', label: '大纲', icon: BookOpen },
   { key: 'script', label: '剧本', icon: ScrollText },
-];
+] as const;
+
+const sectionClassName = 'rounded-[24px] border border-[var(--border-soft)] bg-[var(--surface-2)] shadow-soft';
 
 export default function ScriptPanel({ onClose }: ScriptPanelProps) {
   const {
@@ -47,385 +60,379 @@ export default function ScriptPanel({ onClose }: ScriptPanelProps) {
     handleAnalyze,
   } = useScriptPanel({ onClose });
 
-  // 加载选中的分集剧本
   useEffect(() => {
     if (localSelectedEpisodeId) {
-      loadEpisodeScript(parseInt(localSelectedEpisodeId));
+      void loadEpisodeScript(parseInt(localSelectedEpisodeId, 10));
     }
   }, [localSelectedEpisodeId, loadEpisodeScript]);
 
-  const selectedOption = actionOptions.find(o => o.key === selectedAction);
+  const selectedOption = actionOptions.find((option) => option.key === selectedAction) || actionOptions[0];
 
-  // 渲染Tab内容
-  const renderTabContent = () => {
-    // 资产Tab - 优先显示后端资产
-    if (activeResultTab === 'assets') {
-      const assetsToShow = backendAssets || analysisResult?.assets;
-      
-      if (assetsToShow) {
-        const { characters = [], scenes = [], props = [] } = assetsToShow as any;
-        
-        // 分离主要和次要
-        const primaryChars = characters.filter((c: any) => !c.type?.includes('secondary'));
-        const secondaryChars = characters.filter((c: any) => c.type?.includes('secondary'));
-        const primaryScenes = scenes.filter((s: any) => !s.type?.includes('secondary'));
-        const secondaryScenes = scenes.filter((s: any) => s.type?.includes('secondary'));
-        const primaryProps = props.filter((p: any) => !p.type?.includes('secondary'));
-        const secondaryProps = props.filter((p: any) => p.type?.includes('secondary'));
-        
-        const hasAssets = primaryChars.length + secondaryChars.length + 
-                        primaryScenes.length + secondaryScenes.length + 
-                        primaryProps.length + secondaryProps.length > 0;
-        
-        if (!hasAssets) {
-          return <div className="text-gray-500 text-xs text-center py-4">上传剧本后提取资产</div>;
-        }
-        
-        return (
-          <div className="space-y-3 text-[10px] max-h-96 overflow-y-auto">
-            {/* 主要角色 */}
-            {primaryChars.length > 0 && (
-              <div>
-                <div className="text-blue-400 font-medium mb-1">主要角色 ({primaryChars.length})</div>
-                <div className="space-y-1 pl-2">
-                  {primaryChars.map((char: any, i: number) => (
-                    <div key={`primary-${i}`} className="bg-gray-800 p-2 rounded">
-                      <div className="text-gray-200 font-medium">{char.name}</div>
-                      {char.description && (
-                        <div className="text-gray-500 text-[9px] mt-1">{char.description}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* 次要角色 */}
-            {secondaryChars.length > 0 && (
-              <div>
-                <div className="text-blue-300 font-medium mb-1">次要角色 ({secondaryChars.length})</div>
-                <div className="space-y-1 pl-2">
-                  {secondaryChars.map((char: any, i: number) => (
-                    <div key={`secondary-${i}`} className="bg-gray-800 p-2 rounded opacity-70">
-                      <div className="text-gray-300 font-medium">{char.name}</div>
-                      {char.description && (
-                        <div className="text-gray-500 text-[9px] mt-1">{char.description}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* 主要场景 */}
-            {primaryScenes.length > 0 && (
-              <div>
-                <div className="text-green-400 font-medium mb-1">主要场景 ({primaryScenes.length})</div>
-                <div className="space-y-1 pl-2">
-                  {primaryScenes.map((scene: any, i: number) => (
-                    <div key={`scene-${i}`} className="bg-gray-800 p-2 rounded">
-                      <div className="text-gray-200 font-medium">{scene.name}</div>
-                      {scene.description && (
-                        <div className="text-gray-500 text-[9px] mt-1">{scene.description}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* 次要场景 */}
-            {secondaryScenes.length > 0 && (
-              <div>
-                <div className="text-green-300 font-medium mb-1">次要场景 ({secondaryScenes.length})</div>
-                <div className="space-y-1 pl-2">
-                  {secondaryScenes.map((scene: any, i: number) => (
-                    <div key={`sec-scene-${i}`} className="bg-gray-800 p-2 rounded opacity-70">
-                      <div className="text-gray-300 font-medium">{scene.name}</div>
-                      {scene.description && (
-                        <div className="text-gray-500 text-[9px] mt-1">{scene.description}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* 道具 */}
-            {(primaryProps.length + secondaryProps.length) > 0 && (
-              <div>
-                <div className="text-yellow-400 font-medium mb-1">道具 ({(primaryProps as any[]).length + (secondaryProps as any[]).length})</div>
-                <div className="space-y-1 pl-2">
-                  {[...primaryProps, ...secondaryProps].map((prop: any, i: number) => (
-                    <div key={`prop-${i}`} className={`bg-gray-800 p-2 rounded ${prop.type?.includes('secondary') ? 'opacity-70' : ''}`}>
-                      <div className="text-gray-200 font-medium">{prop.name}</div>
-                      {prop.description && (
-                        <div className="text-gray-500 text-[9px] mt-1">{prop.description}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      }
-      
-      return <div className="text-gray-500 text-xs text-center py-4">上传剧本后提取资产</div>;
-    }
-    
-    // 人物Tab
-    if (activeResultTab === 'bios' && analysisResult?.characterBios) {
+  const renderAssets = () => {
+    const source = backendAssets;
+    if (!source) {
       return (
-        <div className="space-y-2 text-[10px] max-h-80 overflow-y-auto">
-          {analysisResult.characterBios.map((bio, i) => (
-            <div key={i} className="bg-gray-800 p-2 rounded">
-              <div className="text-blue-300 font-medium">{bio.name}</div>
-              {bio.age && <div className="text-gray-500">年龄: {bio.age}</div>}
-              {bio.background && <div className="text-gray-400 mt-1">{bio.background}</div>}
-              {bio.role && <div className="text-gray-500">角色: {bio.role}</div>}
-            </div>
-          ))}
-          {analysisResult.characterBios.length === 0 && (
-            <div className="text-gray-500 text-center py-4">未提取到人物小传</div>
-          )}
+        <div className="flex h-full items-center justify-center px-6 py-10 text-center text-sm text-[var(--text-secondary)]">
+          上传剧本并执行“提取资产”后，这里会展示角色、场景和道具结果。
         </div>
       );
     }
-    
-    // 关系Tab
-    if (activeResultTab === 'relationships' && analysisResult?.relationships) {
+
+    const groups = [
+      { title: '角色', items: source.characters || [] },
+      { title: '场景', items: source.scenes || [] },
+      { title: '道具', items: source.props || [] },
+    ].filter((group) => group.items.length > 0);
+
+    if (groups.length === 0) {
       return (
-        <div className="space-y-2 text-[10px] max-h-80 overflow-y-auto">
-          {analysisResult.relationships.map((rel, i) => (
-            <div key={i} className="bg-gray-800 p-2 rounded">
-              <div className="text-blue-300">{rel.from}</div>
-              <div className="text-gray-500 text-center text-[8px]">— {rel.type} —</div>
-              <div className="text-green-300">{rel.to}</div>
-              {rel.description && <div className="text-gray-400 mt-1">{rel.description}</div>}
-            </div>
-          ))}
-          {analysisResult.relationships.length === 0 && (
-            <div className="text-gray-500 text-center py-4">未提取到人物关系</div>
-          )}
+        <div className="flex h-full items-center justify-center px-6 py-10 text-center text-sm text-[var(--text-secondary)]">
+          当前分析结果中没有可展示的资产条目。
         </div>
       );
     }
-    
-    // 大纲Tab
-    if (activeResultTab === 'outline' && analysisResult?.storyOutline) {
-      const { storyOutline } = analysisResult;
-      return (
-        <div className="space-y-2 text-[10px] max-h-80 overflow-y-auto">
-          {storyOutline.title && (
-            <div className="text-lg text-blue-300 font-medium">{storyOutline.title}</div>
-          )}
-          {storyOutline.genre && (
-            <div className="text-gray-500">类型: {storyOutline.genre}</div>
-          )}
-          {storyOutline.summary && (
-            <div className="text-gray-300 mt-2">{storyOutline.summary}</div>
-          )}
-          {storyOutline.chapters && storyOutline.chapters.length > 0 && (
-            <div className="mt-2">
-              <div className="text-gray-400 font-medium">章节:</div>
-              {storyOutline.chapters.map((ch, i) => (
-                <div key={i} className="text-gray-300 pl-2">{ch}</div>
+
+    return (
+      <div className="space-y-4">
+        {groups.map((group) => (
+          <section key={group.title} className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">{group.title}</h4>
+              <span className="text-xs text-[var(--text-tertiary)]">{group.items.length} 项</span>
+            </div>
+            <div className="space-y-2">
+              {group.items.map((item: any, index: number) => (
+                <div key={`${group.title}-${index}`} className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-3">
+                  <div className="text-sm font-medium text-[var(--text-primary)]">{item.name}</div>
+                  {item.description && <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{item.description}</p>}
+                </div>
               ))}
             </div>
-          )}
-        </div>
-      );
+          </section>
+        ))}
+      </div>
+    );
+  };
+
+  const renderBios = () => {
+    const bios = analysisResult?.characterBios || [];
+    if (bios.length === 0) {
+      return <EmptyState text="执行“剧本分析”后，这里会展示人物小传和角色定位。" />;
     }
-    
-    // 剧本Tab - 显示分集剧本
-    if (activeResultTab === 'script') {
-      if (episodes.length > 0) {
-        return (
-          <div className="space-y-2">
-            <select
-              value={localSelectedEpisodeId || ''}
-              onChange={(e) => setLocalSelectedEpisodeId(e.target.value)}
-              className="w-full px-2 py-1.5 text-[10px] bg-gray-800 border border-gray-600 rounded text-gray-300 focus:outline-none focus:border-blue-500"
-            >
-              {episodes.map((ep) => (
-                <option key={ep.id} value={ep.id}>{ep.name || `第${ep.episodeNumber || ep.id}集`}</option>
-              ))}
-            </select>
-            <pre className="text-[9px] text-gray-400 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto">
-              {currentEpisode?.content || '暂无内容'}
-            </pre>
-            <div className="px-1 flex items-center gap-3 text-[8px] text-gray-500">
-              <span>共 {episodes.length} 集</span>
-              <span>{currentEpisode?.content?.length || 0} 字</span>
+
+    return (
+      <div className="space-y-3">
+        {bios.map((bio, index) => (
+          <div key={`${bio.name}-${index}`} className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">{bio.name}</h4>
+              {bio.role && <span className="status-pill status-pending">{bio.role}</span>}
+            </div>
+            <div className="mt-2 space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
+              {bio.age && <p>年龄：{bio.age}</p>}
+              {bio.background && <p>{bio.background}</p>}
             </div>
           </div>
-        );
-      }
-      
-      return (
-        <div className="text-[10px] text-gray-500 text-center py-4">
-          {scriptFile ? '点击"开始分析"生成分集剧本' : '上传剧本文件后进行分集'}
-        </div>
-      );
+        ))}
+      </div>
+    );
+  };
+
+  const renderRelationships = () => {
+    const relationships = analysisResult?.relationships || [];
+    if (relationships.length === 0) {
+      return <EmptyState text="执行“剧本分析”后，这里会展示人物关系和关系说明。" />;
     }
-    
-    return <div className="text-gray-500 text-xs text-center py-4">暂无内容</div>;
+
+    return (
+      <div className="space-y-3">
+        {relationships.map((relationship, index) => (
+          <div key={`${relationship.from}-${relationship.to}-${index}`} className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-semibold text-[var(--text-primary)]">{relationship.from}</span>
+              <span className="text-[var(--text-tertiary)]">→</span>
+              <span className="status-pill status-active">{relationship.type}</span>
+              <span className="font-semibold text-[var(--text-primary)]">{relationship.to}</span>
+            </div>
+            {relationship.description && (
+              <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">{relationship.description}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderOutline = () => {
+    const outline = analysisResult?.storyOutline;
+    if (!outline) {
+      return <EmptyState text="执行“剧本分析”后，这里会生成故事概要和章节结构。" />;
+    }
+
+    return (
+      <div className="space-y-4">
+        {(outline.title || outline.genre) && (
+          <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4">
+            {outline.title && <h4 className="text-base font-semibold text-[var(--text-primary)]">{outline.title}</h4>}
+            {outline.genre && <p className="mt-2 text-xs text-[var(--text-secondary)]">类型：{outline.genre}</p>}
+          </div>
+        )}
+
+        {outline.summary && (
+          <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4">
+            <h4 className="text-sm font-semibold text-[var(--text-primary)]">故事摘要</h4>
+            <p className="mt-2 text-xs leading-6 text-[var(--text-secondary)]">{outline.summary}</p>
+          </div>
+        )}
+
+        {outline.chapters && outline.chapters.length > 0 && (
+          <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4">
+            <h4 className="text-sm font-semibold text-[var(--text-primary)]">章节结构</h4>
+            <div className="mt-3 space-y-2">
+              {outline.chapters.map((chapter, index) => (
+                <div key={`${chapter}-${index}`} className="rounded-xl border border-[var(--border-soft)] bg-white/5 px-3 py-2 text-xs text-[var(--text-secondary)]">
+                  {index + 1}. {chapter}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderScript = () => {
+    if (episodes.length === 0) {
+      return <EmptyState text="上传剧本后执行“智能分集”，这里会展示分集结果和脚本内容。" />;
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)]">分集列表</h4>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">共 {episodes.length} 集，选择后可查看当前剧集内容。</p>
+            </div>
+          </div>
+          <select
+            value={localSelectedEpisodeId || ''}
+            onChange={(event) => setLocalSelectedEpisodeId(event.target.value)}
+            className="field-select mt-3"
+          >
+            {episodes.map((episode) => (
+              <option key={episode.id} value={episode.id}>
+                {episode.name || `第 ${episode.episodeNumber || episode.id} 集`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold text-[var(--text-primary)]">当前剧本</h4>
+            <span className="text-xs text-[var(--text-tertiary)]">{currentEpisode?.content?.length || 0} 字</span>
+          </div>
+          <pre className="mt-3 max-h-[360px] overflow-auto whitespace-pre-wrap rounded-2xl border border-[var(--border-soft)] bg-[color:rgba(11,13,18,0.52)] px-4 py-4 text-xs leading-6 text-[var(--text-secondary)]">
+            {currentEpisode?.content || '暂无内容'}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    switch (activeResultTab) {
+      case 'assets':
+        return renderAssets();
+      case 'bios':
+        return renderBios();
+      case 'relationships':
+        return renderRelationships();
+      case 'outline':
+        return renderOutline();
+      case 'script':
+        return renderScript();
+      default:
+        return <EmptyState text="暂无可展示内容。" />;
+    }
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* 头部 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 shrink-0">
-        <div className="flex items-center gap-2">
-          <FileText size={14} className="text-blue-400" />
-          <span className="text-xs font-medium">剧本管理</span>
-        </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-gray-700 transition-colors">
-          <X size={12} />
-        </button>
-      </div>
-
-      {/* 标签页 */}
-      <div className="border-b border-gray-700 shrink-0">
-        <div className="flex">
-          {resultTabs.slice(0, 3).map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveResultTab(tab.key as any)}
-              className={`flex-1 py-1.5 text-[9px] flex items-center justify-center gap-1 transition-colors ${
-                activeResultTab === tab.key
-                  ? 'bg-blue-500/20 text-blue-300 border-b-2 border-blue-500'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <tab.icon size={10} />
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className="flex">
-          {resultTabs.slice(3).map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveResultTab(tab.key as any)}
-              className={`flex-1 py-1.5 text-[9px] flex items-center justify-center gap-1 transition-colors ${
-                activeResultTab === tab.key
-                  ? 'bg-blue-500/20 text-blue-300 border-b-2 border-blue-500'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <tab.icon size={10} />
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 进度条 */}
-      {isAnalyzing && (
-        <div className="px-3 py-1 bg-gray-800 shrink-0">
-          <div className="text-[8px] text-gray-400 mb-1">{currentAnalysisStep}</div>
-          <div className="h-1 bg-gray-700 rounded overflow-hidden">
-            <div 
-              className="h-full bg-blue-500 transition-all duration-300"
-              style={{ width: `${analysisProgress}%` }}
-            />
+    <div className="flex h-full flex-col">
+      <div className="border-b border-[var(--border-soft)] px-4 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="app-meta">Script Workspace</p>
+            <h3 className="mt-1 text-base font-semibold text-[var(--text-primary)]">剧本管理</h3>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">上传原始剧本，提取资产、分析人物关系，或按内容结构智能分集。</p>
           </div>
-        </div>
-      )}
-
-      {/* 错误提示 */}
-      {analysisError && (
-        <div className="px-3 py-2 bg-red-900/30 border-b border-red-700 shrink-0">
-          <div className="text-[10px] text-red-400">{analysisError}</div>
-        </div>
-      )}
-
-      {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto p-2">
-        {renderTabContent()}
-      </div>
-
-      {/* 底部操作区 */}
-      <div className="p-2 border-t border-gray-700 space-y-2 shrink-0">
-        {/* 操作选择 */}
-        <div className="relative">
           <button
-            onClick={() => setShowActionDropdown(!showActionDropdown)}
-            className="w-full p-2 rounded-lg border border-gray-600 bg-gray-800/50 flex items-center gap-2 text-left hover:border-gray-500 transition-colors"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-soft)] bg-white/5 text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+            title="关闭"
           >
-            <div className="p-1 rounded bg-gray-700 text-gray-400">
-              {selectedOption && <selectedOption.icon size={12} />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] text-gray-300">{selectedOption?.label}</div>
-              <div className="text-[8px] text-gray-500 truncate">{selectedOption?.desc}</div>
-            </div>
-            <ChevronDown size={12} className={`text-gray-500 transition-transform ${showActionDropdown ? 'rotate-180' : ''}`} />
+            <X size={16} />
           </button>
-
-          {showActionDropdown && (
-            <div className="absolute bottom-full left-0 right-0 mb-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
-              {actionOptions.map(option => (
-                <button
-                  key={option.key}
-                  onClick={() => {
-                    setSelectedAction(option.key as any);
-                    setShowActionDropdown(false);
-                  }}
-                  className="w-full px-3 py-2 text-left text-[10px] text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-                >
-                  {selectedAction === option.key && <Check size={10} className="text-blue-400" />}
-                  <option.icon size={12} className={selectedAction === option.key ? 'text-blue-400' : 'text-gray-500'} />
-                  <span className={selectedAction === option.key ? 'text-blue-300' : ''}>
-                    {option.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
-
-        {/* 文件上传 */}
-        <div className={`border-2 border-dashed rounded-lg p-2 text-center transition-colors ${
-          scriptFile ? 'border-green-500/50 bg-green-500/10' : 'border-gray-600 hover:border-blue-500/50'
-        }`}>
-          <input
-            type="file"
-            accept=".txt,.md,.json"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="script-upload-panel"
-          />
-          <label htmlFor="script-upload-panel" className="cursor-pointer flex flex-col items-center gap-1">
-            {scriptFile ? (
-              <>
-                <File size={14} className="text-green-400" />
-                <span className="text-[10px] text-green-300 font-medium truncate max-w-full">{scriptFile.name}</span>
-              </>
-            ) : (
-              <>
-                <Upload size={14} className="text-gray-500" />
-                <span className="text-[10px] text-gray-400">上传剧本文件</span>
-              </>
-            )}
-          </label>
-        </div>
-
-        {/* 执行按钮 */}
-        <button
-          onClick={handleAnalyze}
-          disabled={!scriptFile || isAnalyzing}
-          className="w-full py-2 rounded-lg font-medium text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-500"
-        >
-          {isAnalyzing ? (
-            <><Sparkles size={12} className="animate-pulse" />{analysisProgress}%</>
-          ) : (
-            <><Sparkles size={12} />{selectedAction === 'splitEpisodes' ? '开始分集' : '开始处理'}</>
-          )}
-        </button>
       </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="space-y-4">
+          <section className={`${sectionClassName} p-4`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-[var(--text-primary)]">剧本输入</h4>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">支持上传 `txt`、`md`、`json` 文件，作为当前分析输入。</p>
+              </div>
+              {scriptFile && <span className="status-pill status-active">已上传</span>}
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <label
+                htmlFor="script-upload-panel"
+                className={`flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed px-4 py-4 transition ${
+                  scriptFile
+                    ? 'border-primary-500/35 bg-primary-500/10'
+                    : 'border-[var(--border-soft)] bg-[var(--surface-3)] hover:border-primary-500/30'
+                }`}
+              >
+                <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${scriptFile ? 'bg-primary-500 text-white' : 'bg-white/5 text-[var(--text-secondary)]'}`}>
+                  <Upload size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-[var(--text-primary)]">
+                    {scriptFile ? scriptFile.name : '上传剧本文件'}
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-[var(--text-secondary)]">
+                    {scriptFile ? '已选择文件，随时可以重新上传替换。' : '点击选择文件，作为后续资产提取与剧本分析输入。'}
+                  </span>
+                </span>
+              </label>
+              <input
+                type="file"
+                accept=".txt,.md,.json"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="script-upload-panel"
+              />
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowActionDropdown(!showActionDropdown)}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-3)] px-4 py-3 text-left transition hover:border-primary-500/25"
+                >
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-[var(--text-secondary)]">
+                    <selectedOption.icon size={16} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-[var(--text-primary)]">{selectedOption.label}</span>
+                    <span className="mt-1 block truncate text-xs text-[var(--text-secondary)]">{selectedOption.desc}</span>
+                  </span>
+                  <ChevronDown size={16} className={`text-[var(--text-tertiary)] transition-transform ${showActionDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showActionDropdown && (
+                  <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-2)] shadow-2xl">
+                    {actionOptions.map((option) => (
+                      <button
+                        key={option.key}
+                        onClick={() => {
+                          setSelectedAction(option.key as any);
+                          setShowActionDropdown(false);
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5"
+                      >
+                        <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${selectedAction === option.key ? 'bg-primary-500 text-white' : 'bg-white/5 text-[var(--text-secondary)]'}`}>
+                          <option.icon size={14} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className={`block text-sm ${selectedAction === option.key ? 'text-primary-300' : 'text-[var(--text-primary)]'}`}>{option.label}</span>
+                          <span className="mt-1 block truncate text-xs text-[var(--text-secondary)]">{option.desc}</span>
+                        </span>
+                        {selectedAction === option.key && <Check size={14} className="text-primary-400" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => void handleAnalyze()}
+                disabled={!scriptFile || isAnalyzing}
+                className="btn btn-primary h-11 w-full justify-center text-sm disabled:opacity-50"
+              >
+                <Sparkles size={15} className={isAnalyzing ? 'animate-pulse' : ''} />
+                <span>
+                  {isAnalyzing
+                    ? `${analysisProgress}%`
+                    : selectedAction === 'splitEpisodes'
+                      ? '开始分集'
+                      : '开始处理'}
+                </span>
+              </button>
+            </div>
+          </section>
+
+          {(isAnalyzing || analysisError) && (
+            <section className={`${sectionClassName} p-4`}>
+              {isAnalyzing && (
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">处理中</p>
+                    <span className="text-xs text-[var(--text-secondary)]">{analysisProgress}%</span>
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">{currentAnalysisStep || '正在处理剧本内容...'}</p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-3)]">
+                    <div
+                      className="h-full rounded-full bg-primary-500 transition-all duration-300"
+                      style={{ width: `${analysisProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {analysisError && (
+                <div className={`${isAnalyzing ? 'mt-4 border-t border-[var(--border-soft)] pt-4' : ''}`}>
+                  <p className="text-sm font-medium text-red-300">处理失败</p>
+                  <p className="mt-2 text-xs leading-5 text-red-200/85">{analysisError}</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          <section className={`${sectionClassName} overflow-hidden`}>
+            <div className="border-b border-[var(--border-soft)] px-4 py-3">
+              <div className="flex gap-2 overflow-x-auto">
+                {resultTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveResultTab(tab.key as any)}
+                    className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm whitespace-nowrap transition ${
+                      activeResultTab === tab.key
+                        ? 'bg-primary-500 text-white shadow-brand'
+                        : 'bg-white/5 text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <tab.icon size={14} />
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="max-h-[560px] overflow-y-auto px-4 py-4">
+              {renderContent()}
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex h-full items-center justify-center px-6 py-10 text-center text-sm leading-6 text-[var(--text-secondary)]">
+      {text}
     </div>
   );
 }

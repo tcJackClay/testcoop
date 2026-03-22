@@ -1,297 +1,247 @@
-import { useState, useEffect } from 'react';
-import { X, Zap, FolderOpen, Layers, Trash2, Download, Image, Video, Grid3X3, List, RefreshCw, MessageCircle, Layout, MoreVertical, Loader2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { listProjectImages, listProjectVideos, type OSSFile } from '../../api/oss';
-import { useProjectStore } from '../../stores/projectStore';
+import { useEffect, useMemo, useState } from 'react'
+import { Grid3X3, Grip, Image, Layout, List, Loader2, Video, X } from 'lucide-react'
+import { projectApi, type ProjectHistoryRecord } from '../../api/project'
+import { useProjectStore } from '../../stores/projectStore'
+import { formatHistorySize, formatHistoryTime, getDisplayName, getDisplayUrl } from './historyUtils'
 
-type ViewMode = 'grid' | 'list';
-type MediaType = 'image' | 'video';
+type ViewMode = 'grid' | 'list'
+type MediaType = 'image' | 'video'
 
 export default function FilesPanel({ onClose }: { onClose: () => void }) {
-  const { t } = useTranslation();
-  const [mediaType, setMediaType] = useState<MediaType>('image');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [performanceMode, setPerformanceMode] = useState<'off' | 'normal' | 'ultra'>('normal');
-  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [files, setFiles] = useState<OSSFile[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  
-  const { currentProject } = useProjectStore();
-  const projectId = currentProject?.id || 1;
+  const [mediaType, setMediaType] = useState<MediaType>('image')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [hoveredItem, setHoveredItem] = useState<number | null>(null)
+  const [files, setFiles] = useState<ProjectHistoryRecord[]>([])
+  const [loading, setLoading] = useState(false)
 
-  // 加载文件列表
+  const { currentProject } = useProjectStore()
+  const projectId = currentProject?.id
+
   useEffect(() => {
     const loadFiles = async () => {
-      setLoading(true);
-      try {
-        const data = mediaType === 'image' 
-          ? await listProjectImages(projectId, 100)
-          : await listProjectVideos(projectId, 100);
-        setFiles(data);
-      } catch (error) {
-        console.error('加载文件列表失败:', error);
-        setFiles([]);
-      } finally {
-        setLoading(false);
+      if (!projectId) {
+        setFiles([])
+        return
       }
-    };
-    
-    loadFiles();
-  }, [mediaType, projectId]);
 
-  // 切换媒体类型时清空选择
-  useEffect(() => {
-    setSelectedItems(new Set());
-  }, [mediaType]);
-
-  // 切换全选
-  const toggleSelectAll = () => {
-    if (selectedItems.size === files.length) {
-      setSelectedItems(new Set());
-    } else {
-      setSelectedItems(new Set(files.map(f => f.name)));
+      setLoading(true)
+      try {
+        const data = await projectApi.getHistory(projectId, { pageSize: 100 })
+        setFiles(data.filter((item) => item.historyStatus !== 'deleted'))
+      } catch (error) {
+        console.error('load files failed:', error)
+        setFiles([])
+      } finally {
+        setLoading(false)
+      }
     }
-  };
 
-  // 切换单个选择
-  const toggleSelect = (fileName: string) => {
-    const newSelected = new Set(selectedItems);
-    if (newSelected.has(fileName)) {
-      newSelected.delete(fileName);
-    } else {
-      newSelected.add(fileName);
-    }
-    setSelectedItems(newSelected);
-  };
+    void loadFiles()
+  }, [projectId])
 
-  // 拖拽开始
-  const handleDragStart = (e: React.DragEvent, file: OSSFile) => {
-    // 构造与资产卡相同的数据格式，以便 Canvas 统一处理
+  const visibleFiles = useMemo(
+    () => files.filter((file) => file.mediaType === mediaType),
+    [files, mediaType]
+  )
+
+  const handleDragStart = (event: React.DragEvent, file: ProjectHistoryRecord) => {
+    const imageUrl = getDisplayUrl(file)
+    const displayName = getDisplayName(file)
     const dragData = {
-      id: file.url,  // 使用 URL 作为 ID（临时方案）
-      name: file.name.split('/').pop() || 'image',
-      resourceName: file.name.split('/').pop() || 'image',
-      imageUrl: file.url,  // 直接使用 OSS URL
-      type: file.type,
-      url: file.url,
-      // 用于区分是 OSS 历史文件
+      id: String(file.id),
+      historyId: file.id,
+      name: displayName,
+      resourceName: displayName,
+      imageUrl,
+      type: file.mediaType,
+      url: imageUrl,
+      objectKey: file.objectKey,
       isHistoryFile: true,
-    };
-    
-    e.dataTransfer.setData('application/json', JSON.stringify(dragData));
-    e.dataTransfer.effectAllowed = 'copy';
-  };
+    }
 
-  // 格式化时间
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN', { 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // 格式化大小
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+    event.dataTransfer.setData('application/json', JSON.stringify(dragData))
+    event.dataTransfer.effectAllowed = 'copy'
+  }
 
   return (
-    <div className="flex flex-col h-full relative">
-      {/* Header */}
-      <div className="h-12 border-b border-gray-700 flex items-center justify-between px-3 shrink-0">
-        <div className="flex items-center gap-2">
-          {/* 媒体类型切换 - 放在左边 */}
-          <button
-            onClick={() => setMediaType('image')}
-            className={`p-1.5 rounded ${mediaType === 'image' ? 'bg-primary-500 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-            title="图片"
-          >
-            <Image size={14} />
-          </button>
-          <button
-            onClick={() => setMediaType('video')}
-            className={`p-1.5 rounded ${mediaType === 'video' ? 'bg-primary-500 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-            title="视频"
-          >
-            <Video size={14} />
-          </button>
+    <div className="flex h-full flex-col">
+      <div className="border-b border-[var(--border-soft)] px-4 py-4">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-xs font-bold text-gray-300">
-              {mediaType === 'image' ? '图片' : '视频'}
-            </h3>
-            <span className="text-[9px] text-gray-500">{files.length}/100</span>
+            <p className="app-meta">Side Library</p>
+            <h3 className="mt-1 text-base font-semibold text-[var(--text-primary)]">文件面板</h3>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">当前项目的可拖拽图片与视频结果。</p>
           </div>
+          <button
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-soft)] bg-white/5 text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+            title="关闭"
+          >
+            <X size={16} />
+          </button>
         </div>
-      </div>
 
-      {/* View Mode Toggle */}
-      <div className="h-10 border-b border-gray-700 flex items-center justify-between px-3">
-        <div className="flex gap-1">
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-dark-surface text-white' : 'text-gray-500'}`}
-          >
-            <Grid3X3 size={14} />
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-dark-surface text-white' : 'text-gray-500'}`}
-          >
-            <List size={14} />
-          </button>
-        </div>
-        {selectedItems.size > 0 && (
-          <div className="flex gap-1">
-            <span className="text-[10px] text-primary-400">
-              已选 {selectedItems.size} 项
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <div className="flex items-center rounded-2xl border border-[var(--border-soft)] bg-white/5 p-1">
+            <button
+              onClick={() => setMediaType('image')}
+              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+                mediaType === 'image'
+                  ? 'bg-primary-500 text-white shadow-brand'
+                  : 'text-[var(--text-secondary)] hover:bg-white/6 hover:text-[var(--text-primary)]'
+              }`}
+              title="图片"
+            >
+              <Image size={14} />
+              图片
+            </button>
+            <button
+              onClick={() => setMediaType('video')}
+              className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+                mediaType === 'video'
+                  ? 'bg-primary-500 text-white shadow-brand'
+                  : 'text-[var(--text-secondary)] hover:bg-white/6 hover:text-[var(--text-primary)]'
+              }`}
+              title="视频"
+            >
+              <Video size={14} />
+              视频
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-[var(--border-soft)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+              {visibleFiles.length} 项
             </span>
+            <div className="flex items-center rounded-2xl border border-[var(--border-soft)] bg-white/5 p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                  viewMode === 'grid'
+                    ? 'bg-white/10 text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:bg-white/6 hover:text-[var(--text-primary)]'
+                }`}
+                title="网格视图"
+              >
+                <Grid3X3 size={15} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition ${
+                  viewMode === 'list'
+                    ? 'bg-white/10 text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:bg-white/6 hover:text-[var(--text-primary)]'
+                }`}
+                title="列表视图"
+              >
+                <List size={15} />
+              </button>
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
         {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-7 w-7 animate-spin text-primary-500" />
           </div>
-        ) : files.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            {mediaType === 'image' ? (
-              <Image className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            ) : (
-              <Video className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            )}
-            <p className="text-xs">暂无{mediaType === 'image' ? '图片' : '视频'}历史</p>
+        ) : !projectId || visibleFiles.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="rounded-[24px] border border-[var(--border-soft)] bg-white/5 px-6 py-8 text-center shadow-soft">
+              {mediaType === 'image' ? (
+                <Image className="mx-auto h-10 w-10 text-[var(--text-tertiary)]" />
+              ) : (
+                <Video className="mx-auto h-10 w-10 text-[var(--text-tertiary)]" />
+              )}
+              <p className="mt-4 text-sm font-medium text-[var(--text-primary)]">暂无{mediaType === 'image' ? '图片' : '视频'}结果</p>
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">生成后即可从这里直接拖入画布。</p>
+            </div>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 gap-2">
-            {files.map((file) => (
-              <div
-                key={file.name}
-                className={`aspect-square bg-dark-elevated rounded-lg overflow-hidden cursor-pointer relative group ${
-                  selectedItems.has(file.name) ? 'ring-2 ring-primary-500' : ''
-                }`}
-                onMouseEnter={() => setHoveredItem(file.name)}
-                onMouseLeave={() => setHoveredItem(null)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, file)}
-              >
-                {/* 选择框 */}
-                <div 
-                  className="absolute top-2 left-2 z-10"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSelect(file.name);
-                  }}
+          <div className="grid grid-cols-2 gap-3">
+            {visibleFiles.map((file) => {
+              const displayUrl = getDisplayUrl(file)
+              return (
+                <div
+                  key={file.id}
+                  className="group overflow-hidden rounded-[22px] border border-[var(--border-soft)] bg-[var(--surface-2)] shadow-soft transition hover:-translate-y-0.5 hover:border-primary-500/30"
+                  onMouseEnter={() => setHoveredItem(file.id)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, file)}
                 >
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                    selectedItems.has(file.name) 
-                      ? 'bg-primary-500 border-primary-500' 
-                      : 'border-gray-500 hover:border-gray-400'
-                  }`}>
-                    {selectedItems.has(file.name) && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
+                  <div className="relative aspect-square overflow-hidden bg-[var(--surface-3)]">
+                    {file.mediaType === 'image' ? (
+                      <img src={displayUrl} alt="" className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+                    ) : (
+                      <video src={displayUrl} className="h-full w-full object-cover" />
                     )}
-                  </div>
-                </div>
 
-                {file.type === 'image' ? (
-                  <img src={file.url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <video src={file.url} className="w-full h-full object-cover" />
-                )}
-                
-                {/* Hover overlay */}
-                {hoveredItem === file.name && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <Layout size={20} className="text-white" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+
+                    {hoveredItem === file.id && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/28">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/35 px-3 py-2 text-xs text-white">
+                          <Grip size={12} />
+                          拖入画布
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="absolute bottom-2 left-2 right-2 rounded-xl bg-black/35 px-2 py-1 text-[10px] text-white/85">
+                      {formatHistoryTime(file.createdTime)}
+                    </div>
                   </div>
-                )}
-                
-                {/* 时间标签 */}
-                <div className="absolute bottom-1 left-1 right-1 text-[10px] text-white/80 bg-black/50 rounded px-1 truncate">
-                  {formatTime(file.lastModified)}
+
+                  <div className="px-3 py-3">
+                    <p className="truncate text-xs font-medium text-[var(--text-primary)]">{getDisplayName(file)}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : (
-          <div className="space-y-2">
-            {files.map((file) => (
-              <div
-                key={file.name}
-                className={`flex items-center gap-2 p-2 bg-dark-elevated rounded-lg cursor-pointer ${
-                  selectedItems.has(file.name) ? 'ring-1 ring-primary-500' : ''
-                }`}
-                onMouseEnter={() => setHoveredItem(file.name)}
-                onMouseLeave={() => setHoveredItem(null)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, file)}
-              >
-                {/* 选择框 */}
-                <div 
-                  className="shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleSelect(file.name);
-                  }}
+          <div className="space-y-3">
+            {visibleFiles.map((file) => {
+              const displayUrl = getDisplayUrl(file)
+              return (
+                <div
+                  key={file.id}
+                  className="flex items-center gap-3 rounded-[20px] border border-[var(--border-soft)] bg-[var(--surface-2)] px-3 py-3 shadow-soft transition hover:border-primary-500/25 hover:bg-[var(--surface-3)]"
+                  onMouseEnter={() => setHoveredItem(file.id)}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, file)}
                 >
-                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                    selectedItems.has(file.name) 
-                      ? 'bg-primary-500 border-primary-500' 
-                      : 'border-gray-500 hover:border-gray-400'
-                  }`}>
-                    {selectedItems.has(file.name) && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[var(--surface-3)]">
+                    {file.mediaType === 'image' ? (
+                      <img src={displayUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <video src={displayUrl} className="h-full w-full object-cover" />
                     )}
                   </div>
-                </div>
 
-                {/* 缩略图 */}
-                <div className="w-12 h-12 bg-gray-700 rounded overflow-hidden shrink-0">
-                  {file.type === 'image' ? (
-                    <img src={file.url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <video src={file.url} className="w-full h-full object-cover" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">{getDisplayName(file)}</p>
+                    <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                      {formatHistoryTime(file.createdTime)}
+                      {file.fileSize ? ` · ${formatHistorySize(file.fileSize)}` : ''}
+                    </p>
+                  </div>
+
+                  {hoveredItem === file.id && (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] px-3 py-1.5 text-xs text-[var(--text-secondary)]">
+                      <Layout size={14} />
+                      拖入画布
+                    </div>
                   )}
                 </div>
-                
-                {/* 信息 */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-300 truncate">{file.name.split('/').pop()}</p>
-                  <p className="text-[10px] text-gray-500">
-                    {formatTime(file.lastModified)} · {formatSize(file.size)}
-                  </p>
-                </div>
-                
-                {/* Hover 图标 */}
-                {hoveredItem === file.name && (
-                  <Layout size={16} className="text-gray-400 shrink-0" />
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
-
-      {/* Close Button */}
-      <button
-        onClick={onClose}
-        className="absolute top-3 right-3 p-1.5 text-gray-500 hover:text-white hover:bg-dark-elevated rounded-lg transition-colors z-10"
-      >
-        <X size={16} />
-      </button>
     </div>
-  );
+  )
 }

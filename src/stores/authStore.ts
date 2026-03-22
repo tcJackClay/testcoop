@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi, LoginRequest, RegisterRequest } from '@/api/auth';
+import { authApi, LoginRequest, RegisterRequest } from '../api/auth';
 
 export interface User {
   id: number;

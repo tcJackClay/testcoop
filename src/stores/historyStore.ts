@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { HistoryItem, HistoryItemType, HistoryItemStatus } from '../types';
+import { useCanvasStore } from './canvasStore';
+import { useChatStore } from './chatStore';
 
 // Performance mode options
 export type PerformanceMode = 'fast' | 'normal' | 'off';
@@ -151,57 +153,48 @@ export const useHistoryStore = create<HistoryState>()(
 
       // Send history item to canvas
       sendToCanvas: (item) => {
-        // Dynamically import canvas store to avoid circular dependency
-        import('./canvasStore').then(({ useCanvasStore }) => {
-          const canvasStore = useCanvasStore.getState();
-          
-          if (item.type === 'image' && item.imageUrls && item.imageUrls.length > 0) {
-            // Add image node to canvas
-            canvasStore.addNode('imageNode', { x: 100, y: 100 }, {
-              data: {
-                label: 'Image from History',
-                imageUrl: item.imageUrls[0],
-                prompt: item.prompt || '',
-                status: 'completed',
-              }
-            });
-          } else if (item.type === 'video' && item.videoUrl) {
-            // Add video node to canvas
-            canvasStore.addNode('videoNode', { x: 100, y: 100 }, {
-              data: {
-                label: 'Video from History',
-                videoUrl: item.videoUrl,
-                prompt: item.prompt || '',
-                status: 'completed',
-              }
-            });
-          }
-        });
+        const canvasStore = useCanvasStore.getState();
+
+        if (item.type === 'image' && item.imageUrls && item.imageUrls.length > 0) {
+          canvasStore.addNode('imageNode', { x: 100, y: 100 }, {
+            data: {
+              label: 'Image from History',
+              imageUrl: item.imageUrls[0],
+              prompt: item.prompt || '',
+              status: 'completed',
+            }
+          });
+        } else if (item.type === 'video' && item.videoUrl) {
+          canvasStore.addNode('videoNode', { x: 100, y: 100 }, {
+            data: {
+              label: 'Video from History',
+              videoUrl: item.videoUrl,
+              prompt: item.prompt || '',
+              status: 'completed',
+            }
+          });
+        }
       },
 
       // Send history item to chat
       sendToChat: (item) => {
-        // Dynamically import chat store to avoid circular dependency
-        import('./chatStore').then(({ useChatStore }) => {
-          const chatStore = useChatStore.getState();
-          
-          if (item.type === 'image' && item.imageUrls && item.imageUrls.length > 0) {
-            chatStore.addAttachment({
-              type: 'image',
-              url: item.imageUrls[0],
-              thumbnailUrl: item.thumbnailUrl || item.imageUrls[0],
-            });
-          } else if (item.type === 'video' && item.videoUrl) {
-            chatStore.addAttachment({
-              type: 'video',
-              url: item.videoUrl,
-              thumbnailUrl: item.thumbnailUrl,
-            });
-          }
-          
-          // Dispatch event to open chat panel
-          window.dispatchEvent(new CustomEvent('history:send-to-chat', { detail: { item } }));
-        });
+        const chatStore = useChatStore.getState();
+
+        if (item.type === 'image' && item.imageUrls && item.imageUrls.length > 0) {
+          chatStore.addAttachment({
+            type: 'image',
+            url: item.imageUrls[0],
+            thumbnailUrl: item.thumbnailUrl || item.imageUrls[0],
+          });
+        } else if (item.type === 'video' && item.videoUrl) {
+          chatStore.addAttachment({
+            type: 'video',
+            url: item.videoUrl,
+            thumbnailUrl: item.thumbnailUrl,
+          });
+        }
+
+        window.dispatchEvent(new CustomEvent('history:send-to-chat', { detail: { item } }));
       },
 
       // Get cache size (approximate)

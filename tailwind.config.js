@@ -7,26 +7,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Brand Primary - From Logo (#0090FF)
         primary: {
-          50: '#e6f4ff',
-          100: '#cce8ff',
-          200: '#99d1ff',
-          300: '#66baff',
-          400: '#33a3ff',
-          500: '#0090ff',
-          600: '#0073cc',
-          700: '#005599',
-          800: '#003866',
-          900: '#001b33',
+          50: '#e9f5ff',
+          100: '#d5ecff',
+          200: '#add8ff',
+          300: '#7cc1ff',
+          400: '#46a8ff',
+          500: '#1292ff',
+          600: '#0b7de0',
+          700: '#0a66b7',
+          800: '#0c4f88',
+          900: '#0b3558',
         },
-        // Custom dark theme colors (OKLCH-inspired)
         dark: {
-          bg: '#0f0f0f',
-          surface: '#1a1a1a',
-          elevated: '#242424',
+          bg: '#0b0d12',
+          subtle: '#11161d',
+          surface: '#18202b',
+          elevated: '#202a36',
+          panel: '#273444',
         },
-        // Accent color - Coral/Salmon (70-20-10 rule: 10% accent)
         accent: {
           50: '#fff1f0',
           100: '#ffe4e1',
@@ -108,13 +107,17 @@ export default {
       borderRadius: {
         'xs': '2px',
         'sm': '4px',
-        'DEFAULT': '8px',
-        'md': '8px',
+        'DEFAULT': '12px',
+        'md': '12px',
         'lg': '12px',
         'xl': '16px',
         '2xl': '24px',
         '3xl': '32px',
         'full': '9999px',
+      },
+      boxShadow: {
+        soft: '0 18px 48px rgba(3, 6, 12, 0.28)',
+        brand: '0 10px 30px rgba(18, 146, 255, 0.2)',
       },
     },
   },

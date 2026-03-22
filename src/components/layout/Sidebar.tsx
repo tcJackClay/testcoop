@@ -1,10 +1,9 @@
-import { 
+import {
   History,
   MessageSquare,
   BookOpen,
-  Library
+  Library,
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import type { LeftPanelType } from '../leftPanel/LeftPanel';
 import type { RightPanelType } from '../rightPanel/RightPanel';
 import type { NodeType } from '../../stores/canvasStore';
@@ -21,78 +20,69 @@ interface SidebarProps {
   onRightPanelChange: (type: RightPanelType) => void;
 }
 
-export default function Sidebar({ 
+const leftActions = [
+  { key: 'assets' as const, title: '资产库', icon: Library },
+  { key: 'script' as const, title: '脚本', icon: BookOpen },
+];
+
+const rightActions = [
+  { key: 'history' as const, title: '文件', icon: History },
+  { key: 'chat' as const, title: '对话', icon: MessageSquare },
+];
+
+export default function Sidebar({
   leftPanel,
   rightPanel,
   onLeftPanelChange,
-  onRightPanelChange
+  onRightPanelChange,
 }: SidebarProps) {
-  const { t } = useTranslation();
-
-  // Dynamic position: move right when leftPanel is open
-  const sidebarLeft = leftPanel ? 'left-[324px]' : 'left-4';
+  const sidebarLeft = leftPanel ? 'left-[380px]' : 'left-5';
 
   return (
-    <aside className={`fixed ${sidebarLeft} top-1/2 -translate-y-1/2 bg-dark-surface/95 backdrop-blur rounded-2xl shadow-2xl border border-gray-700/50 flex flex-col items-center py-2.5 gap-1 z-50 w-10 transition-all duration-200 ease-out-expo`}>
+    <aside
+      className={`fixed ${sidebarLeft} top-1/2 z-40 flex w-14 -translate-y-1/2 flex-col items-center gap-2 rounded-[24px] border border-[var(--border-soft)] bg-[color:rgba(24,32,43,0.86)] px-2 py-3 shadow-2xl backdrop-blur-xl transition-all duration-200`}
+    >
+      {leftActions.map((action) => {
+        const Icon = action.icon;
+        const active = leftPanel === action.key;
 
-      {/* ===== 左侧面板按钮（上方）=====*/}
-      
-      {/* 资产库 - Assets */}
-      <button
-        onClick={() => onLeftPanelChange(leftPanel === 'assets' ? null : 'assets')}
-        className={`p-2.5 rounded-xl transition-all duration-150 ease-out-expo ${
-          leftPanel === 'assets'
-            ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' 
-            : 'text-gray-400 hover:text-primary-300 hover:bg-dark-elevated'
-        }`}
-        title={t('资产库')}
-      >
-        <Library size={18} />
-      </button>
+        return (
+          <button
+            key={action.key}
+            onClick={() => onLeftPanelChange(active ? null : action.key)}
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition ${
+              active
+                ? 'border-primary-500/40 bg-primary-500 text-white shadow-brand'
+                : 'border-transparent text-[var(--text-secondary)] hover:border-[var(--border-soft)] hover:bg-white/6 hover:text-[var(--text-primary)]'
+            }`}
+            title={action.title}
+          >
+            <Icon size={18} />
+          </button>
+        );
+      })}
 
-      {/* 剧本 - Script */}
-      <button
-        onClick={() => onLeftPanelChange(leftPanel === 'script' ? null : 'script')}
-        className={`p-2.5 rounded-xl transition-all duration-150 ease-out-expo ${
-          leftPanel === 'script'
-            ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' 
-            : 'text-gray-400 hover:text-primary-300 hover:bg-dark-elevated'
-        }`}
-        title={t('剧本')}
-      >
-        <BookOpen size={18} />
-      </button>
+      <div className="my-1 h-px w-6 bg-[var(--border-soft)]" />
 
-      <div className="flex-1" />
+      {rightActions.map((action) => {
+        const Icon = action.icon;
+        const active = rightPanel === action.key;
 
-      {/* ===== 右侧面板按钮（下方）=====*/}
-
-      {/* 文件 - Files (右侧) */}
-      <button
-        onClick={() => onRightPanelChange(rightPanel === 'history' ? null : 'history')}
-        className={`p-2.5 rounded-xl transition-all duration-150 ease-out-expo ${
-          rightPanel === 'history'
-            ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' 
-            : 'text-gray-400 hover:text-primary-300 hover:bg-dark-elevated'
-        }`}
-        title={t('files')}
-      >
-        <History size={18} />
-      </button>
-
-      {/* 对话 - Chat (右侧) */}
-      <button
-        onClick={() => onRightPanelChange(rightPanel === 'chat' ? null : 'chat')}
-        className={`p-2.5 rounded-xl transition-all duration-150 ease-out-expo ${
-          rightPanel === 'chat'
-            ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/25' 
-            : 'text-gray-400 hover:text-primary-300 hover:bg-dark-elevated'
-        }`}
-        title={t('对话')}
-      >
-        <MessageSquare size={18} />
-      </button>
-
+        return (
+          <button
+            key={action.key}
+            onClick={() => onRightPanelChange(active ? null : action.key)}
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition ${
+              active
+                ? 'border-primary-500/40 bg-primary-500 text-white shadow-brand'
+                : 'border-transparent text-[var(--text-secondary)] hover:border-[var(--border-soft)] hover:bg-white/6 hover:text-[var(--text-primary)]'
+            }`}
+            title={action.title}
+          >
+            <Icon size={18} />
+          </button>
+        );
+      })}
     </aside>
   );
 }

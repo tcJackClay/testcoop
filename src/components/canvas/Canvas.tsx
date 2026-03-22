@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Grid3X3, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { imageApi } from '../../api/image';
 import { useCanvasStore, type NodeType } from '../../stores/canvasStore';
 import NodeRenderer from '../nodes/NodeRenderer';
 import CanvasToolbar from './CanvasToolbar';
@@ -21,10 +22,27 @@ interface ContextMenuState {
   worldY: number;
 }
 
+interface DuplicateAssetState {
+  x: number;
+  y: number;
+  id: number;
+  name: string;
+  ext2?: string;
+  assetData?: any;
+  existingNodeId: string;
+}
+
+const helpTips = [
+  { key: '滚轮', value: '缩放画布' },
+  { key: '中键 / Alt', value: '平移视图' },
+  { key: '双击空白区', value: '恢复初始视图' },
+  { key: 'Del', value: '删除选中节点' },
+];
+
 export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const [isPanning, setIsPanning] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionBox, setSelectionBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -33,14 +51,23 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, worldX: 0, worldY: 0 });
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [showHelp, setShowHelp] = useState(true);
-  
-  const { 
-    nodes, viewPort, addNode, updateViewPort,
-    deleteSelectedNodes, selectedNodeIds, undo, redo,
-    selectNodesInBox, clearSelection, copyNodes, pasteNodes
+  const [zoomTip, setZoomTip] = useState<string | null>(null);
+
+  const {
+    nodes,
+    viewPort,
+    addNode,
+    updateViewPort,
+    deleteSelectedNodes,
+    selectedNodeIds,
+    undo,
+    redo,
+    selectNodesInBox,
+    clearSelection,
+    copyNodes,
+    pasteNodes,
   } = useCanvasStore();
 
-  // 使用连线 hook (Tapnow 风格)
   const {
     connectingSource,
     connectingTarget,
@@ -59,238 +86,205 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
     viewPort,
   });
 
-  // 资产流程线状态
   const [assetInfo, setAssetInfo] = useState<{ x: number; y: number; id: number; name: string; ext2?: string; assetData?: any } | null>(null);
   const [flowLineCount, setFlowLineCount] = useState(0);
-  
-  // 重复资产确认对话框状态
-  const [duplicateAsset, setDuplicateAsset] = useState<{
-    x: number; y: number; id: number; name: string; ext2?: string; assetData?: any;
-    existingNodeId: string;
-  } | null>(null);
-  
-  // 监听流程线数量变化后清空 assetInfo
+  const [duplicateAsset, setDuplicateAsset] = useState<DuplicateAssetState | null>(null);
+
   useEffect(() => {
     if (assetInfo && flowLineCount > 0) {
-      console.log('[Canvas] 流程线创建完成，清空 assetInfo');
       setAssetInfo(null);
       setFlowLineCount(0);
     }
-  }, [flowLineCount]);
+  }, [assetInfo, flowLineCount]);
 
-  // 缩放状态提示
-  const [zoomTip, setZoomTip] = useState<string | null>(null);
+  const showZoomTip = useCallback((nextZoom: number) => {
+    setZoomTip(`${Math.round(nextZoom * 100)}%`);
+    window.setTimeout(() => setZoomTip(null), 800);
+  }, []);
 
-  // 滚轮缩放 - 以鼠标为中心
-  const handleWheelNative = useCallback((e: WheelEvent) => {
-    e.preventDefault();
+  const handleWheelNative = useCallback((event: WheelEvent) => {
+    event.preventDefault();
     if (!containerRef.current) return;
-    
+
     const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
-    // 缩放前鼠标在世界坐标的位置
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
     const worldX = (mouseX - viewPort.x) / viewPort.zoom;
     const worldY = (mouseY - viewPort.y) / viewPort.zoom;
-    
-    // 计算新缩放
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const delta = event.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
-    
-    // 缩放后保持鼠标位置不变
     const newX = mouseX - worldX * newZoom;
     const newY = mouseY - worldY * newZoom;
-    
+
     updateViewPort({ x: newX, y: newY, zoom: newZoom });
-    
-    // 显示缩放提示
-    setZoomTip(`${Math.round(newZoom * 100)}%`);
-    setTimeout(() => setZoomTip(null), 800);
-  }, [viewPort.zoom, viewPort.x, viewPort.y, updateViewPort]);
+    showZoomTip(newZoom);
+  }, [showZoomTip, updateViewPort, viewPort.x, viewPort.y, viewPort.zoom]);
 
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
+
     element.addEventListener('wheel', handleWheelNative, { passive: false });
     return () => element.removeEventListener('wheel', handleWheelNative);
   }, [handleWheelNative]);
 
-  // 缩放控制 - 以画布中心为中心
   const handleZoomIn = useCallback(() => {
     if (!containerRef.current) return;
+
     const rect = containerRef.current.getBoundingClientRect();
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
-    
     const worldX = (centerX - viewPort.x) / viewPort.zoom;
     const worldY = (centerY - viewPort.y) / viewPort.zoom;
-    
     const newZoom = Math.min(viewPort.zoom * 1.2, 3);
     const newX = centerX - worldX * newZoom;
     const newY = centerY - worldY * newZoom;
-    
+
     updateViewPort({ x: newX, y: newY, zoom: newZoom });
-    setZoomTip(`${Math.round(newZoom * 100)}%`);
-    setTimeout(() => setZoomTip(null), 800);
-  }, [viewPort, updateViewPort]);
+    showZoomTip(newZoom);
+  }, [showZoomTip, updateViewPort, viewPort.x, viewPort.y, viewPort.zoom]);
 
   const handleZoomOut = useCallback(() => {
     if (!containerRef.current) return;
+
     const rect = containerRef.current.getBoundingClientRect();
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
-    
     const worldX = (centerX - viewPort.x) / viewPort.zoom;
     const worldY = (centerY - viewPort.y) / viewPort.zoom;
-    
     const newZoom = Math.max(viewPort.zoom / 1.2, 0.1);
     const newX = centerX - worldX * newZoom;
     const newY = centerY - worldY * newZoom;
-    
-    updateViewPort({ x: newX, y: newY, zoom: newZoom });
-    setZoomTip(`${Math.round(newZoom * 100)}%`);
-    setTimeout(() => setZoomTip(null), 800);
-  }, [viewPort, updateViewPort]);
 
-  // 适应窗口 - 让所有节点适应画布
+    updateViewPort({ x: newX, y: newY, zoom: newZoom });
+    showZoomTip(newZoom);
+  }, [showZoomTip, updateViewPort, viewPort.x, viewPort.y, viewPort.zoom]);
+
   const handleFitView = useCallback(() => {
     if (nodes.length === 0) {
       updateViewPort({ x: 0, y: 0, zoom: 1 });
       return;
     }
-    
+
     if (!containerRef.current) return;
+
     const rect = containerRef.current.getBoundingClientRect();
     const padding = 50;
-    
-    // 计算所有节点的边界
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    nodes.forEach(node => {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    nodes.forEach((node) => {
       minX = Math.min(minX, node.position.x);
       minY = Math.min(minY, node.position.y);
       maxX = Math.max(maxX, node.position.x + (node.width || 200));
       maxY = Math.max(maxY, node.position.y + (node.height || 120));
     });
-    
+
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
     const canvasWidth = rect.width - padding * 2;
     const canvasHeight = rect.height - padding * 2;
-    
     const zoom = Math.min(canvasWidth / contentWidth, canvasHeight / contentHeight, 1.5);
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
-    
     const x = rect.width / 2 - centerX * zoom;
     const y = rect.height / 2 - centerY * zoom;
-    
-    updateViewPort({ x, y, zoom });
-    setZoomTip(`${Math.round(zoom * 100)}%`);
-    setTimeout(() => setZoomTip(null), 800);
-  }, [nodes, updateViewPort]);
 
-  // 回到原点
+    updateViewPort({ x, y, zoom });
+    showZoomTip(zoom);
+  }, [nodes, showZoomTip, updateViewPort]);
+
   const handleResetView = useCallback(() => {
     updateViewPort({ x: 0, y: 0, zoom: 1 });
-    setZoomTip('100%');
-    setTimeout(() => setZoomTip(null), 800);
-  }, [updateViewPort]);
+    showZoomTip(1);
+  }, [showZoomTip, updateViewPort]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    // React 事件处理同上
+  const handleWheel = useCallback((event: React.WheelEvent) => {
     if (!containerRef.current) return;
+
     const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
     const worldX = (mouseX - viewPort.x) / viewPort.zoom;
     const worldY = (mouseY - viewPort.y) / viewPort.zoom;
-    
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const delta = event.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(viewPort.zoom * delta, 0.1), 3);
     const newX = mouseX - worldX * newZoom;
     const newY = mouseY - worldY * newZoom;
-    
-    updateViewPort({ x: newX, y: newY, zoom: newZoom });
-    setZoomTip(`${Math.round(newZoom * 100)}%`);
-    setTimeout(() => setZoomTip(null), 800);
-  }, [viewPort, updateViewPort]);
 
-  // 右键菜单
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const worldX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-      const worldY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-      setContextMenu({ visible: true, x: e.clientX, y: e.clientY, worldX, worldY });
-    }
+    updateViewPort({ x: newX, y: newY, zoom: newZoom });
+    showZoomTip(newZoom);
+  }, [showZoomTip, updateViewPort, viewPort.x, viewPort.y, viewPort.zoom]);
+
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const worldX = (event.clientX - rect.left - viewPort.x) / viewPort.zoom;
+    const worldY = (event.clientY - rect.top - viewPort.y) / viewPort.zoom;
+    setContextMenu({ visible: true, x: event.clientX, y: event.clientY, worldX, worldY });
   }, [viewPort.x, viewPort.y, viewPort.zoom]);
 
-  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    // 双击空白处复位视图
-    if (e.target === containerRef.current || (e.target as HTMLElement).classList.contains('canvas-content')) {
-      e.preventDefault();
+  const handleDoubleClick = useCallback((event: React.MouseEvent) => {
+    if (event.target === containerRef.current || (event.target as HTMLElement).classList.contains('canvas-content')) {
+      event.preventDefault();
       handleResetView();
       return;
     }
-    // 双击节点显示上下文菜单（保留原有功能）
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const worldX = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-      const worldY = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-      setContextMenu({ visible: true, x: e.clientX, y: e.clientY, worldX, worldY });
-    }
-  }, [viewPort.x, viewPort.y, viewPort.zoom, handleResetView]);
 
-  const closeContextMenu = useCallback(() => setContextMenu(prev => ({ ...prev, visible: false })), []);
-  
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const worldX = (event.clientX - rect.left - viewPort.x) / viewPort.zoom;
+    const worldY = (event.clientY - rect.top - viewPort.y) / viewPort.zoom;
+    setContextMenu({ visible: true, x: event.clientX, y: event.clientY, worldX, worldY });
+  }, [handleResetView, viewPort.x, viewPort.y, viewPort.zoom]);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  }, []);
+
   const handleAddNodeFromContextMenu = useCallback((type: NodeType) => {
     addNode(type, { x: contextMenu.worldX, y: contextMenu.worldY });
     closeContextMenu();
-  }, [addNode, contextMenu.worldX, contextMenu.worldY, closeContextMenu]);
+  }, [addNode, closeContextMenu, contextMenu.worldX, contextMenu.worldY]);
 
-  // 鼠标按下
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // 使用连线 hook 的处理
-    onCanvasMouseDown(e);
-    
+  const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    onCanvasMouseDown(event);
+
     const rect = containerRef.current?.getBoundingClientRect();
-    const x = e.clientX - (rect?.left || 0);
-    const y = e.clientY - (rect?.top || 0);
+    const x = event.clientX - (rect?.left || 0);
+    const y = event.clientY - (rect?.top || 0);
 
-    // 框选模式
-    if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      // 不清除选中，让用户可以在已有选中基础上添加
+    if (event.button === 0 && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
       setIsSelecting(true);
       setSelectionStart({ x, y });
       setSelectionBox({ x, y, width: 0, height: 0 });
       return;
     }
 
-    // 平移模式：鼠标中键 或 Alt+左键 或 空格+左键
-    if (e.button === 1 || (e.button === 0 && (e.altKey || e.shiftKey)) || (e.button === 0 && isSpacePressed)) {
-      e.preventDefault();
+    if (event.button === 1 || (event.button === 0 && (event.altKey || event.shiftKey)) || (event.button === 0 && isSpacePressed)) {
+      event.preventDefault();
       setIsPanning(true);
-      setPanStart({ x: e.clientX - viewPort.x, y: e.clientY - viewPort.y });
-    } else if (e.button === 0 && e.target === containerRef.current) {
+      setPanStart({ x: event.clientX - viewPort.x, y: event.clientY - viewPort.y });
+    } else if (event.button === 0 && event.target === containerRef.current) {
       clearSelection();
     }
-  }, [viewPort.x, viewPort.y, clearSelection, onCanvasMouseDown]);
+  }, [clearSelection, isSpacePressed, onCanvasMouseDown, viewPort.x, viewPort.y]);
 
-  // 鼠标移动
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    // 使用连线 hook 的处理（更新预览位置）
-    onCanvasMouseMove(e);
-    
+  const handleMouseMove = useCallback((event: React.MouseEvent) => {
+    onCanvasMouseMove(event);
+
     const rect = containerRef.current?.getBoundingClientRect();
-    const x = e.clientX - (rect?.left || 0);
-    const y = e.clientY - (rect?.top || 0);
+    const x = event.clientX - (rect?.left || 0);
+    const y = event.clientY - (rect?.top || 0);
 
     if (isPanning) {
-      updateViewPort({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+      updateViewPort({ x: event.clientX - panStart.x, y: event.clientY - panStart.y });
     } else if (isSelecting) {
       const selX = Math.min(x, selectionStart.x);
       const selY = Math.min(y, selectionStart.y);
@@ -298,9 +292,8 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
       const height = Math.abs(y - selectionStart.y);
       setSelectionBox({ x: selX, y: selY, width, height });
     }
-  }, [isPanning, isSelecting, panStart, selectionStart, updateViewPort, onCanvasMouseMove]);
+  }, [isPanning, isSelecting, onCanvasMouseMove, panStart.x, panStart.y, selectionStart.x, selectionStart.y, updateViewPort]);
 
-  // 鼠标松开
   const handleMouseUp = useCallback(() => {
     if (isSelecting && selectionBox && selectionBox.width > 5 && selectionBox.height > 5) {
       selectNodesInBox(selectionBox);
@@ -308,49 +301,34 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
     setIsPanning(false);
     setIsSelecting(false);
     setSelectionBox(null);
-  }, [isSelecting, selectionBox, selectNodesInBox]);
-  
-  // 拖放
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    
-    const assetData = e.dataTransfer.getData('application/json');
+  }, [isSelecting, selectNodesInBox, selectionBox]);
+
+  const handleDrop = useCallback(async (event: React.DragEvent) => {
+    event.preventDefault();
+
+    const assetData = event.dataTransfer.getData('application/json');
     if (assetData && containerRef.current) {
       try {
         const asset = JSON.parse(assetData);
         const rect = containerRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-        const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
-        
-        // ========== 处理历史记录中的 OSS 文件（直接使用 URL）==========
+        const x = (event.clientX - rect.left - viewPort.x) / viewPort.zoom;
+        const y = (event.clientY - rect.top - viewPort.y) / viewPort.zoom;
+
         if (asset.isHistoryFile && asset.imageUrl) {
-          console.log('[Canvas] 拖放历史文件:', asset.name, 'url:', asset.imageUrl);
-          
-          // 直接创建 ImageNode，使用 OSS URL
           addNode('imageNode', { x, y }, {
             data: {
               imageUrl: asset.imageUrl,
               label: asset.name || 'OSS Image',
-            }
+            },
           });
           return;
         }
-        
-        // ========== 优化：先用资产卡携带的数据立即响应，后台异步获取最新 ==========
-        
-        // 优先使用资产卡携带的 ext2（不阻塞拖拽）
+
         const assetExt2 = asset.ext2 || null;
-        
-        // 解析处理链信息
         const processChain = assetExt2 ? JSON.parse(assetExt2) : [];
-        
-        console.log('[Canvas] 拖放资产:', asset.name, 'ext2:', assetExt2, 'processChain:', processChain);
-        
-        // ========== 检查画布是否已有该资产 ==========
-        const existingNode = nodes.find(n => n.data?.assetId === asset.id);
+        const existingNode = nodes.find((node) => node.data?.assetId === asset.id);
+
         if (existingNode) {
-          console.log('[Canvas] 画布已有该资产:', asset.name, 'existing node:', existingNode.id);
-          // 弹出确认对话框
           setDuplicateAsset({
             x,
             y,
@@ -362,221 +340,193 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
           });
           return;
         }
-        
-        // 如果有生成历史，触发 FlowLinesManager 处理
+
         if (processChain.length > 0) {
-          console.log('[Canvas] 触发流程线渲染, asset:', asset.name);
           setAssetInfo({
             x,
             y,
             id: asset.id,
             name: asset.name,
             ext2: assetExt2,
-            assetData: asset
+            assetData: asset,
           });
         } else {
-          // 立即创建节点（不等待 API）
           addNode('imageNode', { x, y }, {
             data: {
               imageUrl: asset.id?.toString() || '',
               assetId: asset.id,
               label: asset.name || asset.resourceName || 'Asset',
               assetData: asset,
-            }
+            },
           });
-          
-          // ========== 后台异步获取最新数据，获取后更新节点 ==========
+
           if (asset.id) {
-            (async () => {
-              try {
-                const { imageApi } = await import('../../api/image');
-                const latestAsset = await imageApi.getById(asset.id);
-                if (latestAsset?.ext2 && latestAsset.ext2 !== assetExt2) {
-                  console.log('[Canvas] 后台获取到最新 ext2:', latestAsset.ext2);
-                  // 可以选择更新节点或提示用户
-                }
-              } catch (err) {
-                console.error('[Canvas] 后台获取资产最新数据失败:', err);
+            try {
+              const latestAsset = await imageApi.getById(asset.id);
+              if (latestAsset?.ext2 && latestAsset.ext2 !== assetExt2) {
+                console.log('[Canvas] latest asset ext2 updated');
               }
-            })();
+            } catch (error) {
+              console.error('[Canvas] failed to fetch latest asset', error);
+            }
           }
         }
         return;
-      } catch (err) {
-        console.error('解析资产数据失败:', err);
+      } catch (error) {
+        console.error('failed to parse asset data:', error);
       }
     }
-    
-    const nodeType = e.dataTransfer.getData('application/reactflow');
+
+    const nodeType = event.dataTransfer.getData('application/reactflow');
     if (nodeType && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const x = (e.clientX - rect.left - viewPort.x) / viewPort.zoom;
-      const y = (e.clientY - rect.top - viewPort.y) / viewPort.zoom;
+      const x = (event.clientX - rect.left - viewPort.x) / viewPort.zoom;
+      const y = (event.clientY - rect.top - viewPort.y) / viewPort.zoom;
       addNode(nodeType as NodeType, { x, y });
     }
-  }, [addNode, viewPort.x, viewPort.y, viewPort.zoom, nodes]);
+  }, [addNode, nodes, viewPort.x, viewPort.y, viewPort.zoom]);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // 处理重复资产的确认 - 移动画布到原有资产位置
   const handleMoveToExisting = useCallback(() => {
     if (!duplicateAsset) return;
-    
+
     const { existingNodeId } = duplicateAsset;
-    const { nodes, updateViewPort } = useCanvasStore.getState();
-    
-    // 找到原有节点的位置
-    const existingNode = nodes.find(n => n.id === existingNodeId);
+    const { nodes: canvasNodes, updateViewPort: syncViewPort } = useCanvasStore.getState();
+    const existingNode = canvasNodes.find((node) => node.id === existingNodeId);
+
     if (existingNode) {
-      // 计算合适的缩放比例，使节点能完整显示
       const canvasWidth = containerRef.current?.clientWidth || 800;
       const canvasHeight = containerRef.current?.clientHeight || 600;
       const nodeWidth = existingNode.width || 200;
       const nodeHeight = existingNode.height || 120;
-      
-      // 计算缩放比例（留出边距）
       const zoomX = (canvasWidth * 0.8) / nodeWidth;
       const zoomY = (canvasHeight * 0.8) / nodeHeight;
-      const zoom = Math.min(Math.min(zoomX, zoomY), 1.5);  // 最大1.5倍
-      
-      // 计算居中位置
+      const zoom = Math.min(Math.min(zoomX, zoomY), 1.5);
       const x = -existingNode.position.x * zoom + canvasWidth / 2 - (nodeWidth * zoom) / 2;
       const y = -existingNode.position.y * zoom + canvasHeight / 2 - (nodeHeight * zoom) / 2;
-      updateViewPort({ x, y, zoom });
-      
-      // 选中该节点
-      useCanvasStore.getState().selectNode(existingNodeId);
-    }
-    
-    console.log('[Canvas] 已移动画布到原有资产位置');
-    setDuplicateAsset(null);
-  }, [duplicateAsset]);
 
-  // 处理重复资产的确认 - 删除原有节点并重新创建
+      syncViewPort({ x, y, zoom });
+      useCanvasStore.getState().selectNode(existingNodeId);
+      showZoomTip(zoom);
+    }
+
+    setDuplicateAsset(null);
+  }, [duplicateAsset, showZoomTip]);
+
   const handleCreateNew = useCallback(() => {
     if (!duplicateAsset) return;
-    
+
     const { x, y, id, name, ext2, assetData, existingNodeId } = duplicateAsset;
-    const { nodes, deleteNode } = useCanvasStore.getState();
+    const { nodes: canvasNodes, deleteNode } = useCanvasStore.getState();
     const processChain = ext2 ? JSON.parse(ext2) : [];
-    
-    // 收集需要删除的节点ID（包括原有节点和其流程下的所有子节点）
     const nodesToDelete = new Set<string>([existingNodeId]);
-    
+
     if (processChain.length > 0) {
-      // 找出流程下的所有子节点（根据 assetId 匹配）
       processChain.forEach((item: { targetId: number }) => {
-        const childNode = nodes.find(n => n.data?.assetId === item.targetId);
+        const childNode = canvasNodes.find((node) => node.data?.assetId === item.targetId);
         if (childNode) {
           nodesToDelete.add(childNode.id);
         }
       });
     }
-    
-    // 删除所有相关节点
-    nodesToDelete.forEach(nodeId => deleteNode(nodeId));
-    
-    console.log('[Canvas] 已删除节点:', Array.from(nodesToDelete));
-    
-    // 然后创建新节点
+
+    nodesToDelete.forEach((nodeId) => deleteNode(nodeId));
+
     if (processChain.length > 0) {
-      // 触发流程线渲染
       setAssetInfo({ x, y, id, name, ext2, assetData });
     } else {
-      // 立即创建节点
       addNode('imageNode', { x, y }, {
         data: {
           imageUrl: id?.toString() || '',
           assetId: id,
           label: name || assetData?.resourceName || 'Asset',
-          assetData: assetData,
-        }
+          assetData,
+        },
       });
     }
-    
-    console.log('[Canvas] 已删除原有节点及其流程并在新位置创建');
-    setDuplicateAsset(null);
-  }, [duplicateAsset, addNode]);
 
-  // 取消重复资产确认
+    setDuplicateAsset(null);
+  }, [addNode, duplicateAsset]);
+
   const handleCancelDuplicate = useCallback(() => {
     setDuplicateAsset(null);
   }, []);
 
-  // 键盘事件
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 空格键按下 - 用于平移画布
-      if (e.key === ' ' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
-        e.preventDefault();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === ' ' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        event.preventDefault();
         setIsSpacePressed(true);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c') { e.preventDefault(); copyNodes(); }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') { e.preventDefault(); pasteNodes(); }
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedNodeIds.length > 0 && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
-          deleteSelectedNodes();
-        }
+      if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        undo();
       }
-      if (e.key === 'Escape') {
+      if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+        event.preventDefault();
+        redo();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+        event.preventDefault();
+        copyNodes();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+        event.preventDefault();
+        pasteNodes();
+      }
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNodeIds.length > 0 && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        deleteSelectedNodes();
+      }
+      if (event.key === 'Escape') {
         clearSelection();
-        onCanvasClick(); // 取消连线
+        onCanvasClick();
       }
     };
-    
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === ' ') {
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === ' ') {
         setIsSpacePressed(false);
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedNodeIds, deleteSelectedNodes, undo, redo, clearSelection, copyNodes, pasteNodes, onCanvasClick]);
+  }, [clearSelection, copyNodes, deleteSelectedNodes, onCanvasClick, pasteNodes, redo, selectedNodeIds.length, undo]);
 
   useEffect(() => {
-    if (contextMenu.visible) {
-      const handleClick = () => closeContextMenu();
-      window.addEventListener('click', handleClick);
-      return () => window.removeEventListener('click', handleClick);
-    }
-  }, [contextMenu.visible, closeContextMenu]);
+    if (!contextMenu.visible) return;
+
+    const handleClick = () => closeContextMenu();
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [closeContextMenu, contextMenu.visible]);
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 重复资产确认对话框 */}
+    <div className="flex h-full flex-col">
       {duplicateAsset && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-gray-800 rounded-lg p-4 shadow-xl border border-gray-700">
-            <p className="text-white text-sm mb-3">
-              资产 <span className="text-pink-400 font-medium">{duplicateAsset.name}</span> 已在画布中
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] border border-[var(--border-soft)] bg-[var(--surface-2)] p-6 shadow-2xl">
+            <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-tertiary)]">Asset Conflict</p>
+            <h3 className="mt-2 text-lg font-semibold text-[var(--text-primary)]">当前资产已在画布中</h3>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              <span className="font-medium text-primary-300">{duplicateAsset.name}</span> 已存在于当前工作流。你可以直接定位到旧节点，或者删除旧节点后在当前位置重建。
             </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleMoveToExisting}
-                className="px-4 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition-colors"
-              >
-                移动到资产
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button onClick={handleMoveToExisting} className="btn btn-primary">
+                定位到已有节点
               </button>
-              <button
-                onClick={handleCreateNew}
-                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-              >
-                重新创建
+              <button onClick={handleCreateNew} className="btn btn-secondary">
+                删除后重建
               </button>
-              <button
-                onClick={handleCancelDuplicate}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
-              >
+              <button onClick={handleCancelDuplicate} className="btn btn-ghost">
                 取消
               </button>
             </div>
@@ -586,38 +536,42 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
 
       <CanvasToolbar viewPort={viewPort} />
 
-      {/* 操作提示 - 左下角，左侧边栏展开时隐藏 */}
       {!leftPanelOpen && (
         <button
-          onClick={() => setShowHelp(!showHelp)}
-          className="absolute bottom-4 left-4 z-40 w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 shadow-lg border border-gray-700 transition-transform hover:scale-110"
-          title={showHelp ? "隐藏操作提示" : "显示操作提示"}
+          onClick={() => setShowHelp((value) => !value)}
+          className="absolute bottom-5 left-5 z-40 flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[color:rgba(24,32,43,0.92)] text-sm font-semibold text-[var(--text-secondary)] shadow-soft transition hover:border-primary-500/30 hover:text-[var(--text-primary)]"
+          title={showHelp ? '隐藏操作提示' : '显示操作提示'}
         >
           ?
         </button>
       )}
-      
-      {/* 提示内容 - 展开时显示在 ? 按钮右侧，左侧边栏展开时也隐藏 */}
+
       {showHelp && !leftPanelOpen && (
-        <div className="absolute bottom-4 left-14 z-40 bg-gray-900/95 text-gray-300 text-xs px-3 py-2 rounded-lg shadow-lg border border-gray-700">
-          <div className="flex items-center gap-4">
-            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">滚轮</kbd> 缩放</p>
-            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">中键</kbd> / <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">Alt</kbd> 平移</p>
-            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">双击</kbd> 复位</p>
-            <p><kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">Del</kbd> 删除</p>
+        <div className="absolute bottom-5 left-17 z-40 rounded-3xl border border-[var(--border-soft)] bg-[color:rgba(17,22,29,0.96)] px-4 py-3 shadow-soft backdrop-blur-xl">
+          <div className="grid gap-2 text-xs text-[var(--text-secondary)] md:grid-cols-2 xl:grid-cols-4">
+            {helpTips.map((tip) => (
+              <div key={tip.key} className="flex items-center gap-2">
+                <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[var(--text-primary)]">{tip.key}</kbd>
+                <span>{tip.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       <div
         ref={containerRef}
-        className="flex-1 relative overflow-hidden canvas-grid"
-        style={{ 
-          cursor: isPanning ? 'grabbing' 
-            : isSelecting ? 'crosshair' 
-            : connectingSource ? 'crosshair' 
-            : isSpacePressed ? 'grab' 
-            : 'default' 
+        className="canvas-grid relative flex-1 overflow-hidden"
+        style={{
+          cursor: isPanning
+            ? 'grabbing'
+            : isSelecting
+              ? 'crosshair'
+              : connectingSource
+                ? 'crosshair'
+                : isSpacePressed
+                  ? 'grab'
+                  : 'default',
         }}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -630,22 +584,17 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
         onDoubleClick={handleDoubleClick}
       >
         <div
-          className="absolute inset-0 origin-top-left canvas-content"
+          className="canvas-content absolute inset-0 origin-top-left"
           style={{ transform: `translate(${viewPort.x}px, ${viewPort.y}px) scale(${viewPort.zoom})` }}
         >
-          {/* 连线渲染器 */}
           <ConnectionRenderer />
-
-          {/* 流程线（自动检测连线中的资产关系） */}
           <FlowLines />
-
-          {/* 流程线管理 */}
-          <FlowLinesManager assetInfo={assetInfo} onComplete={() => setFlowLineCount(c => c + 1)} />
+          <FlowLinesManager assetInfo={assetInfo} onComplete={() => setFlowLineCount((count) => count + 1)} />
 
           {nodes.map((node) => (
-            <NodeRenderer 
-              key={node.id} 
-              node={node} 
+            <NodeRenderer
+              key={node.id}
+              node={node}
               connectingSource={connectingSource}
               connectingTarget={connectingTarget}
               connectingInputType={connectingInputType}
@@ -656,24 +605,40 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
               onDeleteConnection={onDeleteConnection}
             />
           ))}
-
         </div>
 
         {selectionBox && (
           <div
-            className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none"
-            style={{ left: selectionBox.x, top: selectionBox.y, width: selectionBox.width, height: selectionBox.height }}
+            className="pointer-events-none absolute border-2 border-primary-500 bg-primary-500/10"
+            style={{
+              left: selectionBox.x,
+              top: selectionBox.y,
+              width: selectionBox.width,
+              height: selectionBox.height,
+            }}
           />
         )}
 
         {nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center text-gray-500">
-              <Grid3X3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>{t('canvas.addNode')}</p>
-              <p className="text-xs mt-1">双击或右键点击添加节点</p>
-              <p className="text-xs mt-1">拖拽节点连接点进行连线</p>
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6">
+            <div className="max-w-xl rounded-[32px] border border-[var(--border-soft)] bg-[color:rgba(17,22,29,0.9)] px-8 py-8 text-center shadow-soft backdrop-blur-xl">
+              <Grid3X3 className="mx-auto h-12 w-12 text-[var(--text-tertiary)]" />
+              <h3 className="mt-4 text-xl font-semibold text-[var(--text-primary)]">{t('canvas.addNode')}</h3>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+                从左侧资产库或脚本面板拖入内容，或者在空白处右键添加节点，开始组织你的生成链路。
+              </p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs text-[var(--text-tertiary)]">
+                <span className="rounded-full border border-[var(--border-soft)] px-3 py-1">右键添加节点</span>
+                <span className="rounded-full border border-[var(--border-soft)] px-3 py-1">拖拽建立流程</span>
+                <span className="rounded-full border border-[var(--border-soft)] px-3 py-1">双击复位视图</span>
+              </div>
             </div>
+          </div>
+        )}
+
+        {zoomTip && (
+          <div className="pointer-events-none absolute top-5 right-5 rounded-2xl border border-primary-500/20 bg-[color:rgba(17,22,29,0.94)] px-3 py-2 text-sm font-medium text-primary-300 shadow-soft">
+            {zoomTip}
           </div>
         )}
 
@@ -687,31 +652,30 @@ export default function Canvas({ leftPanelOpen = false }: CanvasProps) {
           onClose={closeContextMenu}
         />
 
-        {/* Zoom Controls - Bottom Right */}
-        <div className="absolute bottom-3 right-3 flex items-center gap-1">
+        <div className="absolute bottom-5 right-5 flex items-center gap-1 rounded-2xl border border-[var(--border-soft)] bg-[color:rgba(17,22,29,0.92)] p-1 shadow-soft">
           <button
             onClick={handleZoomOut}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition hover:bg-white/8 hover:text-[var(--text-primary)]"
             title="缩小"
           >
-            <ZoomOut className="w-4 h-4" />
+            <ZoomOut className="h-4 w-4" />
           </button>
-          <span className="px-2 py-1 bg-gray-800/80 rounded text-xs text-gray-400 min-w-[50px] text-center">
+          <span className="min-w-[56px] px-2 py-1 text-center text-sm font-medium text-[var(--text-primary)]">
             {Math.round(viewPort.zoom * 100)}%
           </span>
           <button
             onClick={handleZoomIn}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition hover:bg-white/8 hover:text-[var(--text-primary)]"
             title="放大"
           >
-            <ZoomIn className="w-4 h-4" />
+            <ZoomIn className="h-4 w-4" />
           </button>
           <button
             onClick={handleFitView}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 ml-1"
+            className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-xl text-[var(--text-secondary)] transition hover:bg-white/8 hover:text-[var(--text-primary)]"
             title="适应视图"
           >
-            <Maximize2 className="w-4 h-4" />
+            <Maximize2 className="h-4 w-4" />
           </button>
         </div>
       </div>

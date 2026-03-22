@@ -4,6 +4,7 @@
 import { useRef, useCallback } from 'react';
 import { uploadToOSS } from '@/api/oss';
 import { projectApi } from '@/api/project';
+import { useProjectStore } from '@/stores/projectStore';
 
 interface UseImageUploadOptions {
   nodeId: string;
@@ -17,9 +18,8 @@ interface UseImageUploadOptions {
 export function useImageUpload({ nodeId, data, updateData, onImageLoaded }: UseImageUploadOptions) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getProjectId = (): number => {
-    const projectStorage = localStorage.getItem('project-storage');
-    return projectStorage ? JSON.parse(projectStorage).state?.currentProjectId : 1;
+  const getProjectId = (): number | null => {
+    return useProjectStore.getState().currentProjectId ?? null;
   };
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,6 +27,10 @@ export function useImageUpload({ nodeId, data, updateData, onImageLoaded }: UseI
     if (!file) return;
 
     const projectId = getProjectId();
+    if (!projectId) {
+      console.error('[useImageUpload] no project selected');
+      return;
+    }
 
     try {
       console.log('[useImageUpload] 开始上传, projectId:', projectId);

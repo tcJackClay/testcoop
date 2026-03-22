@@ -1,6 +1,5 @@
-import { useMemo, useEffect, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Trash2, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Home } from 'lucide-react';
+import { useMemo, useEffect } from 'react';
+import { Trash2, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Home, Sparkles } from 'lucide-react';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { useAssetStore } from '../../stores';
 
@@ -8,12 +7,10 @@ interface CanvasToolbarProps {
   viewPort: { x: number; y: number; zoom: number };
 }
 
-// Extract variant display name by removing the parent asset name prefix
-// e.g., "九转印行 - 夜晚闭店状态" -> "夜晚闭店状态"
 const getVariantDisplayName = (variantName: string, parentName: string): string => {
   if (!variantName || !parentName) return variantName || '';
-  
-  const separators = [' - ', ' — ', ' - ', ' _ ', '：', ':'];
+
+  const separators = [' - ', ' — ', ' _ ', '：', ':'];
   for (const sep of separators) {
     const fullPattern = `${parentName}${sep}`;
     if (variantName.startsWith(fullPattern)) {
@@ -23,30 +20,28 @@ const getVariantDisplayName = (variantName: string, parentName: string): string 
   return variantName;
 };
 
+const iconButtonClass =
+  'inline-flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-[var(--text-secondary)] transition hover:border-[var(--border-soft)] hover:bg-white/8 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:text-[var(--text-tertiary)]';
+
 export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
-  const { t } = useTranslation();
   const { undo, redo, undoStack, redoStack, selectedNodeIds, deleteSelectedNodes, addNode, nodes } = useCanvasStore();
-  const { assets, fetchAssets, selectedAssetId } = useAssetStore((state) => ({ 
-    assets: state.assets, 
+  const { assets, fetchAssets, selectedAssetId } = useAssetStore((state) => ({
+    assets: state.assets,
     fetchAssets: state.fetchAssets,
-    selectedAssetId: state.selectedAssetId 
+    selectedAssetId: state.selectedAssetId,
   }));
 
-  // Ensure assets are loaded when toolbar mounts
   useEffect(() => {
     fetchAssets();
   }, [fetchAssets]);
 
-  // Get selected asset from assetStore
   const selectedAsset = useMemo(() => {
     if (!selectedAssetId) return null;
     return assets.find((asset) => asset.id === selectedAssetId) || null;
   }, [selectedAssetId, assets]);
 
-  // Get asset name
   const assetName = selectedAsset?.name || selectedAsset?.resourceName || '';
 
-  // Get variants for this asset (assets with same parent)
   const variants = useMemo(() => {
     if (!assetName) return [];
     return assets.filter((asset) => {
@@ -63,21 +58,19 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
     });
   }, [assetName, assets]);
 
-  // Calculate canvas center position for new node
   const getCanvasCenterPosition = () => {
     if (nodes.length === 0) {
       return { x: 100, y: 100 };
     }
-    const maxX = Math.max(...nodes.map(n => n.position.x + (n.width || 200)));
-    const maxY = Math.max(...nodes.map(n => n.position.y + (n.height || 100)));
+    const maxX = Math.max(...nodes.map((node) => node.position.x + (node.width || 200)));
+    const maxY = Math.max(...nodes.map((node) => node.position.y + (node.height || 100)));
     return { x: maxX + 50, y: maxY };
   };
 
-  // Handle variant button click - create asset node with variant info
   const handleVariantClick = (variant: typeof assets[0]) => {
     const position = getCanvasCenterPosition();
     const variantImageUrl = variant.url || variant.resourceContent || '';
-    
+
     addNode('createAsset', position, {
       data: {
         name: variant.name || variant.resourceName || assetName,
@@ -87,155 +80,157 @@ export default function CanvasToolbar({ viewPort }: CanvasToolbarProps) {
         parentAssetId: selectedAssetId,
       },
     });
-    console.log('Created asset node from variant:', variant.name);
   };
 
+  const updateViewPort = useCanvasStore.getState().updateViewPort;
+
   return (
-    <div className="h-10 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 shrink-0">
-      <div className="flex items-center gap-2">
-        {/* Selected Asset Info */}
-        {selectedAsset ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-300 font-medium">{assetName}</span>
-            {variants.length > 0 && (
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-gray-500">(</span>
-                {variants.map((variant) => (
-                  <button
-                    key={variant.id}
-                    onClick={() => handleVariantClick(variant)}
-                    className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/40 transition-colors"
-                    title={`点击创建资产节点: ${variant.name}`}
-                  >
-                    {getVariantDisplayName(variant.name || variant.resourceName || '', assetName)}
-                  </button>
-                ))}
-                <span className="text-xs text-gray-500">)</span>
-              </div>
+    <div className="border-b border-[var(--border-soft)] bg-[color:rgba(17,22,29,0.82)] px-4 py-3 backdrop-blur-xl">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0 rounded-2xl border border-[var(--border-soft)] bg-white/5 px-4 py-3">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-[var(--text-tertiary)]">
+            <Sparkles size={12} />
+            当前资产
+          </div>
+
+          {selectedAsset ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="truncate text-sm font-semibold text-[var(--text-primary)]">{assetName}</span>
+              {variants.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {variants.map((variant) => (
+                    <button
+                      key={variant.id}
+                      onClick={() => handleVariantClick(variant)}
+                      className="rounded-full border border-primary-500/25 bg-primary-500/10 px-3 py-1 text-xs text-primary-300 transition hover:border-primary-500/40 hover:bg-primary-500/16 hover:text-primary-200"
+                      title={`创建变体节点：${variant.name || variant.resourceName || ''}`}
+                    >
+                      {getVariantDisplayName(variant.name || variant.resourceName || '', assetName)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">未选中资产，可从左侧资产库拖入画布开始编排。</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="flex items-center gap-1 rounded-2xl border border-[var(--border-soft)] bg-white/5 p-1">
+            <button
+              onClick={undo}
+              disabled={undoStack.length === 0}
+              className={iconButtonClass}
+              title="撤销"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={redo}
+              disabled={redoStack.length === 0}
+              className={iconButtonClass}
+              title="重做"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+            {selectedNodeIds.length > 0 && (
+              <button
+                onClick={deleteSelectedNodes}
+                className="inline-flex h-9 items-center gap-1 rounded-xl border border-red-500/20 bg-red-500/10 px-3 text-sm text-red-300 transition hover:border-red-500/35 hover:bg-red-500/16 hover:text-red-200"
+                title="删除选中节点"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>删除</span>
+              </button>
             )}
           </div>
-        ) : (
-          <span className="text-xs text-gray-500">画布</span>
-        )}
-      </div>
 
-      <div className="flex items-center gap-2">
-        <button
-          onClick={undo}
-          disabled={undoStack.length === 0}
-          className={`p-1.5 rounded ${
-            undoStack.length > 0 
-              ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
-              : 'text-gray-600 cursor-not-allowed'
-          }`}
-          title={t('canvas.undo')}
-        >
-          <Undo2 className="w-4 h-4" />
-        </button>
-        <button
-          onClick={redo}
-          disabled={redoStack.length === 0}
-          className={`p-1.5 rounded ${
-            redoStack.length > 0 
-              ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
-              : 'text-gray-600 cursor-not-allowed'
-          }`}
-          title={t('canvas.redo')}
-        >
-          <Redo2 className="w-4 h-4" />
-        </button>
-        {selectedNodeIds.length > 0 && (
-          <button
-            onClick={deleteSelectedNodes}
-            className="p-1.5 text-red-400 hover:text-red-300 rounded hover:bg-red-500/20"
-            title={t('canvas.deleteNode')}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        )}
-        
-        {/* 缩放控制 */}
-        <div className="flex items-center gap-1 ml-2 border-l border-gray-700 pl-2">
-          <button
-            onClick={() => {
-              const rect = document.body.getBoundingClientRect();
-              const centerX = rect.width / 2;
-              const centerY = rect.height / 2;
-              const worldX = (centerX - viewPort.x) / viewPort.zoom;
-              const worldY = (centerY - viewPort.y) / viewPort.zoom;
-              const newZoom = Math.max(viewPort.zoom / 1.2, 0.1);
-              const x = centerX - worldX * newZoom;
-              const y = centerY - worldY * newZoom;
-              useCanvasStore.getState().updateViewPort({ x, y, zoom: newZoom });
-            }}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-            title="缩小"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          
-          <span className="text-xs text-gray-400 min-w-[40px] text-center">
-            {Math.round(viewPort.zoom * 100)}%
-          </span>
-          
-          <button
-            onClick={() => {
-              const rect = document.body.getBoundingClientRect();
-              const centerX = rect.width / 2;
-              const centerY = rect.height / 2;
-              const worldX = (centerX - viewPort.x) / viewPort.zoom;
-              const worldY = (centerY - viewPort.y) / viewPort.zoom;
-              const newZoom = Math.min(viewPort.zoom * 1.2, 3);
-              const x = centerX - worldX * newZoom;
-              const y = centerY - worldY * newZoom;
-              useCanvasStore.getState().updateViewPort({ x, y, zoom: newZoom });
-            }}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-            title="放大"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          
-          <button
-            onClick={() => {
-              const nodes = useCanvasStore.getState().nodes;
-              if (nodes.length === 0) {
-                useCanvasStore.getState().updateViewPort({ x: 0, y: 0, zoom: 1 });
-                return;
-              }
-              const rect = document.body.getBoundingClientRect();
-              const padding = 50;
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-              nodes.forEach(node => {
-                minX = Math.min(minX, node.position.x);
-                minY = Math.min(minY, node.position.y);
-                maxX = Math.max(maxX, node.position.x + (node.width || 200));
-                maxY = Math.max(maxY, node.position.y + (node.height || 120));
-              });
-              const contentWidth = maxX - minX;
-              const contentHeight = maxY - minY;
-              const canvasWidth = rect.width - padding * 2;
-              const canvasHeight = rect.height - padding * 2;
-              const zoom = Math.min(canvasWidth / contentWidth, canvasHeight / contentHeight, 1.5);
-              const centerX = (minX + maxX) / 2;
-              const centerY = (minY + maxY) / 2;
-              const x = rect.width / 2 - centerX * zoom;
-              const y = rect.height / 2 - centerY * zoom;
-              useCanvasStore.getState().updateViewPort({ x, y, zoom });
-            }}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-            title="适应窗口"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
-          
-          <button
-            onClick={() => useCanvasStore.getState().updateViewPort({ x: 0, y: 0, zoom: 1 })}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-            title="回到原点"
-          >
-            <Home className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 rounded-2xl border border-[var(--border-soft)] bg-white/5 p-1">
+            <button
+              onClick={() => {
+                const rect = document.body.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const worldX = (centerX - viewPort.x) / viewPort.zoom;
+                const worldY = (centerY - viewPort.y) / viewPort.zoom;
+                const newZoom = Math.max(viewPort.zoom / 1.2, 0.1);
+                const x = centerX - worldX * newZoom;
+                const y = centerY - worldY * newZoom;
+                updateViewPort({ x, y, zoom: newZoom });
+              }}
+              className={iconButtonClass}
+              title="缩小"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </button>
+
+            <span className="min-w-[58px] px-2 text-center text-sm font-medium text-[var(--text-primary)]">
+              {Math.round(viewPort.zoom * 100)}%
+            </span>
+
+            <button
+              onClick={() => {
+                const rect = document.body.getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const worldX = (centerX - viewPort.x) / viewPort.zoom;
+                const worldY = (centerY - viewPort.y) / viewPort.zoom;
+                const newZoom = Math.min(viewPort.zoom * 1.2, 3);
+                const x = centerX - worldX * newZoom;
+                const y = centerY - worldY * newZoom;
+                updateViewPort({ x, y, zoom: newZoom });
+              }}
+              className={iconButtonClass}
+              title="放大"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </button>
+
+            <button
+              onClick={() => {
+                const nextNodes = useCanvasStore.getState().nodes;
+                if (nextNodes.length === 0) {
+                  updateViewPort({ x: 0, y: 0, zoom: 1 });
+                  return;
+                }
+                const rect = document.body.getBoundingClientRect();
+                const padding = 50;
+                let minX = Infinity;
+                let minY = Infinity;
+                let maxX = -Infinity;
+                let maxY = -Infinity;
+                nextNodes.forEach((node) => {
+                  minX = Math.min(minX, node.position.x);
+                  minY = Math.min(minY, node.position.y);
+                  maxX = Math.max(maxX, node.position.x + (node.width || 200));
+                  maxY = Math.max(maxY, node.position.y + (node.height || 120));
+                });
+                const contentWidth = maxX - minX;
+                const contentHeight = maxY - minY;
+                const canvasWidth = rect.width - padding * 2;
+                const canvasHeight = rect.height - padding * 2;
+                const zoom = Math.min(canvasWidth / contentWidth, canvasHeight / contentHeight, 1.5);
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                const x = rect.width / 2 - centerX * zoom;
+                const y = rect.height / 2 - centerY * zoom;
+                updateViewPort({ x, y, zoom });
+              }}
+              className={iconButtonClass}
+              title="适应视图"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+
+            <button
+              onClick={() => updateViewPort({ x: 0, y: 0, zoom: 1 })}
+              className={iconButtonClass}
+              title="回到原点"
+            >
+              <Home className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

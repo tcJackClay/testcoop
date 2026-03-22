@@ -1,12 +1,5 @@
-/**
- * Project API Service
- * 项目管理 - 项目的增删改查
- *_GUIDE  参考 REQUEST_BODY规范
- */
-
 import { apiClient, ApiResponse } from './client'
 
-// Project types - 符合 API 文档规范
 export interface Project {
   id: number
   userId: number
@@ -24,7 +17,6 @@ export interface Project {
   ext2?: string
 }
 
-// 兼容旧版 name/description 字段的视图模型
 export interface ProjectView {
   id: number
   name: string
@@ -57,129 +49,193 @@ export interface UpdateProjectRequest {
   ext2?: string
 }
 
-// 将后端响应转换为视图模型
-const convertToViewModel = (project: any): ProjectView => {
-  let statusText = '未知';
-  if (project.resourceStatus === '1' || project.resourceStatus === 'active') {
-    statusText = '进行中';
-  } else if (project.resourceStatus === '2' || project.resourceStatus === 'completed') {
-    statusText = '已完成';
-  } else if (project.resourceStatus === '0' || project.resourceStatus === 'archived') {
-    statusText = '已归档';
-  }
-  
+export interface ProjectHistoryRecord {
+  id: number
+  projectId: number
+  userId: number
+  historyStatus: 'generated' | 'saved' | 'deleted' | 'missing' | 'failed'
+  mediaType: 'image' | 'video'
+  objectKey: string
+  fileName?: string
+  fileSize?: number
+  mimeType?: string
+  contentHash?: string
+  sourceTaskId?: string
+  idempotencyKey?: string
+  provider?: string
+  model?: string
+  workflowType?: string
+  promptDigest?: string
+  assetResourceId?: number
+  createdBy?: string
+  updatedBy?: string
+  createdTime?: string
+  updatedTime?: string
+  status?: number
+}
+
+export interface RegisterProjectHistoryRequest {
+  mediaType: 'image' | 'video'
+  objectKey: string
+  fileName?: string
+  fileSize?: number
+  mimeType?: string
+  contentHash?: string
+  sourceTaskId?: string
+  idempotencyKey?: string
+  provider?: string
+  model?: string
+  workflowType?: string
+  promptDigest?: string
+}
+
+const STATUS_TEXT_MAP: Record<string, string> = {
+  '0': '已归档',
+  '1': '进行中',
+  '2': '已完成',
+  active: '进行中',
+  archived: '已归档',
+  completed: '已完成',
+  done: '已完成',
+  history: '已归档',
+  inactive: '已归档',
+  official: '进行中',
+  processing: '进行中',
+  running: '进行中',
+  success: '已完成',
+}
+
+const convertToViewModel = (project: Project): ProjectView => {
+  const statusValue = String(project.resourceStatus ?? '').trim().toLowerCase()
+  const statusText = STATUS_TEXT_MAP[statusValue] || '未知'
+
   return {
     id: project.id,
-    name: project.resourceName || project.name || '',
-    description: project.resourceContent || project.description || '',
+    name: project.resourceName || '',
+    description: project.resourceContent || '',
     status: project.status,
     statusText,
     createTime: project.createTime,
     updateTime: project.updateTime,
-  };
-};
-
-// 历史记录项类型
-export interface HistoryRecord {
-  name: string
-  url: string
-  createdAt: string
-  type: 'image' | 'video'
-  size?: number
+  }
 }
 
+const extractObjectKey = (name?: string, url?: string): string => {
+  if (name && !name.startsWith('http://') && !name.startsWith('https://')) {
+    return name.replace(/^\/+/, '')
+  }
+
+  if (!url) {
+    return ''
+  }
+
+  try {
+    const parsed = new URL(url)
+    return decodeURIComponent(parsed.pathname.replace(/^\/+/, ''))
+  } catch {
+    return url.replace(/^https?:\/\/[^/]+\//, '')
+  }
+}
+
+const fileNameFromObjectKey = (objectKey: string): string =>
+  objectKey.split('/').filter(Boolean).pop() || objectKey
+
 export const projectApi = {
-  /**
-   * 获取所有项目
-   */
   getAll: async (): Promise<ApiResponse<Project[]>> => {
     const response = await apiClient.get('/project/list')
     return response.data
   },
 
-  /**
-   * 根据ID获取项目
-   */
   getById: async (id: number): Promise<ApiResponse<Project>> => {
     const response = await apiClient.get(`/project/${id}`)
     return response.data
   },
 
-  /**
-   * 获取项目历史记录（从 ext2 解析）
-   */
-  getHistory: async (projectId: number): Promise<HistoryRecord[]> => {
-    console.log('[getHistory] 获取历史, projectId:', projectId);
-    const response = await apiClient.get(`/project/${projectId}`)
-    const res = response.data
-    console.log('[getHistory] 响应:', res);
-    
-    if (res.code === 0 && res.data?.ext2) {
-      try {
-        const history = JSON.parse(res.data.ext2)
-        console.log('[getHistory] 解析后:', history);
-        return Array.isArray(history) ? history : []
-      } catch (e) {
-        console.error('[projectApi.getHistory] 解析 ext2 失败:', e)
-        return []
+  getHistory: async (
+    projectId: number,
+    options?: {
+      mediaType?: 'image' | 'video'
+      historyStatus?: string
+      page?: number
+      pageSize?: number
+    }
+  ): Promise<ProjectHistoryRecord[]> => {
+    const response = await apiClient.get<ApiResponse<ProjectHistoryRecord[]>>(
+      `/project/${projectId}/history/list`,
+      {
+        params: {
+          mediaType: options?.mediaType,
+          historyStatus: options?.historyStatus,
+          page: options?.page ?? 1,
+          pageSize: options?.pageSize ?? 100,
+        },
       }
+    )
+
+    const res = response.data
+    if (res.code === 0 && Array.isArray(res.data)) {
+      return res.data
     }
     return []
   },
 
-  /**
-   * 添加历史记录到项目 ext2
-   */
-  addHistoryRecord: async (
-    projectId: number, 
-    record: Omit<HistoryRecord, 'createdAt'>
-  ): Promise<boolean> => {
-    try {
-      console.log('[addHistoryRecord] 开始添加, projectId:', projectId, 'record:', record);
-      
-      // 先获取当前 ext2
-      const response = await apiClient.get(`/project/${projectId}`)
-      const res = response.data
-      console.log('[addHistoryRecord] 获取项目响应:', res);
-      
-      let history: HistoryRecord[] = []
-      if (res.code === 0 && res.data?.ext2) {
-        try {
-          history = JSON.parse(res.data.ext2)
-        } catch (e) {
-          history = []
-        }
-      }
-      console.log('[addHistoryRecord] 当前历史记录:', history);
-      
-      // 添加新记录
-      const newRecord: HistoryRecord = {
-        ...record,
-        createdAt: new Date().toISOString()
-      }
-      history.unshift(newRecord)
-      
-      // 限制最多 100 条
-      if (history.length > 100) {
-        history = history.slice(0, 100)
-      }
-      
-      // 更新 ext2
-      const updateResponse = await apiClient.put(`/project/${projectId}`, {
-        ext2: JSON.stringify(history)
-      })
-      console.log('[addHistoryRecord] 更新响应:', updateResponse.data);
-      
-      return updateResponse.data.code === 0
-    } catch (e) {
-      console.error('[projectApi.addHistoryRecord] 更新失败:', e)
-      return false
+  registerHistory: async (
+    projectId: number,
+    data: RegisterProjectHistoryRequest
+  ): Promise<ProjectHistoryRecord | null> => {
+    const response = await apiClient.post<ApiResponse<ProjectHistoryRecord>>(
+      `/project/${projectId}/history/register`,
+      data
+    )
+
+    const res = response.data
+    if (res.code === 0 && res.data) {
+      return res.data
     }
+    return null
   },
 
-  /**
-   * 创建项目
-   */
+  saveHistoryAsAsset: async (
+    projectId: number,
+    historyId: number
+  ): Promise<boolean> => {
+    const response = await apiClient.post(`/project/${projectId}/history/${historyId}/save-as-asset`)
+    return response.data.code === 0
+  },
+
+  deleteHistory: async (
+    projectId: number,
+    historyId: number
+  ): Promise<boolean> => {
+    const response = await apiClient.delete(`/project/${projectId}/history/${historyId}`)
+    return response.data.code === 0
+  },
+
+  addHistoryRecord: async (
+    projectId: number,
+    record: {
+      name: string
+      url: string
+      type: 'image' | 'video'
+      size?: number
+    }
+  ): Promise<boolean> => {
+    const objectKey = extractObjectKey(record.name, record.url)
+    if (!objectKey) {
+      return false
+    }
+
+    const result = await projectApi.registerHistory(projectId, {
+      mediaType: record.type,
+      objectKey,
+      fileName: fileNameFromObjectKey(objectKey),
+      fileSize: record.size,
+      idempotencyKey: `${record.type}:${objectKey}`,
+    })
+
+    return !!result
+  },
+
   create: async (data: CreateProjectRequest): Promise<ApiResponse<Project>> => {
     const payload = {
       resourceName: data.resourceName,
@@ -194,9 +250,6 @@ export const projectApi = {
     return response.data
   },
 
-  /**
-   * 更新项目
-   */
   update: async (id: number, data: UpdateProjectRequest): Promise<ApiResponse<Project>> => {
     const payload = {
       id,
@@ -212,26 +265,21 @@ export const projectApi = {
     return response.data
   },
 
-  /**
-   * 删除项目
-   */
   delete: async (id: number): Promise<ApiResponse<void>> => {
     const response = await apiClient.delete(`/project/${id}`)
     return response.data
   },
 }
 
-// 导出视图模型的便捷方法
 export const projectViewApi = {
   getAll: async (): Promise<ProjectView[]> => {
     const response = await projectApi.getAll()
-    console.log('[projectViewApi.getAll] response:', response)
     if (response.code === 0 && response.data) {
       return response.data.map(convertToViewModel)
     }
     return []
   },
-  
+
   create: async (name: string, description?: string): Promise<ProjectView | null> => {
     const response = await projectApi.create({
       resourceName: name,
@@ -243,7 +291,7 @@ export const projectViewApi = {
     }
     return null
   },
-  
+
   update: async (id: number, name?: string, description?: string, status?: string): Promise<ProjectView | null> => {
     const response = await projectApi.update(id, {
       id,

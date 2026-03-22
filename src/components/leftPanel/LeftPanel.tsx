@@ -10,37 +10,34 @@ interface LeftPanelProps {
   onClose: () => void;
 }
 
+const shellClassName =
+  'w-[368px] shrink-0 border-r border-[var(--border-soft)] bg-[var(--surface-1)] animate-in slide-in-from-left duration-200';
+
 export default function LeftPanel({ type, onClose }: LeftPanelProps) {
   if (!type) return null;
 
-  const panelClasses = "w-80 border-r border-gray-700 flex flex-col animate-in slide-in-from-left duration-200 ease-out-expo";
+  const content = (() => {
+    switch (type) {
+      case 'history':
+        return <FilesPanel onClose={onClose} />;
+      case 'characters':
+        return <CharactersPanel onClose={onClose} />;
+      case 'script':
+        return <ScriptPanel onClose={onClose} />;
+      case 'assets':
+        return <AssetLibraryPanel onClose={onClose} />;
+      default:
+        return null;
+    }
+  })();
 
-  switch (type) {
-    case 'history':
-      return (
-        <div className={`${panelClasses} bg-dark-surface`}>
-          <FilesPanel onClose={onClose} />
-        </div>
-      );
-    case 'characters':
-      return (
-        <div className={`${panelClasses.replace('border-r', 'border-l')} bg-dark-surface`}>
-          <CharactersPanel onClose={onClose} />
-        </div>
-      );
-    case 'script':
-      return (
-        <div className={`${panelClasses} bg-dark-surface`}>
-          <ScriptPanel onClose={onClose} />
-        </div>
-      );
-    case 'assets':
-      return (
-        <div className={`${panelClasses} bg-dark-surface`}>
-          <AssetLibraryPanel onClose={onClose} />
-        </div>
-      );
-    default:
-      return null;
-  }
+  if (!content) return null;
+
+  return (
+    <aside className={shellClassName}>
+      <div className="h-full bg-[color:rgba(17,22,29,0.92)] backdrop-blur-xl">
+        {content}
+      </div>
+    </aside>
+  );
 }
